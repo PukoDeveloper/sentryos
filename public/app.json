@@ -1,0 +1,6 @@
+[
+    "app/stdlib",
+    "app/example",
+    "app/terminal",
+    "app/task-manager"
+]

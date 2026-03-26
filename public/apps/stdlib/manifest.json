@@ -1,0 +1,20 @@
+{
+    "name": "stdlib",
+    "version": "1.0.0",
+    "description": "SentryOS standard library — reusable utility modules.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "stdlib-math",
+            "name": "Math Utils",
+            "main": "math.js",
+            "type": "Library"
+        },
+        {
+            "id": "stdlib-string",
+            "name": "String Utils",
+            "main": "string.js",
+            "type": "Library"
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+{
+    "name": "Example",
+    "version": "1.0.0",
+    "description": "An example application package for SentryOS.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "example-app",
+            "name": "Example App",
+            "main": "main.js",
+            "type": "Window",
+            "icon": "icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "notification.send"
+            ],
+            "maxInstances": 1
+        }
+    ]
+}
