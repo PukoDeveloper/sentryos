@@ -1,0 +1,72 @@
+Date : 2026-03-27 21:02:47
+Directory : d:\Projects\sentryos\sentryos\src
+Total : 39 files,  4900 codes, 181 comments, 814 blanks, all 5895 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| TypeScript |         38 |      4,254 |        177 |        713 |      5,144 |
+| PostCSS    |          1 |        646 |          4 |        101 |        751 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                            | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                               |         39 |      4,900 |        181 |        814 |      5,895 |
+| . (Files)                                                       |          2 |        659 |          4 |        104 |        767 |
+| api                                                             |         10 |        446 |          4 |         22 |        472 |
+| bootstrap                                                       |          2 |        466 |         17 |         85 |        568 |
+| core                                                            |         24 |      3,077 |        156 |        549 |      3,782 |
+| core (Files)                                                    |         16 |      1,690 |        141 |        325 |      2,156 |
+| core\runtime                                                    |          4 |        521 |          9 |         75 |        605 |
+| core\window                                                     |          4 |        866 |          6 |        149 |      1,021 |
+| ui                                                              |          1 |        252 |          0 |         54 |        306 |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                        | language   | code       | comment    | blank      | total      |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+
+| d:\Projects\sentryos\sentryos\src\api\consoleApi.ts             | TypeScript |         31 |          0 |          2 |         33 |
+| d:\Projects\sentryos\sentryos\src\api\envApi.ts                 | TypeScript |         76 |          1 |          2 |         79 |
+| d:\Projects\sentryos\sentryos\src\api\index.ts                  | TypeScript |         21 |          0 |          3 |         24 |
+| d:\Projects\sentryos\sentryos\src\api\monitorApi.ts             | TypeScript |         52 |          0 |          2 |         54 |
+| d:\Projects\sentryos\sentryos\src\api\notificationApi.ts        | TypeScript |         27 |          0 |          2 |         29 |
+| d:\Projects\sentryos\sentryos\src\api\shellApi.ts               | TypeScript |        131 |          1 |          2 |        134 |
+| d:\Projects\sentryos\sentryos\src\api\storageApi.ts             | TypeScript |         13 |          0 |          2 |         15 |
+| d:\Projects\sentryos\sentryos\src\api\systemApi.ts              | TypeScript |         17 |          2 |          2 |         21 |
+| d:\Projects\sentryos\sentryos\src\api\types.ts                  | TypeScript |         34 |          0 |          3 |         37 |
+| d:\Projects\sentryos\sentryos\src\api\uiApi.ts                  | TypeScript |         44 |          0 |          2 |         46 |
+| d:\Projects\sentryos\sentryos\src\bootstrap\bios.ts             | TypeScript |        235 |          0 |         48 |        283 |
+| d:\Projects\sentryos\sentryos\src\bootstrap\systemBootstrap.ts  | TypeScript |        231 |         17 |         37 |        285 |
+| d:\Projects\sentryos\sentryos\src\core\App.ts                   | TypeScript |          3 |          2 |          0 |          5 |
+| d:\Projects\sentryos\sentryos\src\core\ApplicationCatalog.ts    | TypeScript |        168 |          7 |         25 |        200 |
+| d:\Projects\sentryos\sentryos\src\core\ApplicationLauncher.ts   | TypeScript |        166 |         11 |         29 |        206 |
+| d:\Projects\sentryos\sentryos\src\core\ApplicationManager.ts    | TypeScript |         27 |         10 |          8 |         45 |
+| d:\Projects\sentryos\sentryos\src\core\EnvironmentManager.ts    | TypeScript |         61 |         11 |         24 |         96 |
+| d:\Projects\sentryos\sentryos\src\core\EventBus.ts              | TypeScript |         84 |          2 |         14 |        100 |
+| d:\Projects\sentryos\sentryos\src\core\NotificationManager.ts   | TypeScript |        128 |         11 |         32 |        171 |
+| d:\Projects\sentryos\sentryos\src\core\PermissionsManager.ts    | TypeScript |        101 |          2 |          7 |        110 |
+| d:\Projects\sentryos\sentryos\src\core\Process.ts               | TypeScript |         40 |          7 |          8 |         55 |
+| d:\Projects\sentryos\sentryos\src\core\ProcessManager.ts        | TypeScript |        129 |         28 |         30 |        187 |
+| d:\Projects\sentryos\sentryos\src\core\ScriptRuntime.ts         | TypeScript |         15 |          2 |          0 |         17 |
+| d:\Projects\sentryos\sentryos\src\core\SystemMonitor.ts         | TypeScript |        327 |         21 |         47 |        395 |
+| d:\Projects\sentryos\sentryos\src\core\WindowSystem.ts          | TypeScript |         24 |          2 |          1 |         27 |
+| d:\Projects\sentryos\sentryos\src\core\constants.ts             | TypeScript |         70 |         25 |         24 |        119 |
+| d:\Projects\sentryos\sentryos\src\core\runtime\ScriptRuntime.ts | TypeScript |        439 |          7 |         61 |        507 |
+| d:\Projects\sentryos\sentryos\src\core\runtime\index.ts         | TypeScript |         15 |          1 |          1 |         17 |
+| d:\Projects\sentryos\sentryos\src\core\runtime\quickjsInit.ts   | TypeScript |         10 |          0 |          4 |         14 |
+| d:\Projects\sentryos\sentryos\src\core\runtime\types.ts         | TypeScript |         57 |          1 |          9 |         67 |
+| d:\Projects\sentryos\sentryos\src\core\storage.ts               | TypeScript |        312 |          0 |         65 |        377 |
+| d:\Projects\sentryos\sentryos\src\core\types.ts                 | TypeScript |         35 |          0 |         11 |         46 |
+| d:\Projects\sentryos\sentryos\src\core\window\WindowApi.ts      | TypeScript |         85 |          0 |         19 |        104 |
+| d:\Projects\sentryos\sentryos\src\core\window\WindowManager.ts  | TypeScript |        613 |          4 |        106 |        723 |
+| d:\Projects\sentryos\sentryos\src\core\window\index.ts          | TypeScript |         25 |          1 |          1 |         27 |
+| d:\Projects\sentryos\sentryos\src\core\window\types.ts          | TypeScript |        143 |          1 |         23 |        167 |
+| d:\Projects\sentryos\sentryos\src\main.ts                       | TypeScript |         13 |          0 |          3 |         16 |
+| d:\Projects\sentryos\sentryos\src\style.css                     | PostCSS    |        646 |          4 |        101 |        751 |
+| d:\Projects\sentryos\sentryos\src\ui\DesktopShell.ts            | TypeScript |        252 |          0 |         54 |        306 |
+| Total                                                           |            |      4,900 |        181 |        814 |      5,895 |
++-----------------------------------------------------------------+------------+------------+------------+------------+------------+

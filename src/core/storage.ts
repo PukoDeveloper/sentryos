@@ -1,4 +1,4 @@
-import PermissionsManager from './PermissionsManager';
+import { PermissionsManager } from './PermissionsManager';
 import type { Result } from './types';
 import { STORAGE_TOTAL_CAPACITY, STORAGE_TIER_CAPACITIES, Permissions } from './constants';
 

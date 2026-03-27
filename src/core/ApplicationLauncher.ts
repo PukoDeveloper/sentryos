@@ -1,5 +1,5 @@
-import type PermissionsManager from './PermissionsManager';
-import type EventBus from './EventBus';
+import type { PermissionsManager } from './PermissionsManager';
+import type { EventBus } from './EventBus';
 import type { ApplicationManager, ProcessManager } from './App';
 import type { ScriptRuntime } from './ScriptRuntime';
 import type { WindowManager, ConsoleWindowController, WindowUiEvent } from './WindowSystem';

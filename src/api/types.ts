@@ -1,5 +1,5 @@
-import type PermissionsManager from '../core/PermissionsManager';
-import type EventBus from '../core/EventBus';
+import type { PermissionsManager } from '../core/PermissionsManager';
+import type { EventBus } from '../core/EventBus';
 import type { ApplicationManager, ProcessManager } from '../core/App';
 import type { ScriptRuntime } from '../core/ScriptRuntime';
 import type { WebFileSystemAdapter } from '../core/storage';

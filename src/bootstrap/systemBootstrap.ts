@@ -1,6 +1,6 @@
 import { initializeQuickJS, ScriptRuntime } from '../core/ScriptRuntime';
-import PermissionsManager from '../core/PermissionsManager';
-import EventBus from '../core/EventBus';
+import { PermissionsManager } from '../core/PermissionsManager';
+import { EventBus } from '../core/EventBus';
 import { ApplicationManager, ProcessManager, type Application } from '../core/App';
 import { loadApplicationCatalog, type RegisteredApplication } from '../core/ApplicationCatalog';
 import { WebFileSystemAdapter } from '../core/storage';

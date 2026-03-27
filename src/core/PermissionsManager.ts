@@ -107,4 +107,4 @@ class PermissionsManager {
     }
 }
 
-export default PermissionsManager;
+export { PermissionsManager };

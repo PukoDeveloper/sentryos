@@ -1,5 +1,5 @@
 import type { EventBusResult } from './types';
-import PermissionsManager from './PermissionsManager';
+import { PermissionsManager } from './PermissionsManager';
 import { Permissions } from './constants';
 import type { SystemMonitor } from './SystemMonitor';
 
@@ -97,4 +97,4 @@ class EventBus {
     }
 }
 
-export default EventBus;
+export { EventBus };
