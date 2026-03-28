@@ -1,7 +1,6 @@
 import type { EventBusResult } from './types';
-import { PermissionsManager } from './PermissionsManager';
+import type { Kernel } from './Kernel';
 import { Permissions } from './constants';
-import type { SystemMonitor } from './SystemMonitor';
 
 
 interface ListenerEntry {
@@ -14,18 +13,16 @@ class EventBus {
     private eventListeners: Map<string, ListenerEntry[]>;
     // 依應用程式 ID 索引：appId -> [{event, listener}]
     private appListeners: Map<string, Array<{ event: string; listener: (...args: any[]) => void }>>;
-    private permissions: PermissionsManager;
-    private monitor: SystemMonitor | null = null;
+    private readonly kernel: Kernel;
 
-    constructor(permissions: PermissionsManager) {
+    constructor(kernel: Kernel) {
         this.eventListeners = new Map();
         this.appListeners = new Map();
-        this.permissions = permissions;
+        this.kernel = kernel;
     }
 
-    setMonitor(monitor: SystemMonitor): void {
-        this.monitor = monitor;
-    }
+    private get permissions() { return this.kernel.resolve('permissions'); }
+    private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
     on(appId: string, event: string, listener: (...args: any[]) => void): EventBusResult {
         if (!this.permissions.has(appId, Permissions.eventSubscribe(event))) {

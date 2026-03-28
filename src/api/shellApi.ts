@@ -1,14 +1,22 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { Permissions } from '../core/constants';
 
-export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies): void {
+export function registerShellApi(kernel: Kernel): void {
+  const runtime = kernel.resolve('runtime');
+  const permissions = kernel.resolve('permissions');
+  const processManager = kernel.resolve('processManager');
+  const windowManager = kernel.resolve('windowManager');
+  const environmentManager = kernel.resolve('environmentManager');
+  const launcher = kernel.resolve('applicationLauncher');
+  const catalogApps = kernel.get('catalogApps');
+  const bootStartTime = kernel.get('bootStartTime');
+
   runtime.registerApi('shellApi', ({ pid, process }) => ({
     listProcesses: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.PROCESS_LIST)) {
+      if (!permissions.has(process.processAppId, Permissions.PROCESS_LIST)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const all = deps.processManager.getAllProcesses();
+      const all = processManager.getAllProcesses();
       return {
         success: true,
         data: all.map(p => ({
@@ -22,24 +30,24 @@ export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies):
       };
     },
     killProcess: (targetPid: unknown) => {
-      if (!deps.permissions.has(process.processAppId, Permissions.PROCESS_TERMINATE)) {
+      if (!permissions.has(process.processAppId, Permissions.PROCESS_TERMINATE)) {
         return { success: false, error: 'PermissionDenied' };
       }
       const tPid = Number(targetPid);
       if (!Number.isFinite(tPid)) return { success: false, error: 'InvalidPid' };
-      const target = deps.processManager.get(tPid);
+      const target = processManager.get(tPid);
       if (!target) return { success: false, error: 'NotFound' };
       const reason = target.pid === pid ? 'Self-terminated via shell' : `Killed by PID ${pid} via shell`;
-      setTimeout(() => deps.terminateApplication(target.processAppId, reason), 0);
+      setTimeout(() => launcher.terminateApplication(target.processAppId, reason), 0);
       return { success: true, data: tPid };
     },
     listApps: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.SHELL_LIST_APPS)) {
+      if (!permissions.has(process.processAppId, Permissions.SHELL_LIST_APPS)) {
         return { success: false, error: 'PermissionDenied' };
       }
       return {
         success: true,
-        data: deps.catalogApps.map(a => ({
+        data: catalogApps.map(a => ({
           appId: a.appId,
           name: a.name,
           version: a.version,
@@ -50,24 +58,24 @@ export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies):
       };
     },
     launch: (appDefId: unknown) => {
-      if (!deps.permissions.has(process.processAppId, Permissions.SHELL_LAUNCH)) {
+      if (!permissions.has(process.processAppId, Permissions.SHELL_LAUNCH)) {
         return { success: false, error: 'PermissionDenied' };
       }
       const id = String(appDefId);
-      const app = deps.catalogApps.find(a => a.appId === id || a.name === id);
+      const app = catalogApps.find(a => a.appId === id || a.name === id);
       if (!app) return { success: false, error: 'AppNotFound' };
       if (app.runtimeType === 'Library') return { success: false, error: 'CannotLaunchLibrary' };
       // Fire-and-forget launch (async)
-      deps.launchApplication({ app, type: app.runtimeType });
+      launcher.launchApplication({ app, type: app.runtimeType });
       return { success: true, data: app.name };
     },
     listWindows: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.SHELL_WINDOWS)) {
+      if (!permissions.has(process.processAppId, Permissions.SHELL_WINDOWS)) {
         return { success: false, error: 'PermissionDenied' };
       }
       return {
         success: true,
-        data: deps.windowManager.getOpenWindowSummaries().map(w => ({
+        data: windowManager.getOpenWindowSummaries().map(w => ({
           windowId: w.windowId,
           processAppId: w.processAppId,
           title: w.title,
@@ -76,15 +84,15 @@ export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies):
       };
     },
     sysinfo: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.SHELL_SYSINFO)) {
+      if (!permissions.has(process.processAppId, Permissions.SHELL_SYSINFO)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const allProcs = deps.processManager.getAllProcesses();
+      const allProcs = processManager.getAllProcesses();
       const running = allProcs.filter(p => p.status === 'running').length;
-      const windows = deps.windowManager.getOpenWindowSummaries().length;
-      const libs = deps.environmentManager.getLibraryIds();
-      const cmds = deps.environmentManager.getAllCommands();
-      const uptimeMs = Date.now() - deps.bootStartTime;
+      const windows = windowManager.getOpenWindowSummaries().length;
+      const libs = environmentManager.getLibraryIds();
+      const cmds = environmentManager.getAllCommands();
+      const uptimeMs = Date.now() - bootStartTime;
       const uptimeSec = Math.floor(uptimeMs / 1000);
       const uptimeMin = Math.floor(uptimeSec / 60);
       const uptimeH = Math.floor(uptimeMin / 60);
@@ -100,12 +108,12 @@ export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies):
           windows,
           libraries: libs.length,
           commands: cmds.length,
-          apps: deps.catalogApps.length,
+          apps: catalogApps.length,
         },
       };
     },
     listCommands: () => {
-      const cmds = deps.environmentManager.getAllCommands();
+      const cmds = environmentManager.getAllCommands();
       return {
         success: true,
         data: cmds.map(c => ({
@@ -117,7 +125,7 @@ export function registerShellApi(runtime: ScriptRuntime, deps: ApiDependencies):
       };
     },
     resolveCommand: (name: unknown) => {
-      const cmd = deps.environmentManager.getCommand(String(name));
+      const cmd = environmentManager.getCommand(String(name));
       if (!cmd) return { success: false, error: 'CommandNotFound' };
       return {
         success: true,

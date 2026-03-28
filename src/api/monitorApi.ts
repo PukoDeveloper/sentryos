@@ -1,53 +1,57 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { Permissions } from '../core/constants';
 
-export function registerMonitorApi(runtime: ScriptRuntime, deps: ApiDependencies): void {
+export function registerMonitorApi(kernel: Kernel): void {
+  const runtime = kernel.resolve('runtime');
+  const permissions = kernel.resolve('permissions');
+  const processManager = kernel.resolve('processManager');
+  const systemMonitor = kernel.resolve('systemMonitor');
+
   runtime.registerApi('monitorApi', ({ process }) => ({
     snapshot: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const activeCount = deps.processManager.getAllProcesses().length;
-      return { success: true, data: deps.systemMonitor.getSnapshot(activeCount) };
+      const activeCount = processManager.getAllProcesses().length;
+      return { success: true, data: systemMonitor.getSnapshot(activeCount) };
     },
     eventStats: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      return { success: true, data: deps.systemMonitor.getEventStats() };
+      return { success: true, data: systemMonitor.getEventStats() };
     },
     apiStats: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      return { success: true, data: deps.systemMonitor.getApiStats() };
+      return { success: true, data: systemMonitor.getApiStats() };
     },
     permissionStats: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      return { success: true, data: deps.systemMonitor.getPermissionStats() };
+      return { success: true, data: systemMonitor.getPermissionStats() };
     },
     recentEvents: (limit?: unknown) => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
       const n = typeof limit === 'number' ? limit : 50;
-      return { success: true, data: deps.systemMonitor.getRecentEvents(n) };
+      return { success: true, data: systemMonitor.getRecentEvents(n) };
     },
     recentApiCalls: (limit?: unknown) => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
       const n = typeof limit === 'number' ? limit : 50;
-      return { success: true, data: deps.systemMonitor.getRecentApiCalls(n) };
+      return { success: true, data: systemMonitor.getRecentApiCalls(n) };
     },
     processHistory: () => {
-      if (!deps.permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      return { success: true, data: deps.systemMonitor.getProcessHistory() };
+      return { success: true, data: systemMonitor.getProcessHistory() };
     },
   }), 'all');
 }

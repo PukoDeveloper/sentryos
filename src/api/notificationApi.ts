@@ -1,17 +1,22 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { Permissions } from '../core/constants';
 
-export function registerNotificationApi(runtime: ScriptRuntime, deps: ApiDependencies): void {
+export function registerNotificationApi(kernel: Kernel): void {
+  const runtime = kernel.resolve('runtime');
+  const permissions = kernel.resolve('permissions');
+  const appManager = kernel.resolve('appManager');
+  const processManager = kernel.resolve('processManager');
+  const notificationManager = kernel.resolve('notificationManager');
+
   runtime.registerApi('notificationApi', ({ process }) => ({
     notify: (title: unknown, body?: unknown, type?: unknown, duration?: unknown) => {
-      if (!deps.permissions.has(process.processAppId, Permissions.NOTIFICATION_SEND)) {
+      if (!permissions.has(process.processAppId, Permissions.NOTIFICATION_SEND)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const appDef = deps.appManager.get(
-        deps.processManager.getByProcessAppId(process.processAppId)?.appDefId ?? ''
+      const appDef = appManager.get(
+        processManager.getByProcessAppId(process.processAppId)?.appDefId ?? ''
       );
-      const id = deps.notificationManager.notify({
+      const id = notificationManager.notify({
         title: String(title),
         body: body != null ? String(body) : undefined,
         type: (['info', 'success', 'warning', 'error'].includes(String(type)) ? String(type) : 'info') as any,
@@ -21,7 +26,7 @@ export function registerNotificationApi(runtime: ScriptRuntime, deps: ApiDepende
       return { success: true, data: id };
     },
     dismiss: (id: unknown) => {
-      deps.notificationManager.dismiss(String(id));
+      notificationManager.dismiss(String(id));
       return { success: true };
     },
   }), 'all');

@@ -1,27 +1,30 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { Permissions } from '../core/constants';
 
-export function registerConsoleApi(runtime: ScriptRuntime, deps: ApiDependencies): void {
+export function registerConsoleApi(kernel: Kernel): void {
+  const runtime = kernel.resolve('runtime');
+  const permissions = kernel.resolve('permissions');
+  const launcher = kernel.resolve('applicationLauncher');
+
   runtime.registerApi('consoleApi', ({ process }) => {
-    const controller = deps.consoleControllers.get(process.processAppId);
+    const controller = launcher.getConsoleControllers().get(process.processAppId);
     return {
       writeLine: (text: unknown) => {
-        if (!deps.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
+        if (!permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.appendLine(String(text));
         return true;
       },
       write: (text: unknown) => {
-        if (!deps.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
+        if (!permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.appendText(String(text));
         return true;
       },
       clear: () => {
-        if (!deps.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
+        if (!permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.clear();

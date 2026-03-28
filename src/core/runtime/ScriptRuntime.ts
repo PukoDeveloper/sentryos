@@ -1,10 +1,7 @@
 import { shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { EventBusResult } from '../types';
-import { EventBus } from '../EventBus';
-import { PermissionsManager } from '../PermissionsManager';
-import { ProcessManager } from '../ProcessManager';
+import type { Kernel } from '../Kernel';
 import { DEFAULT_EXECUTION_TIMEOUT_MS, Permissions, Events } from '../constants';
-import type { SystemMonitor } from '../SystemMonitor';
 import { getQuickJSInstance } from './quickjsInit';
 import type {
     ProcessType,
@@ -20,22 +17,12 @@ import type {
 } from './types';
 
 class ScriptRuntime {
-    private readonly processManager: ProcessManager;
-    private readonly eventBus: EventBus;
-    private readonly permissions: PermissionsManager;
+    private readonly kernel: Kernel;
     private readonly processRuntimes: Map<number, RuntimeProcess> = new Map();
     private readonly apiFactories: Map<ApiScope, Map<string, ApiFactory>> = new Map();
-    private monitor: SystemMonitor | null = null;
 
-    constructor(
-        _systemAppId: string,
-        processManager: ProcessManager,
-        eventBus: EventBus,
-        permissions: PermissionsManager
-    ) {
-        this.processManager = processManager;
-        this.eventBus = eventBus;
-        this.permissions = permissions;
+    constructor(kernel: Kernel) {
+        this.kernel = kernel;
         this.apiFactories.set('all', new Map());
         this.apiFactories.set('service', new Map());
         this.apiFactories.set('window', new Map());
@@ -44,9 +31,10 @@ class ScriptRuntime {
         this.registerBuiltinApis();
     }
 
-    setMonitor(monitor: SystemMonitor): void {
-        this.monitor = monitor;
-    }
+    private get processManager() { return this.kernel.resolve('processManager'); }
+    private get eventBus() { return this.kernel.resolve('eventBus'); }
+    private get permissions() { return this.kernel.resolve('permissions'); }
+    private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
     registerApi(name: string, factory: ApiFactory, scope: ApiScope = 'all'): void {
         this.apiFactories.get(scope)!.set(name, factory);

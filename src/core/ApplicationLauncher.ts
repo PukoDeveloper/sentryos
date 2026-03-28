@@ -1,12 +1,7 @@
-import type { PermissionsManager } from './PermissionsManager';
-import type { EventBus } from './EventBus';
-import type { ApplicationManager, ProcessManager } from './App';
-import type { ScriptRuntime } from './ScriptRuntime';
-import type { WindowManager, ConsoleWindowController, WindowUiEvent } from './WindowSystem';
-import type { EnvironmentManager } from './EnvironmentManager';
-import type { SystemMonitor } from './SystemMonitor';
+import type { Kernel } from './Kernel';
 import type { RegisteredApplication } from './ApplicationCatalog';
-import type { bios as BiosType } from '../bootstrap/bios';
+import type { ConsoleWindowController, WindowUiEvent } from './WindowSystem';
+import { bios } from '../bootstrap/bios';
 import { Events, type AppType } from './constants';
 
 export interface LaunchContext {
@@ -14,58 +9,54 @@ export interface LaunchContext {
   type: AppType;
 }
 
-export interface ApplicationLauncherDeps {
-  bios: typeof BiosType;
-  systemAppId: string;
-  permissions: PermissionsManager;
-  eventBus: EventBus;
-  appManager: ApplicationManager;
-  processManager: ProcessManager;
-  runtime: ScriptRuntime;
-  windowManager: WindowManager;
-  environmentManager: EnvironmentManager;
-  systemMonitor: SystemMonitor;
-}
-
 export class ApplicationLauncher {
-  private readonly deps: ApplicationLauncherDeps;
+  private readonly kernel: Kernel;
   private readonly consoleControllers = new Map<string, ConsoleWindowController>();
 
-  constructor(deps: ApplicationLauncherDeps) {
-    this.deps = deps;
+  constructor(kernel: Kernel) {
+    this.kernel = kernel;
   }
+
+  private get systemAppId() { return this.kernel.get('systemAppId'); }
+  private get eventBus() { return this.kernel.resolve('eventBus'); }
+  private get appManager() { return this.kernel.resolve('appManager'); }
+  private get processManager() { return this.kernel.resolve('processManager'); }
+  private get runtime() { return this.kernel.resolve('runtime'); }
+  private get windowManager() { return this.kernel.resolve('windowManager'); }
+  private get environmentManager() { return this.kernel.resolve('environmentManager'); }
+  private get systemMonitor() { return this.kernel.resolve('systemMonitor'); }
 
   getConsoleControllers(): Map<string, ConsoleWindowController> {
     return this.consoleControllers;
   }
 
   terminateApplication(processAppId: string, reason: string): void {
-    const proc = this.deps.processManager.getByProcessAppId(processAppId);
+    const proc = this.processManager.getByProcessAppId(processAppId);
     if (!proc) return;
 
-    const appDef = this.deps.appManager.get(proc.appDefId);
+    const appDef = this.appManager.get(proc.appDefId);
     const appName = appDef?.name ?? proc.appDefId;
 
-    this.deps.bios.log('PROC', 'INFO', `Terminating ${appName} (PID ${proc.pid}): ${reason}`);
-    this.deps.systemMonitor.recordProcessTerminate(proc.pid, proc.appDefId);
+    bios.log('PROC', 'INFO', `Terminating ${appName} (PID ${proc.pid}): ${reason}`);
+    this.systemMonitor.recordProcessTerminate(proc.pid, proc.appDefId);
 
     // Clean up console controller if present
     this.consoleControllers.delete(processAppId);
 
     // Close all windows owned by this process
-    const windowIds = this.deps.windowManager.getWindowsByProcess(processAppId);
+    const windowIds = this.windowManager.getWindowsByProcess(processAppId);
     for (const wid of windowIds) {
-      try { this.deps.windowManager.closeWindow(processAppId, wid); } catch { /* window may already be gone */ }
+      try { this.windowManager.closeWindow(processAppId, wid); } catch { /* window may already be gone */ }
     }
 
     // Destroy QuickJS runtime
-    this.deps.runtime.destroyProcessRuntime(proc.pid);
+    this.runtime.destroyProcessRuntime(proc.pid);
 
     // Terminate process tree
-    this.deps.processManager.terminate(this.deps.systemAppId, proc.pid);
+    this.processManager.terminate(this.systemAppId, proc.pid);
 
     // Emit lifecycle event
-    this.deps.eventBus.emit(this.deps.systemAppId, Events.PROCESS_STOPPED, {
+    this.eventBus.emit(this.systemAppId, Events.PROCESS_STOPPED, {
       pid: proc.pid,
       appDefId: proc.appDefId,
       type: proc.type,
@@ -73,11 +64,11 @@ export class ApplicationLauncher {
   }
 
   focusExistingInstance(appDefId: string): void {
-    const processes = this.deps.processManager.getByApp(appDefId);
+    const processes = this.processManager.getByApp(appDefId);
     for (const proc of processes) {
-      const windowIds = this.deps.windowManager.getWindowsByProcess(proc.processAppId);
+      const windowIds = this.windowManager.getWindowsByProcess(proc.processAppId);
       if (windowIds.length > 0) {
-        this.deps.windowManager.focusWindow(proc.processAppId, windowIds[0]);
+        this.windowManager.focusWindow(proc.processAppId, windowIds[0]);
         return;
       }
     }
@@ -89,36 +80,36 @@ export class ApplicationLauncher {
       return;
     }
 
-    const launch = this.deps.processManager.launch(this.deps.systemAppId, app.appId, { type });
+    const launch = this.processManager.launch(this.systemAppId, app.appId, { type });
     if (!launch.success || typeof launch.data !== 'number') {
       if (launch.error === 'MaxInstancesReached') {
         this.focusExistingInstance(app.appId);
       } else {
-        this.deps.bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error ?? 'UnknownError'}`);
+        bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error ?? 'UnknownError'}`);
       }
       return;
     }
 
     const pid = launch.data;
-    const proc = this.deps.processManager.get(pid);
+    const proc = this.processManager.get(pid);
     if (!proc) {
-      this.deps.bios.log('PROC', 'ERROR', `Process not found after launch: PID ${pid}`);
+      bios.log('PROC', 'ERROR', `Process not found after launch: PID ${pid}`);
       return;
     }
 
-    this.deps.systemMonitor.recordProcessLaunch(proc.pid, proc.appDefId, proc.processAppId, proc.type);
+    this.systemMonitor.recordProcessLaunch(proc.pid, proc.appDefId, proc.processAppId, proc.type);
 
     let source: Response;
     try {
       source = await fetch(app.mainPath);
     } catch (err) {
-      this.deps.bios.log('PROC', 'ERROR', `Failed to fetch main script: ${app.mainPath}`);
+      bios.log('PROC', 'ERROR', `Failed to fetch main script: ${app.mainPath}`);
       this.terminateApplication(proc.processAppId, `Fetch error: ${app.mainPath}`);
       return;
     }
 
     if (!source.ok) {
-      this.deps.bios.log('PROC', 'ERROR', `HTTP ${source.status} fetching ${app.mainPath}`);
+      bios.log('PROC', 'ERROR', `HTTP ${source.status} fetching ${app.mainPath}`);
       this.terminateApplication(proc.processAppId, `HTTP ${source.status}: ${app.mainPath}`);
       return;
     }
@@ -128,18 +119,18 @@ export class ApplicationLauncher {
     // Library type: cache source code, execute init, then clean up process
     if (type === 'Library') {
       const libraryId = app.packageName + '/' + app.name;
-      this.deps.environmentManager.registerLibrary(libraryId, code);
-      this.deps.bios.log('BOOT', 'INFO', `Library registered: ${libraryId}`);
+      this.environmentManager.registerLibrary(libraryId, code);
+      bios.log('BOOT', 'INFO', `Library registered: ${libraryId}`);
 
-      const initResult = this.deps.runtime.execute(pid, code);
+      const initResult = this.runtime.execute(pid, code);
       if (!initResult.success) {
-        this.deps.bios.log('BOOT', 'WARN', `Library init failed: ${libraryId} — ${String(initResult.data ?? initResult.error)}`);
+        bios.log('BOOT', 'WARN', `Library init failed: ${libraryId} — ${String(initResult.data ?? initResult.error)}`);
       }
 
       // Library process served its purpose — release runtime resources
-      this.deps.runtime.destroyProcessRuntime(pid);
-      this.deps.processManager.terminate(this.deps.systemAppId, pid);
-      this.deps.eventBus.emit(this.deps.systemAppId, Events.PROCESS_STARTED, {
+      this.runtime.destroyProcessRuntime(pid);
+      this.processManager.terminate(this.systemAppId, pid);
+      this.eventBus.emit(this.systemAppId, Events.PROCESS_STARTED, {
         pid: proc.pid,
         appDefId: proc.appDefId,
         type: proc.type,
@@ -149,7 +140,7 @@ export class ApplicationLauncher {
 
     // Console type: auto-create console window before running code
     if (type === 'Console') {
-      const controller = this.deps.windowManager.createConsoleWindow(
+      const controller = this.windowManager.createConsoleWindow(
         {
           processAppId: proc.processAppId,
           appDefId: app.appId!,
@@ -159,7 +150,7 @@ export class ApplicationLauncher {
         app.name,
         (line: string) => {
           try {
-            this.deps.runtime.dispatchConsoleInput(proc.processAppId, line);
+            this.runtime.dispatchConsoleInput(proc.processAppId, line);
           } catch {
             // Runtime destroyed — ignore
           }
@@ -168,7 +159,7 @@ export class ApplicationLauncher {
       this.consoleControllers.set(proc.processAppId, controller);
     }
 
-    const executed = this.deps.runtime.execute(pid, code);
+    const executed = this.runtime.execute(pid, code);
     if (!executed.success) {
       const errorDetail = String(executed.data ?? executed.error);
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
@@ -176,7 +167,7 @@ export class ApplicationLauncher {
     }
 
     // Emit lifecycle event
-    this.deps.eventBus.emit(this.deps.systemAppId, Events.PROCESS_STARTED, {
+    this.eventBus.emit(this.systemAppId, Events.PROCESS_STARTED, {
       pid: proc.pid,
       appDefId: proc.appDefId,
       type: proc.type,
@@ -184,9 +175,9 @@ export class ApplicationLauncher {
   }
 
   onWindowUiEvent(event: WindowUiEvent): void {
-    let result: ReturnType<typeof this.deps.runtime.dispatchUiEvent>;
+    let result: ReturnType<typeof this.runtime.dispatchUiEvent>;
     try {
-      result = this.deps.runtime.dispatchUiEvent(event.processAppId, {
+      result = this.runtime.dispatchUiEvent(event.processAppId, {
         eventId: event.eventId,
         windowId: event.windowId,
         processAppId: event.processAppId,

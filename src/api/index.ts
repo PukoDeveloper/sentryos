@@ -1,5 +1,4 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { registerUiApi } from './uiApi';
 import { registerSystemApi } from './systemApi';
 import { registerStorageApi } from './storageApi';
@@ -9,15 +8,15 @@ import { registerShellApi } from './shellApi';
 import { registerNotificationApi } from './notificationApi';
 import { registerMonitorApi } from './monitorApi';
 
-export function registerAllHostApis(runtime: ScriptRuntime, deps: ApiDependencies): void {
-  registerUiApi(runtime, deps);
-  registerSystemApi(runtime, deps);
-  registerStorageApi(runtime, deps);
-  registerEnvApi(runtime, deps);
-  registerConsoleApi(runtime, deps);
-  registerShellApi(runtime, deps);
-  registerNotificationApi(runtime, deps);
-  registerMonitorApi(runtime, deps);
+export function registerAllHostApis(kernel: Kernel): void {
+  registerUiApi(kernel);
+  registerSystemApi(kernel);
+  registerStorageApi(kernel);
+  registerEnvApi(kernel);
+  registerConsoleApi(kernel);
+  registerShellApi(kernel);
+  registerNotificationApi(kernel);
+  registerMonitorApi(kernel);
 }
 
-export { type ApiDependencies, type LaunchContext } from './types';
+export { type Kernel, type LaunchContext } from './types';

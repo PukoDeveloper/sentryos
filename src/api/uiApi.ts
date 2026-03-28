@@ -1,24 +1,29 @@
-import type { ScriptRuntime } from '../core/ScriptRuntime';
-import type { ApiDependencies } from './types';
+import type { Kernel } from '../core/Kernel';
 import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../core/constants';
 
-export function registerUiApi(runtime: ScriptRuntime, deps: ApiDependencies): void {
+export function registerUiApi(kernel: Kernel): void {
+  const runtime = kernel.resolve('runtime');
+  const permissions = kernel.resolve('permissions');
+  const appManager = kernel.resolve('appManager');
+  const windowManager = kernel.resolve('windowManager');
+  const iconMap = kernel.get('iconMap');
+
   runtime.registerApi('ui', ({ process }) => {
-    const app = deps.appManager.get(process.appDefId);
+    const app = appManager.get(process.appDefId);
     if (!app) {
       return {};
     }
     return {
       createWindow: (options: Record<string, unknown>) => {
-        if (!deps.permissions.has(process.processAppId, Permissions.WINDOW_CREATE)) {
+        if (!permissions.has(process.processAppId, Permissions.WINDOW_CREATE)) {
           return { success: false, error: 'PermissionDenied' };
         }
-        const result = deps.windowManager.createWindow(
+        const result = windowManager.createWindow(
           {
             processAppId: process.processAppId,
             appDefId: process.appDefId,
             appName: app.name,
-            icon: deps.iconMap.get(process.appDefId),
+            icon: iconMap.get(process.appDefId),
           },
           {
             title: String(options.title ?? app.name),
@@ -35,7 +40,7 @@ export function registerUiApi(runtime: ScriptRuntime, deps: ApiDependencies): vo
         return result;
       },
       initialize: (windowId: string, tree: unknown[]) =>
-        deps.windowManager.initializeUi(process.processAppId, windowId, (tree ?? []) as any),
+        windowManager.initializeUi(process.processAppId, windowId, (tree ?? []) as any),
       label: (text: string, style?: Record<string, string>, id?: string) => ({ type: 'label', text, style, id }),
       button: (text: string, style?: Record<string, string>, id?: string) => ({ type: 'button', text, style, id }),
       stack: (children: unknown[], style?: Record<string, string>, id?: string) => ({ type: 'stack', children, style, id }),

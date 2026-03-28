@@ -1,6 +1,6 @@
 import type { PermissionResult } from "./types";
 import { ID_PREFIX_SYSTEM, ID_PREFIX_APP_INSTANCE, Permissions } from './constants';
-import type { SystemMonitor } from './SystemMonitor';
+import type { Kernel } from './Kernel';
 
 type Permission = string;
 
@@ -20,14 +20,13 @@ function matchesPermission(granted: Permission, required: Permission): boolean {
 class PermissionsManager {
     private appPermissions: { [appId: string]: Set<string> };
     private inited = false;
-    private monitor: SystemMonitor | null = null;
-    constructor() {
+    private readonly kernel: Kernel;
+    constructor(kernel: Kernel) {
+        this.kernel = kernel;
         this.appPermissions = {};
     }
 
-    setMonitor(monitor: SystemMonitor): void {
-        this.monitor = monitor;
-    }
+    private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
     init(): PermissionResult {
         if (this.inited) return { success: false, error: 'UnknownError' };
         // Load permissions from storage or initialize defaults

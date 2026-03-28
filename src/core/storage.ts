@@ -1,4 +1,4 @@
-import { PermissionsManager } from './PermissionsManager';
+import type { Kernel } from './Kernel';
 import type { Result } from './types';
 import { STORAGE_TOTAL_CAPACITY, STORAGE_TIER_CAPACITIES, Permissions } from './constants';
 
@@ -102,13 +102,13 @@ function isValidKey(key: string): boolean {
 }
 
 class WebFileSystemAdapter implements FileSystemAdapter {
-	private readonly permissions: PermissionsManager;
+	private readonly kernel: Kernel;
 	private readonly totalCapacity: number;
 	private readonly tierCapacities: Record<StorageTier, number>;
 	private readonly storage = new Map<StorageTier, Map<string, StorageEntry>>();
 
-	constructor(permissions: PermissionsManager, options: FileSystemOptions = {}) {
-		this.permissions = permissions;
+	constructor(kernel: Kernel, options: FileSystemOptions = {}) {
+		this.kernel = kernel;
 		this.totalCapacity = options.totalCapacity ?? DEFAULT_TOTAL_CAPACITY;
 		this.tierCapacities = {
 			...DEFAULT_TIER_CAPACITIES,
@@ -119,6 +119,8 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			this.storage.set(tier, new Map());
 		}
 	}
+
+	private get permissions() { return this.kernel.resolve('permissions'); }
 
 	read<TData extends StorageData>(appId: string, tier: StorageTier, key: string): StorageResult<StorageEntry<TData>> {
 		const entry = this.getEntry<TData>(appId, 'read', tier, key);

@@ -11,9 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.VSCodeCounter
 
 # Editor directories and files
 .vscode/*
+
 !.vscode/extensions.json
 .idea
 .DS_Store

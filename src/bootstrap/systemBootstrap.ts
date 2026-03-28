@@ -1,7 +1,9 @@
-import { initializeQuickJS, ScriptRuntime } from '../core/ScriptRuntime';
+import { initializeQuickJS } from '../core/ScriptRuntime';
+import { ScriptRuntime } from '../core/runtime/ScriptRuntime';
 import { PermissionsManager } from '../core/PermissionsManager';
 import { EventBus } from '../core/EventBus';
-import { ApplicationManager, ProcessManager, type Application } from '../core/App';
+import { ApplicationManager, type Application } from '../core/App';
+import { ProcessManager } from '../core/ProcessManager';
 import { loadApplicationCatalog, type RegisteredApplication } from '../core/ApplicationCatalog';
 import { WebFileSystemAdapter } from '../core/storage';
 import { WindowManager } from '../core/WindowSystem';
@@ -10,6 +12,7 @@ import { DesktopShell } from '../ui/DesktopShell';
 import { NotificationManager } from '../core/NotificationManager';
 import { SystemMonitor } from '../core/SystemMonitor';
 import { ApplicationLauncher } from '../core/ApplicationLauncher';
+import { Kernel } from '../core/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from './bios';
 import { Events } from '../core/constants';
@@ -48,16 +51,17 @@ async function bootstrapSystem(): Promise<void> {
   bios.init();
   bufferedLog('BOOT', 'INFO', 'Preparing core services');
 
-  // 1. Initialize core services
-  let coreServices: CoreServices;
+  // 1. Initialize kernel & core services
+  let kernel: Kernel;
   try {
-    coreServices = await initializeCore();
+    kernel = await initializeCore();
   } catch (err) {
     showSystemError('核心服務初始化失敗', err);
     return;
   }
 
-  const { desktopShell, ...services } = coreServices;
+  const desktopShell = kernel.resolve('desktopShell');
+  const appManager = kernel.resolve('appManager');
 
   // 2. Load application catalog
   let catalogApps: RegisteredApplication[];
@@ -74,7 +78,9 @@ async function bootstrapSystem(): Promise<void> {
   }
 
   // 3. Register applications
-  const { applications, iconMap } = registerApplications(services.appManager, catalogApps);
+  const { applications, iconMap } = registerApplications(appManager, catalogApps);
+  kernel.set('catalogApps', catalogApps);
+  kernel.set('iconMap', iconMap);
 
   // 4. Mount desktop shell
   const mounted = desktopShell.mount(applications);
@@ -86,7 +92,7 @@ async function bootstrapSystem(): Promise<void> {
   desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library'));
 
   // Register notification overlay
-  const notifContainer = services.notificationManager.createContainer();
+  const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });
 
   // 5. Create window manager
@@ -96,26 +102,20 @@ async function bootstrapSystem(): Promise<void> {
     return;
   }
 
-  // Create the application launcher (owns terminate/launch lifecycle)
-  const launcher = new ApplicationLauncher({
-    bios,
-    systemAppId: services.systemAppId,
-    permissions: services.permissions,
-    eventBus: services.eventBus,
-    appManager: services.appManager,
-    processManager: services.processManager,
-    runtime: services.runtime,
-    windowManager: null!, // will be set after WindowManager creation
-    environmentManager: services.environmentManager,
-    systemMonitor: services.systemMonitor,
-  });
+  // Create the application launcher (resolves deps from kernel)
+  const launcher = new ApplicationLauncher(kernel);
+  kernel.register('applicationLauncher', launcher);
 
   const windowManager = new WindowManager(windowHost, (event) => {
     launcher.onWindowUiEvent(event);
   });
+  kernel.register('windowManager', windowManager);
 
-  // Patch the launcher's windowManager reference now that it exists
-  (launcher as any).deps.windowManager = windowManager;
+  const systemAppId = kernel.get('systemAppId');
+  const processManager = kernel.resolve('processManager');
+  const runtime = kernel.resolve('runtime');
+  const eventBus = kernel.resolve('eventBus');
+  const systemMonitor = kernel.resolve('systemMonitor');
 
   windowManager.setWindowChangeListener((event) => {
     const summaries = windowManager.getOpenWindowSummaries();
@@ -124,12 +124,12 @@ async function bootstrapSystem(): Promise<void> {
     if (event.type === 'closed') {
       const remainingWindows = windowManager.getWindowsByProcess(event.processAppId);
       if (remainingWindows.length === 0) {
-        const proc = services.processManager.getByProcessAppId(event.processAppId);
+        const proc = processManager.getByProcessAppId(event.processAppId);
         if (proc) {
-          services.systemMonitor.recordProcessTerminate(proc.pid, proc.appDefId);
-          services.runtime.destroyProcessRuntime(proc.pid);
-          services.processManager.terminate(services.systemAppId, proc.pid);
-          services.eventBus.emit(services.systemAppId, Events.PROCESS_STOPPED, {
+          systemMonitor.recordProcessTerminate(proc.pid, proc.appDefId);
+          runtime.destroyProcessRuntime(proc.pid);
+          processManager.terminate(systemAppId, proc.pid);
+          eventBus.emit(systemAppId, Events.PROCESS_STOPPED, {
             pid: proc.pid,
             appDefId: proc.appDefId,
             type: proc.type,
@@ -140,7 +140,7 @@ async function bootstrapSystem(): Promise<void> {
 
     if (event.type === 'resized' && event.bounds) {
       try {
-        services.runtime.dispatchUiEvent(event.processAppId, {
+        runtime.dispatchUiEvent(event.processAppId, {
           eventId: '',
           windowId: event.windowId,
           processAppId: event.processAppId,
@@ -153,25 +153,7 @@ async function bootstrapSystem(): Promise<void> {
   });
 
   // 6. Register all Host APIs via modular registrars
-  registerAllHostApis(services.runtime, {
-    systemAppId: services.systemAppId,
-    permissions: services.permissions,
-    eventBus: services.eventBus,
-    appManager: services.appManager,
-    processManager: services.processManager,
-    runtime: services.runtime,
-    fileSystem: services.fileSystem,
-    windowManager,
-    environmentManager: services.environmentManager,
-    notificationManager: services.notificationManager,
-    systemMonitor: services.systemMonitor,
-    catalogApps,
-    iconMap,
-    bootStartTime: services.bootStartTime,
-    consoleControllers: launcher.getConsoleControllers(),
-    terminateApplication: (processAppId, reason) => launcher.terminateApplication(processAppId, reason),
-    launchApplication: (context) => launcher.launchApplication(context),
-  });
+  registerAllHostApis(kernel);
 
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
@@ -196,66 +178,56 @@ async function bootstrapSystem(): Promise<void> {
   bios.destroyBootTerminal();
 }
 
-interface CoreServices {
-  systemAppId: string;
-  permissions: PermissionsManager;
-  eventBus: EventBus;
-  appManager: ApplicationManager;
-  processManager: ProcessManager;
-  runtime: ScriptRuntime;
-  fileSystem: WebFileSystemAdapter;
-  desktopShell: DesktopShell;
-  environmentManager: EnvironmentManager;
-  notificationManager: NotificationManager;
-  systemMonitor: SystemMonitor;
-  bootStartTime: number;
-}
-
-async function initializeCore(): Promise<CoreServices> {
+async function initializeCore(): Promise<Kernel> {
   await initializeQuickJS();
   bufferedLog('BOOT', 'INFO', 'QuickJS WASM runtime loaded');
 
-  const permissions = new PermissionsManager();
+  const kernel = new Kernel();
+
+  const permissions = new PermissionsManager(kernel);
   const initResult = permissions.init();
   if (!initResult.success || typeof initResult.data !== 'string') {
     throw new Error('PermissionsManager initialization failed');
   }
   bufferedLog('BOOT', 'INFO', 'PermissionsManager initialized');
+  kernel.register('permissions', permissions);
 
   const systemAppId = initResult.data;
-  const eventBus = new EventBus(permissions);
+  kernel.set('systemAppId', systemAppId);
+
+  const eventBus = new EventBus(kernel);
+  kernel.register('eventBus', eventBus);
+
   const appManager = new ApplicationManager();
-  const processManager = new ProcessManager(systemAppId, permissions, appManager, eventBus);
-  const runtime = new ScriptRuntime(systemAppId, processManager, eventBus, permissions);
-  const fileSystem = new WebFileSystemAdapter(permissions);
+  kernel.register('appManager', appManager);
+
+  const processManager = new ProcessManager(kernel);
+  kernel.register('processManager', processManager);
+
+  const runtime = new ScriptRuntime(kernel);
+  kernel.register('runtime', runtime);
+
+  const fileSystem = new WebFileSystemAdapter(kernel);
+  kernel.register('fileSystem', fileSystem);
+
   const environmentManager = new EnvironmentManager();
+  kernel.register('environmentManager', environmentManager);
+
   const notificationManager = new NotificationManager();
+  kernel.register('notificationManager', notificationManager);
+
   const desktopShell = new DesktopShell();
+  kernel.register('desktopShell', desktopShell);
 
   const bootStartTime = Date.now();
-  const systemMonitor = new SystemMonitor(bootStartTime);
+  kernel.set('bootStartTime', bootStartTime);
 
-  // Wire monitor into core modules
-  eventBus.setMonitor(systemMonitor);
-  runtime.setMonitor(systemMonitor);
-  permissions.setMonitor(systemMonitor);
+  const systemMonitor = new SystemMonitor(bootStartTime);
+  kernel.register('systemMonitor', systemMonitor);
 
   bufferedLog('BOOT', 'INFO', 'All core services initialized');
 
-  return {
-    systemAppId,
-    permissions,
-    eventBus,
-    appManager,
-    processManager,
-    runtime,
-    fileSystem,
-    desktopShell,
-    environmentManager,
-    notificationManager,
-    systemMonitor,
-    bootStartTime,
-  };
+  return kernel;
 }
 
 function registerApplications(appManager: ApplicationManager, apps: RegisteredApplication[]): { applications: Application[]; iconMap: Map<string, string> } {

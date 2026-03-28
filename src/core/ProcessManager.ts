@@ -1,8 +1,6 @@
 import type { ProcessResult } from './types';
-import { PermissionsManager } from './PermissionsManager';
-import { EventBus } from './EventBus';
+import type { Kernel } from './Kernel';
 import { Permissions, type AppType } from './constants';
-import { ApplicationManager } from './ApplicationManager';
 import { Process } from './Process';
 
 interface LaunchOptions {
@@ -21,22 +19,16 @@ class ProcessManager {
     private appProcesses: Map<string, Set<number>> = new Map();
     private nextPid = 1;
 
-    private readonly systemAppId: string;
-    private readonly permissions: PermissionsManager;
-    private readonly appManager: ApplicationManager;
-    private readonly eventBus: EventBus;
+    private readonly kernel: Kernel;
 
-    constructor(
-        systemAppId: string,
-        permissions: PermissionsManager,
-        appManager: ApplicationManager,
-        eventBus: EventBus
-    ) {
-        this.systemAppId = systemAppId;
-        this.permissions = permissions;
-        this.appManager = appManager;
-        this.eventBus = eventBus;
+    constructor(kernel: Kernel) {
+        this.kernel = kernel;
     }
+
+    private get systemAppId() { return this.kernel.get('systemAppId'); }
+    private get permissions() { return this.kernel.resolve('permissions'); }
+    private get appManager() { return this.kernel.resolve('appManager'); }
+    private get eventBus() { return this.kernel.resolve('eventBus'); }
 
     /**
      * 啟動一個應用程式的新實例。
