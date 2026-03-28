@@ -1,6 +1,6 @@
-import type { Application } from './App';
-import type { Result } from './types';
-import type { AppType } from './constants';
+import type { Application } from './ApplicationManager';
+import type { Result } from '../kernel/types';
+import type { AppType } from '../kernel/constants';
 
 type ApplicationCatalogError = 'ManifestNotFound' | 'InvalidManifest' | 'LoadFailed';
 

@@ -2,7 +2,7 @@
 // NotificationManager — 全域通知系統
 // ────────────────────────────────────────────────────────────
 
-import { NOTIFICATION_DEFAULT_DURATION_MS, NOTIFICATION_MAX_VISIBLE } from './constants';
+import { NOTIFICATION_DEFAULT_DURATION_MS, NOTIFICATION_MAX_VISIBLE } from '../kernel/constants';
 
 type NotificationType = 'info' | 'success' | 'warning' | 'error';
 

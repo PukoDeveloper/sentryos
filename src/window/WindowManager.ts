@@ -3,7 +3,7 @@ import {
     WINDOW_CASCADE_X_OFFSET, WINDOW_CASCADE_Y_OFFSET, WINDOW_CASCADE_INCREMENT,
     MAXIMIZED_WINDOW_MARGIN, MAXIMIZED_TASKBAR_HEIGHT,
     DEFAULT_CONSOLE_WIDTH, DEFAULT_CONSOLE_HEIGHT,
-} from '../constants';
+} from '../kernel/constants';
 import type {
     WindowBounds,
     WindowDescriptor,

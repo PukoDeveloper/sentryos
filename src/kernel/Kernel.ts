@@ -1,16 +1,17 @@
-import type { PermissionsManager } from './PermissionsManager';
-import type { EventBus } from './EventBus';
-import type { ApplicationManager } from './ApplicationManager';
-import type { ProcessManager } from './ProcessManager';
-import type { ScriptRuntime } from './runtime/ScriptRuntime';
-import type { WebFileSystemAdapter } from './storage';
-import type { WindowManager, ConsoleWindowController } from './window';
-import type { EnvironmentManager } from './EnvironmentManager';
-import type { NotificationManager } from './NotificationManager';
-import type { SystemMonitor } from './SystemMonitor';
-import type { ApplicationLauncher } from './ApplicationLauncher';
+import type { PermissionsManager } from '../permissions/PermissionsManager';
+import type { EventBus } from '../events/EventBus';
+import type { ApplicationManager } from '../application/ApplicationManager';
+import type { ProcessManager } from '../process/ProcessManager';
+import type { ScriptRuntime } from '../runtime/ScriptRuntime';
+import type { WebFileSystemAdapter } from '../storage/FileSystem';
+import type { WindowManager } from '../window/WindowManager';
+import type { ConsoleWindowController } from '../window/types';
+import type { EnvironmentManager } from '../environment/EnvironmentManager';
+import type { NotificationManager } from '../notification/NotificationManager';
+import type { SystemMonitor } from '../monitor/SystemMonitor';
+import type { ApplicationLauncher } from '../application/ApplicationLauncher';
 import type { DesktopShell } from '../ui/DesktopShell';
-import type { RegisteredApplication } from './ApplicationCatalog';
+import type { RegisteredApplication } from '../application/ApplicationCatalog';
 
 export interface ServiceMap {
   permissions: PermissionsManager;

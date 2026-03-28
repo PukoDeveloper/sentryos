@@ -1,5 +1,5 @@
-import type { Kernel } from '../core/Kernel';
-import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../core/constants';
+import type { Kernel } from '../kernel/Kernel';
+import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../kernel/constants';
 
 export function registerUiApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');

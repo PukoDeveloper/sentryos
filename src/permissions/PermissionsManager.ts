@@ -1,6 +1,6 @@
-import type { PermissionResult } from "./types";
-import { ID_PREFIX_SYSTEM, ID_PREFIX_APP_INSTANCE, Permissions } from './constants';
-import type { Kernel } from './Kernel';
+import type { PermissionResult } from "../kernel/types";
+import { ID_PREFIX_SYSTEM, ID_PREFIX_APP_INSTANCE, Permissions } from '../kernel/constants';
+import type { Kernel } from '../kernel/Kernel';
 
 type Permission = string;
 

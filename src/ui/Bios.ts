@@ -1,6 +1,6 @@
 type DangerLevel = 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
 
-import { Z_INDEX_BOOT_TERMINAL, Z_INDEX_ERROR_SCREEN } from '../core/constants';
+import { Z_INDEX_BOOT_TERMINAL, Z_INDEX_ERROR_SCREEN } from '../kernel/constants';
 
 interface ErrorScreenAction {
   label: string;

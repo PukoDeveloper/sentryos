@@ -1,6 +1,6 @@
-import type { EventBusResult } from './types';
-import type { Kernel } from './Kernel';
-import { Permissions } from './constants';
+import type { EventBusResult } from '../kernel/types';
+import type { Kernel } from '../kernel/Kernel';
+import { Permissions } from '../kernel/constants';
 
 
 interface ListenerEntry {

@@ -1,6 +1,6 @@
 import './style.css';
 import { bootstrapSystem } from './bootstrap/systemBootstrap';
-import { bios } from './bootstrap/bios';
+import { bios } from './ui/Bios';
 
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 

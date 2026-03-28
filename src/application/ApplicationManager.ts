@@ -1,4 +1,4 @@
-import { ID_PREFIX_APP_DEF } from './constants';
+import { ID_PREFIX_APP_DEF } from '../kernel/constants';
 
 interface Application {
     name: string;

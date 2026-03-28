@@ -1,8 +1,8 @@
 import { shouldInterruptAfterDeadline } from 'quickjs-emscripten';
-import type { EventBusResult } from '../types';
-import type { Kernel } from '../Kernel';
-import { DEFAULT_EXECUTION_TIMEOUT_MS, Permissions, Events } from '../constants';
-import { getQuickJSInstance } from './quickjsInit';
+import type { EventBusResult } from '../kernel/types';
+import type { Kernel } from '../kernel/Kernel';
+import { DEFAULT_EXECUTION_TIMEOUT_MS, Permissions, Events } from '../kernel/constants';
+import { getQuickJSInstance } from './QuickJsInit';
 import type {
     ProcessType,
     ApiScope,

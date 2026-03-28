@@ -1,5 +1,4 @@
 
-
 type Result<DataT, ErrorT> = {
     success: boolean;
     data?: DataT;

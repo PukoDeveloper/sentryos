@@ -1,5 +1,5 @@
-import type { Kernel } from '../core/Kernel';
-import { Permissions } from '../core/constants';
+import type { Kernel } from '../kernel/Kernel';
+import { Permissions } from '../kernel/constants';
 
 export function registerNotificationApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');

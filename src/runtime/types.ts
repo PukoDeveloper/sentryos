@@ -1,5 +1,5 @@
 // ── ScriptRuntime 型別定義 ──────────────────────────────────
-import type { AppType } from '../constants';
+import type { AppType } from '../kernel/constants';
 
 type ProcessType = AppType;
 type ApiScope = 'all' | 'service' | 'window' | 'console' | 'library';

@@ -1,21 +1,21 @@
-import { initializeQuickJS } from '../core/ScriptRuntime';
-import { ScriptRuntime } from '../core/runtime/ScriptRuntime';
-import { PermissionsManager } from '../core/PermissionsManager';
-import { EventBus } from '../core/EventBus';
-import { ApplicationManager, type Application } from '../core/App';
-import { ProcessManager } from '../core/ProcessManager';
-import { loadApplicationCatalog, type RegisteredApplication } from '../core/ApplicationCatalog';
-import { WebFileSystemAdapter } from '../core/storage';
-import { WindowManager } from '../core/WindowSystem';
-import { EnvironmentManager } from '../core/EnvironmentManager';
+import { initializeQuickJS } from '../runtime/QuickJsInit';
+import { ScriptRuntime } from '../runtime/ScriptRuntime';
+import { PermissionsManager } from '../permissions/PermissionsManager';
+import { EventBus } from '../events/EventBus';
+import { ApplicationManager, type Application } from '../application/ApplicationManager';
+import { ProcessManager } from '../process/ProcessManager';
+import { loadApplicationCatalog, type RegisteredApplication } from '../application/ApplicationCatalog';
+import { WebFileSystemAdapter } from '../storage/FileSystem';
+import { WindowManager } from '../window/WindowManager';
+import { EnvironmentManager } from '../environment/EnvironmentManager';
 import { DesktopShell } from '../ui/DesktopShell';
-import { NotificationManager } from '../core/NotificationManager';
-import { SystemMonitor } from '../core/SystemMonitor';
-import { ApplicationLauncher } from '../core/ApplicationLauncher';
-import { Kernel } from '../core/Kernel';
+import { NotificationManager } from '../notification/NotificationManager';
+import { SystemMonitor } from '../monitor/SystemMonitor';
+import { ApplicationLauncher } from '../application/ApplicationLauncher';
+import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
-import { bios } from './bios';
-import { Events } from '../core/constants';
+import { bios } from '../ui/Bios';
+import { Events } from '../kernel/constants';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];

@@ -1,6 +1,6 @@
-import type { ProcessResult } from './types';
-import type { Kernel } from './Kernel';
-import { Permissions, type AppType } from './constants';
+import type { ProcessResult } from '../kernel/types';
+import type { Kernel } from '../kernel/Kernel';
+import { Permissions, type AppType } from '../kernel/constants';
 import { Process } from './Process';
 
 interface LaunchOptions {

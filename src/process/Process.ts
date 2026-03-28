@@ -1,4 +1,4 @@
-import type { AppType } from './constants';
+import type { AppType } from '../kernel/constants';
 
 // ────────────────────────────────────────────────────────────
 // Process — 單一執行中的應用程式實例

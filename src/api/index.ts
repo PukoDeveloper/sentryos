@@ -1,4 +1,4 @@
-import type { Kernel } from '../core/Kernel';
+import type { Kernel } from '../kernel/Kernel';
 import { registerUiApi } from './uiApi';
 import { registerSystemApi } from './systemApi';
 import { registerStorageApi } from './storageApi';
@@ -18,5 +18,3 @@ export function registerAllHostApis(kernel: Kernel): void {
   registerNotificationApi(kernel);
   registerMonitorApi(kernel);
 }
-
-export { type Kernel, type LaunchContext } from './types';

@@ -1,8 +1,8 @@
-import type { Kernel } from './Kernel';
+import type { Kernel } from '../kernel/Kernel';
 import type { RegisteredApplication } from './ApplicationCatalog';
-import type { ConsoleWindowController, WindowUiEvent } from './WindowSystem';
-import { bios } from '../bootstrap/bios';
-import { Events, type AppType } from './constants';
+import type { ConsoleWindowController, WindowUiEvent } from '../window/types';
+import { bios } from '../ui/Bios';
+import { Events, type AppType } from '../kernel/constants';
 
 export interface LaunchContext {
   app: RegisteredApplication;

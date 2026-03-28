@@ -1,7 +1,7 @@
-import type { Application } from '../core/App';
-import type { RegisteredApplication } from '../core/ApplicationCatalog';
-import { getAppDiv } from '../bootstrap/bios';
-import { CLOCK_UPDATE_INTERVAL_MS } from '../core/constants';
+import type { Application } from '../application/ApplicationManager';
+import type { RegisteredApplication } from '../application/ApplicationCatalog';
+import { getAppDiv } from './Bios';
+import { CLOCK_UPDATE_INTERVAL_MS } from '../kernel/constants';
 
 type DesktopOverlayRegistration = {
   id: string;

@@ -1,6 +1,6 @@
-import type { Kernel } from './Kernel';
-import type { Result } from './types';
-import { STORAGE_TOTAL_CAPACITY, STORAGE_TIER_CAPACITIES, Permissions } from './constants';
+import type { Kernel } from '../kernel/Kernel';
+import type { Result } from '../kernel/types';
+import { STORAGE_TOTAL_CAPACITY, STORAGE_TIER_CAPACITIES, Permissions } from '../kernel/constants';
 
 type StorageTier = 'sys' | 'app' | 'user' | 'cache';
 
