@@ -14,6 +14,7 @@ import type {
     WindowSystemResult,
     WindowUiEvent,
     WindowUiNode,
+    WindowUiNodePatch,
     WindowUiStyle,
     ConsoleWindowController,
 } from './types';
@@ -29,6 +30,7 @@ class WindowManager {
     private readonly windows = new Map<string, WindowDescriptor>();
     private readonly processWindows = new Map<string, Set<string>>();
     private readonly eventBindings = new Map<string, WindowUiEvent>();
+    private readonly windowNodeMaps = new Map<string, Map<string, HTMLElement>>();
     private readonly uiEventHandler: (event: WindowUiEvent) => void;
     private zCounter = Z_INDEX_WINDOW_BASE;
     private windowCounter = 0;
@@ -153,13 +155,192 @@ class WindowManager {
         }
 
         const windowDescriptor = descriptor.data!;
+
+        // Save focus state before re-render
+        const activeEl = document.activeElement;
+        let focusControlId: string | null = null;
+        let focusCursorStart: number | null = null;
+        let focusCursorEnd: number | null = null;
+        if (activeEl && windowDescriptor.content.contains(activeEl)) {
+            const htmlActive = activeEl as HTMLElement;
+            focusControlId = htmlActive.dataset.controlId
+                ?? (htmlActive.closest('[data-control-id]') as HTMLElement | null)?.dataset.controlId
+                ?? null;
+            if (activeEl instanceof HTMLInputElement) {
+                focusCursorStart = activeEl.selectionStart;
+                focusCursorEnd = activeEl.selectionEnd;
+            }
+        }
+
         windowDescriptor.content.replaceChildren();
+        this.pruneBindings(windowId);
+
+        const nodeMap = new Map<string, HTMLElement>();
+        this.windowNodeMaps.set(windowId, nodeMap);
+
         for (const node of tree) {
             const rendered = this.renderNode(windowDescriptor, processAppId, node);
             windowDescriptor.content.appendChild(rendered);
         }
 
+        // Restore focus
+        if (focusControlId) {
+            const target = nodeMap.get(focusControlId);
+            if (target) {
+                if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
+                    target.focus();
+                    if (target instanceof HTMLInputElement && focusCursorStart !== null) {
+                        target.setSelectionRange(focusCursorStart, focusCursorEnd);
+                    }
+                } else {
+                    const inner = target.querySelector('input') as HTMLElement | null;
+                    (inner ?? target).focus();
+                }
+            }
+        }
+
         return { success: true, data: windowId };
+    }
+
+    updateUi(processAppId: string, windowId: string, nodeId: string, patch: WindowUiNodePatch): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const nodeMap = this.windowNodeMaps.get(windowId);
+        if (!nodeMap) {
+            return { success: false, error: 'WindowNotFound' };
+        }
+
+        const element = nodeMap.get(nodeId);
+        if (!element) {
+            return { success: false, error: 'NodeNotFound' };
+        }
+
+        const controlType = element.dataset.controlType;
+
+        if (patch.text !== undefined && (controlType === 'label' || controlType === 'button')) {
+            element.textContent = patch.text;
+        }
+
+        if (patch.value !== undefined) {
+            if (controlType === 'input') {
+                (element as HTMLInputElement).value = String(patch.value);
+            } else if (controlType === 'select') {
+                (element as HTMLSelectElement).value = String(patch.value);
+            } else if (controlType === 'progress') {
+                const fill = element.querySelector('.window-ui-progress-fill') as HTMLElement;
+                if (fill) {
+                    fill.style.width = `${Math.max(0, Math.min(100, Number(patch.value)))}%`;
+                }
+            }
+        }
+
+        if (patch.checked !== undefined && controlType === 'checkbox') {
+            const cb = element.querySelector('input[type="checkbox"]') as HTMLInputElement;
+            if (cb) {
+                cb.checked = patch.checked;
+            }
+        }
+
+        if (patch.label !== undefined && controlType === 'checkbox') {
+            const span = element.querySelector('span');
+            if (span) {
+                span.textContent = patch.label;
+            }
+        }
+
+        if (patch.placeholder !== undefined && controlType === 'input') {
+            (element as HTMLInputElement).placeholder = patch.placeholder;
+        }
+
+        if (patch.color !== undefined && controlType === 'progress') {
+            const fill = element.querySelector('.window-ui-progress-fill') as HTMLElement;
+            if (fill) {
+                fill.style.background = patch.color;
+            }
+        }
+
+        if (patch.src !== undefined && controlType === 'image') {
+            (element as HTMLImageElement).src = patch.src;
+        }
+
+        if (patch.options !== undefined && controlType === 'select') {
+            const select = element as HTMLSelectElement;
+            const currentValue = select.value;
+            select.replaceChildren();
+            for (const opt of patch.options) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                select.appendChild(option);
+            }
+            select.value = currentValue;
+        }
+
+        if (patch.children !== undefined && (controlType === 'panel' || controlType === 'stack' || controlType === 'list')) {
+            this.removeChildrenFromNodeMap(windowId, element);
+            this.pruneChildBindings(windowId, element);
+            element.replaceChildren();
+            for (const child of patch.children) {
+                const rendered = this.renderNode(descriptor.data!, processAppId, child);
+                element.appendChild(rendered);
+            }
+        }
+
+        if (patch.style) {
+            this.applyNodeStyle(element, patch.style);
+        }
+
+        return { success: true, data: nodeId };
+    }
+
+    removeUiNode(processAppId: string, windowId: string, nodeId: string): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const nodeMap = this.windowNodeMaps.get(windowId);
+        if (!nodeMap) {
+            return { success: false, error: 'WindowNotFound' };
+        }
+
+        const element = nodeMap.get(nodeId);
+        if (!element) {
+            return { success: false, error: 'NodeNotFound' };
+        }
+
+        this.removeChildrenFromNodeMap(windowId, element);
+        nodeMap.delete(nodeId);
+        element.remove();
+
+        return { success: true, data: nodeId };
+    }
+
+    appendUiNode(processAppId: string, windowId: string, parentId: string, nodes: WindowUiNode[]): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const nodeMap = this.windowNodeMaps.get(windowId);
+        if (!nodeMap) {
+            return { success: false, error: 'WindowNotFound' };
+        }
+
+        const parent = nodeMap.get(parentId);
+        if (!parent) {
+            return { success: false, error: 'NodeNotFound' };
+        }
+
+        for (const node of nodes) {
+            const rendered = this.renderNode(descriptor.data!, processAppId, node);
+            parent.appendChild(rendered);
+        }
+
+        return { success: true, data: parentId };
     }
 
     closeWindow(processAppId: string, windowId: string): WindowSystemResult<string> {
@@ -175,6 +356,7 @@ class WindowManager {
         this.windows.delete(windowId);
         this.processWindows.get(processAppId)?.delete(windowId);
         this.pruneBindings(windowId);
+        this.windowNodeMaps.delete(windowId);
         if (this.focusedWindowId === windowId) {
             this.focusedWindowId = null;
         }
@@ -402,6 +584,7 @@ class WindowManager {
         if (node.type === 'label') {
             element.classList.add('window-ui-label');
             element.textContent = node.text;
+            this.registerNode(descriptor.id, node.id, element);
             return element;
         }
 
@@ -409,6 +592,7 @@ class WindowManager {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'window-ui-button';
+            button.dataset.controlType = 'button';
             if (node.id) {
                 button.dataset.controlId = node.id;
             }
@@ -432,7 +616,198 @@ class WindowManager {
                 this.uiEventHandler(binding);
             });
 
+            this.registerNode(descriptor.id, node.id, button);
             return button;
+        }
+
+        if (node.type === 'input') {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'window-ui-input';
+            input.dataset.controlType = 'input';
+            if (node.id) {
+                input.dataset.controlId = node.id;
+                input.name = node.id;
+            }
+            if (node.value !== undefined) {
+                input.value = node.value;
+            }
+            if (node.placeholder) {
+                input.placeholder = node.placeholder;
+            }
+            this.applyNodeStyle(input, node.style);
+
+            if (node.id) {
+                const changeEventId = this.allocateEventId();
+                this.eventBindings.set(changeEventId, {
+                    eventId: changeEventId,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: 'change',
+                    controlId: node.id,
+                });
+                input.addEventListener('input', () => {
+                    const binding = this.eventBindings.get(changeEventId);
+                    if (binding) {
+                        this.uiEventHandler({ ...binding, value: input.value });
+                    }
+                });
+
+                const submitEventId = this.allocateEventId();
+                this.eventBindings.set(submitEventId, {
+                    eventId: submitEventId,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: 'submit',
+                    controlId: node.id,
+                });
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const binding = this.eventBindings.get(submitEventId);
+                        if (binding) {
+                            this.uiEventHandler({ ...binding, value: input.value });
+                        }
+                    }
+                });
+            }
+
+            this.registerNode(descriptor.id, node.id, input);
+            return input;
+        }
+
+        if (node.type === 'checkbox') {
+            const wrapper = document.createElement('label');
+            wrapper.className = 'window-ui-checkbox';
+            wrapper.dataset.controlType = 'checkbox';
+            if (node.id) {
+                wrapper.dataset.controlId = node.id;
+            }
+            this.applyNodeStyle(wrapper, node.style);
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            if (node.id) {
+                checkbox.name = node.id;
+            }
+            if (node.checked) {
+                checkbox.checked = true;
+            }
+            wrapper.appendChild(checkbox);
+
+            if (node.label) {
+                const labelSpan = document.createElement('span');
+                labelSpan.textContent = node.label;
+                wrapper.appendChild(labelSpan);
+            }
+
+            if (node.id) {
+                const eventId = this.allocateEventId();
+                this.eventBindings.set(eventId, {
+                    eventId,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: 'change',
+                    controlId: node.id,
+                });
+                checkbox.addEventListener('change', () => {
+                    const binding = this.eventBindings.get(eventId);
+                    if (binding) {
+                        this.uiEventHandler({ ...binding, value: checkbox.checked });
+                    }
+                });
+            }
+
+            this.registerNode(descriptor.id, node.id, wrapper);
+            return wrapper;
+        }
+
+        if (node.type === 'select') {
+            const select = document.createElement('select');
+            select.className = 'window-ui-select';
+            select.dataset.controlType = 'select';
+            if (node.id) {
+                select.dataset.controlId = node.id;
+                select.name = node.id;
+            }
+            this.applyNodeStyle(select, node.style);
+
+            for (const opt of node.options ?? []) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (node.value === opt.value) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+
+            if (node.id) {
+                const eventId = this.allocateEventId();
+                this.eventBindings.set(eventId, {
+                    eventId,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: 'change',
+                    controlId: node.id,
+                });
+                select.addEventListener('change', () => {
+                    const binding = this.eventBindings.get(eventId);
+                    if (binding) {
+                        this.uiEventHandler({ ...binding, value: select.value });
+                    }
+                });
+            }
+
+            this.registerNode(descriptor.id, node.id, select);
+            return select;
+        }
+
+        if (node.type === 'image') {
+            const img = document.createElement('img');
+            img.className = 'window-ui-image';
+            img.dataset.controlType = 'image';
+            if (node.id) {
+                img.dataset.controlId = node.id;
+            }
+            img.src = node.src;
+            if (node.alt) {
+                img.alt = node.alt;
+            }
+            this.applyNodeStyle(img, node.style);
+            this.registerNode(descriptor.id, node.id, img);
+            return img;
+        }
+
+        if (node.type === 'separator') {
+            element.classList.add('window-ui-separator');
+            this.registerNode(descriptor.id, node.id, element);
+            return element;
+        }
+
+        if (node.type === 'progress') {
+            element.classList.add('window-ui-progress');
+            const fill = document.createElement('div');
+            fill.className = 'window-ui-progress-fill';
+            const targetWidth = Math.max(0, Math.min(100, node.value));
+            fill.style.width = '0%';
+            if (node.color) {
+                fill.style.background = node.color;
+            }
+            element.appendChild(fill);
+            requestAnimationFrame(() => {
+                fill.style.width = `${targetWidth}%`;
+            });
+            this.registerNode(descriptor.id, node.id, element);
+            return element;
+        }
+
+        if (node.type === 'list') {
+            element.classList.add('window-ui-list');
+            for (const child of node.children ?? []) {
+                element.appendChild(this.renderNode(descriptor, processAppId, child));
+            }
+            this.registerNode(descriptor.id, node.id, element);
+            return element;
         }
 
         if (node.type === 'panel' || node.type === 'stack') {
@@ -445,9 +820,11 @@ class WindowManager {
             for (const child of node.children ?? []) {
                 element.appendChild(this.renderNode(descriptor, processAppId, child));
             }
+            this.registerNode(descriptor.id, node.id, element);
             return element;
         }
 
+        this.registerNode(descriptor.id, (node as WindowUiNode).id, element);
         return element;
     }
 
@@ -456,39 +833,67 @@ class WindowManager {
             return;
         }
 
-        if (style.className) {
-            element.classList.add(style.className);
+        for (const [key, value] of Object.entries(style)) {
+            if (value === undefined) {
+                continue;
+            }
+            if (key === 'className') {
+                element.classList.add(value);
+                continue;
+            }
+            if (key === 'flexDirection') {
+                element.style.display = 'flex';
+            }
+            (element.style as any)[key] = value;
         }
-        if (style.background) {
-            element.style.background = style.background;
+    }
+
+    // ── Private: Node Map 管理 ─────────────────────────────────
+
+    private registerNode(windowId: string, nodeId: string | undefined, element: HTMLElement): void {
+        if (!nodeId) {
+            return;
         }
-        if (style.color) {
-            element.style.color = style.color;
+        const nodeMap = this.windowNodeMaps.get(windowId);
+        if (nodeMap) {
+            nodeMap.set(nodeId, element);
         }
-        if (style.padding) {
-            element.style.padding = style.padding;
+    }
+
+    private removeChildrenFromNodeMap(windowId: string, parent: HTMLElement): void {
+        const nodeMap = this.windowNodeMaps.get(windowId);
+        if (!nodeMap) {
+            return;
         }
-        if (style.gap) {
-            element.style.gap = style.gap;
+        for (const child of parent.children) {
+            if (child instanceof HTMLElement) {
+                const controlId = child.dataset.controlId;
+                if (controlId) {
+                    nodeMap.delete(controlId);
+                }
+                this.removeChildrenFromNodeMap(windowId, child);
+            }
         }
-        if (style.borderRadius) {
-            element.style.borderRadius = style.borderRadius;
-        }
-        if (style.border) {
-            element.style.border = style.border;
-        }
-        if (style.fontSize) {
-            element.style.fontSize = style.fontSize;
-        }
-        if (style.justifyContent) {
-            element.style.justifyContent = style.justifyContent;
-        }
-        if (style.alignItems) {
-            element.style.alignItems = style.alignItems;
-        }
-        if (style.flexDirection) {
-            element.style.display = 'flex';
-            element.style.flexDirection = style.flexDirection;
+    }
+
+    private pruneChildBindings(windowId: string, parent: HTMLElement): void {
+        const controlIds = new Set<string>();
+        const collectIds = (el: HTMLElement) => {
+            const id = el.dataset.controlId;
+            if (id) {
+                controlIds.add(id);
+            }
+            for (const child of el.children) {
+                if (child instanceof HTMLElement) {
+                    collectIds(child);
+                }
+            }
+        };
+        collectIds(parent);
+        for (const [eventId, binding] of this.eventBindings.entries()) {
+            if (binding.windowId === windowId && binding.controlId && controlIds.has(binding.controlId)) {
+                this.eventBindings.delete(eventId);
+            }
         }
     }
 

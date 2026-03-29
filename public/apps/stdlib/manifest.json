@@ -15,6 +15,12 @@
             "name": "String Utils",
             "main": "string.js",
             "type": "Library"
+        },
+        {
+            "id": "stdlib-ui",
+            "name": "UI Utils",
+            "main": "ui.js",
+            "type": "Library"
         }
     ]
 }

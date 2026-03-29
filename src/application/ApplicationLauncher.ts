@@ -161,7 +161,7 @@ export class ApplicationLauncher {
 
     const executed = this.runtime.execute(pid, code);
     if (!executed.success) {
-      const errorDetail = String(executed.data ?? executed.error);
+      const errorDetail = this.formatError(executed.data ?? executed.error);
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
       return;
     }
@@ -183,14 +183,21 @@ export class ApplicationLauncher {
         processAppId: event.processAppId,
         type: event.type,
         controlId: event.controlId,
+        value: event.value,
       });
     } catch {
       // Runtime was destroyed (e.g. process terminated) — expected, ignore
       return;
     }
     if (!result.success && result.error === 'RuntimeError') {
-      const errorDetail = String(result.data ?? 'Unknown runtime error');
+      const errorDetail = this.formatError(result.data ?? 'Unknown runtime error');
       this.terminateApplication(event.processAppId, `UI event handler crashed: ${errorDetail}`);
     }
+  }
+
+  private formatError(value: unknown): string {
+    if (value === null || value === undefined) return 'Unknown error';
+    if (typeof value === 'string') return value;
+    try { return JSON.stringify(value); } catch { return String(value); }
   }
 }

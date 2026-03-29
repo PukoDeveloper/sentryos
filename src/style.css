@@ -315,11 +315,100 @@ body {
 
 .window-ui-label {
 	line-height: 1.6;
+	white-space: pre-wrap;
 }
 
 .window-ui-button {
 	border: 0;
 	cursor: pointer;
+}
+
+.window-ui-input {
+	padding: 8px 12px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.06);
+	color: inherit;
+	font-family: inherit;
+	font-size: 13px;
+	outline: none;
+	transition: border-color 0.2s ease;
+}
+
+.window-ui-input:focus {
+	border-color: rgba(109, 213, 255, 0.5);
+}
+
+.window-ui-input::placeholder {
+	color: rgba(255, 255, 255, 0.3);
+}
+
+.window-ui-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: 13px;
+}
+
+.window-ui-checkbox input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: #67b8ff;
+	cursor: pointer;
+}
+
+.window-ui-select {
+	padding: 8px 12px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.06);
+	color: inherit;
+	font-family: inherit;
+	font-size: 13px;
+	outline: none;
+	cursor: pointer;
+	transition: border-color 0.2s ease;
+}
+
+.window-ui-select:focus {
+	border-color: rgba(109, 213, 255, 0.5);
+}
+
+.window-ui-select option {
+	background: #0a0e14;
+	color: #d8e8ff;
+}
+
+.window-ui-image {
+	max-width: 100%;
+	display: block;
+}
+
+.window-ui-separator {
+	height: 1px;
+	background: rgba(255, 255, 255, 0.08);
+	margin: 4px 0;
+}
+
+.window-ui-progress {
+	height: 6px;
+	background: rgba(255, 255, 255, 0.06);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.window-ui-progress-fill {
+	height: 100%;
+	background: #67b8ff;
+	border-radius: 3px;
+	transition: width 300ms ease;
+}
+
+.window-ui-list {
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
 }
 
 .desktop-taskbar {

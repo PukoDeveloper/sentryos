@@ -14,7 +14,8 @@
                 "window.create",
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
-                "notification.send"
+                "notification.send",
+                "env.library.load"
             ],
             "maxInstances": 1
         }

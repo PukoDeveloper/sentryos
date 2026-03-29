@@ -19,6 +19,7 @@ class DesktopShell {
   private startSearchList: HTMLDivElement | null = null;
   private allApps: RegisteredApplication[] = [];
   private openedWindows = new Map<string, { windowId: string; title: string; state: string; processAppId: string; icon?: string }>();
+  private lastTaskbarFingerprint = '';
   private launchHandler: ((app: RegisteredApplication) => void) | null = null;
   private taskbarWindowClickHandler: ((windowId: string, processAppId: string) => void) | null = null;
   private clockLabel: HTMLDivElement | null = null;
@@ -130,6 +131,13 @@ class DesktopShell {
   }
 
   syncOpenWindows(windows: Array<{ windowId: string; title: string; state: string; processAppId: string; icon?: string }>): void {
+    // Build a fingerprint to skip redundant re-renders
+    const fingerprint = windows.map(w => w.windowId + ':' + w.state + ':' + w.title).join('|');
+    if (fingerprint === this.lastTaskbarFingerprint) {
+      return;
+    }
+    this.lastTaskbarFingerprint = fingerprint;
+
     this.openedWindows.clear();
     for (const windowInfo of windows) {
       this.openedWindows.set(windowInfo.windowId, windowInfo);

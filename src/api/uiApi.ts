@@ -39,12 +39,40 @@ export function registerUiApi(kernel: Kernel): void {
         );
         return result;
       },
+
+      // ── Tree 操作 ──────────────────────────────────────────
       initialize: (windowId: string, tree: unknown[]) =>
         windowManager.initializeUi(process.processAppId, windowId, (tree ?? []) as any),
-      label: (text: string, style?: Record<string, string>, id?: string) => ({ type: 'label', text, style, id }),
-      button: (text: string, style?: Record<string, string>, id?: string) => ({ type: 'button', text, style, id }),
-      stack: (children: unknown[], style?: Record<string, string>, id?: string) => ({ type: 'stack', children, style, id }),
-      panel: (children: unknown[], style?: Record<string, string>, id?: string) => ({ type: 'panel', children, style, id }),
+      update: (windowId: string, nodeId: string, patch: Record<string, unknown>) =>
+        windowManager.updateUi(process.processAppId, windowId, nodeId, patch as any),
+      remove: (windowId: string, nodeId: string) =>
+        windowManager.removeUiNode(process.processAppId, windowId, nodeId),
+      append: (windowId: string, parentId: string, nodes: unknown[]) =>
+        windowManager.appendUiNode(process.processAppId, windowId, parentId, (nodes ?? []) as any),
+
+      // ── Node 建構器 ────────────────────────────────────────
+      label: (text: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'label', text, style, id }),
+      button: (text: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'button', text, style, id }),
+      stack: (children: unknown[], style?: Record<string, string>, id?: string) =>
+        ({ type: 'stack', children, style, id }),
+      panel: (children: unknown[], style?: Record<string, string>, id?: string) =>
+        ({ type: 'panel', children, style, id }),
+      input: (value?: string, placeholder?: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'input', value, placeholder, style, id }),
+      checkbox: (checked?: boolean, label?: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'checkbox', checked, label, style, id }),
+      select: (options: unknown[], value?: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'select', options, value, style, id }),
+      image: (src: string, alt?: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'image', src, alt, style, id }),
+      separator: (style?: Record<string, string>, id?: string) =>
+        ({ type: 'separator', style, id }),
+      progress: (value: number, color?: string, style?: Record<string, string>, id?: string) =>
+        ({ type: 'progress', value, color, style, id }),
+      list: (children: unknown[], style?: Record<string, string>, id?: string) =>
+        ({ type: 'list', children, style, id }),
     };
   }, 'window');
 }

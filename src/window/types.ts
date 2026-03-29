@@ -4,13 +4,17 @@ type WindowCommand = 'close' | 'maximize' | 'minimize' | 'focus' | 'restore';
 
 type WindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 
-type WindowControlType = 'label' | 'button' | 'stack' | 'panel';
+type WindowControlType =
+    | 'label' | 'button' | 'stack' | 'panel'
+    | 'input' | 'checkbox' | 'select'
+    | 'image' | 'separator' | 'progress' | 'list';
 
-type WindowUiEventType = 'click';
+type WindowUiEventType = 'click' | 'change' | 'submit';
 
 type WindowSystemError =
     | 'PermissionDenied'
     | 'WindowNotFound'
+    | 'NodeNotFound'
     | 'Closed'
     | 'InvalidOperation';
 
@@ -56,9 +60,19 @@ interface WindowUiStyle {
     borderRadius?: string;
     border?: string;
     fontSize?: string;
+    fontWeight?: string;
     justifyContent?: string;
     alignItems?: string;
     flexDirection?: 'row' | 'column';
+    width?: string;
+    height?: string;
+    overflow?: string;
+    textAlign?: string;
+    flex?: string;
+    margin?: string;
+    opacity?: string;
+    cursor?: string;
+    [key: string]: string | undefined;
 }
 
 interface WindowUiNodeBase {
@@ -88,7 +102,62 @@ interface WindowStackNode extends WindowUiNodeBase {
     children?: WindowUiNode[];
 }
 
-type WindowUiNode = WindowLabelNode | WindowButtonNode | WindowPanelNode | WindowStackNode;
+interface WindowInputNode extends WindowUiNodeBase {
+    type: 'input';
+    value?: string;
+    placeholder?: string;
+}
+
+interface WindowCheckboxNode extends WindowUiNodeBase {
+    type: 'checkbox';
+    checked?: boolean;
+    label?: string;
+}
+
+interface WindowSelectNode extends WindowUiNodeBase {
+    type: 'select';
+    options: Array<{ value: string; label: string }>;
+    value?: string;
+}
+
+interface WindowImageNode extends WindowUiNodeBase {
+    type: 'image';
+    src: string;
+    alt?: string;
+}
+
+interface WindowSeparatorNode extends WindowUiNodeBase {
+    type: 'separator';
+}
+
+interface WindowProgressNode extends WindowUiNodeBase {
+    type: 'progress';
+    value: number;
+    color?: string;
+}
+
+interface WindowListNode extends WindowUiNodeBase {
+    type: 'list';
+    children?: WindowUiNode[];
+}
+
+type WindowUiNode =
+    | WindowLabelNode | WindowButtonNode | WindowPanelNode | WindowStackNode
+    | WindowInputNode | WindowCheckboxNode | WindowSelectNode
+    | WindowImageNode | WindowSeparatorNode | WindowProgressNode | WindowListNode;
+
+interface WindowUiNodePatch {
+    text?: string;
+    value?: string | number | boolean;
+    checked?: boolean;
+    style?: WindowUiStyle;
+    options?: Array<{ value: string; label: string }>;
+    children?: WindowUiNode[];
+    src?: string;
+    placeholder?: string;
+    label?: string;
+    color?: string;
+}
 
 interface WindowUiEvent {
     eventId: string;
@@ -96,6 +165,7 @@ interface WindowUiEvent {
     processAppId: string;
     type: WindowUiEventType;
     controlId?: string;
+    value?: unknown;
 }
 
 interface WindowLifecycleEvent {
@@ -144,14 +214,21 @@ interface ConsoleWindowController {
 export type {
     WindowBounds,
     WindowButtonNode,
+    WindowCheckboxNode,
     WindowCommand,
     WindowControlType,
     WindowDescriptor,
+    WindowImageNode,
     WindowInitOptions,
+    WindowInputNode,
     WindowLabelNode,
     WindowLifecycleEvent,
+    WindowListNode,
     WindowPanelNode,
     WindowProcessContext,
+    WindowProgressNode,
+    WindowSelectNode,
+    WindowSeparatorNode,
     WindowStackNode,
     WindowState,
     WindowStyle,
@@ -161,6 +238,7 @@ export type {
     WindowUiEventType,
     WindowUiNode,
     WindowUiNodeBase,
+    WindowUiNodePatch,
     WindowUiStyle,
     ConsoleWindowController,
 };
