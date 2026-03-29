@@ -1,7 +1,20 @@
 // ── SentryOS UI Library (stdlib-ui) ─────────────────────────
 // 提供 patch-based 狀態管理與高階元件建構器，簡化 Window 應用程式開發。
 // 載入方式: envApi.loadLibrary('stdlib/UI Utils')
+//
+// 需要權限: env.library.load, window.create
+// 若權限不足將在 globalThis.UI 上提供錯誤訊息而非正常 API。
 (function () {
+  // ── 前置權限檢查 ──────────────────────────────────────────
+  if (typeof ui === 'undefined' || typeof ui.createWindow !== 'function') {
+    globalThis.UI = {
+      _error: 'stdlib/UI Utils: ui API not available. Ensure the app has "window.create" permission and is of type "Window".',
+      createApp: function () {
+        throw new Error(globalThis.UI._error);
+      },
+    };
+    return;
+  }
   var handlers = {};
   var handlerCounter = 0;
 

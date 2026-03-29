@@ -1,4 +1,7 @@
-envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+if (!_loadResult.success) {
+  throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
+}
 
 var app = UI.createApp({
   title: 'Example App',
