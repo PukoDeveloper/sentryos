@@ -273,6 +273,8 @@ Console unknown input
 | `shell.windows` | 列出開啟中視窗 |
 | `shell.sysinfo` | 取得系統資訊 |
 | `storage.usage` | 查詢儲存用量 |
+| `notification.send` | 發送通知 |
+| `monitor.read` | 讀取系統監控數據 |
 | `service.publish-health` | 發送健康狀態 |
 | `window.create` | 建立視窗 |
 | `process.ipc.send-parent` | IPC 傳訊給父程序 |

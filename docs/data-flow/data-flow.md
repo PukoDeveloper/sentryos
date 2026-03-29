@@ -9,7 +9,7 @@
 ```
 StartMenu click
   → DesktopShell.launchHandler(app)
-    → bootstrapSystem.launchApplication(deps, context)
+    → ApplicationLauncher.launchApplication(app)
       → ProcessManager.launch(systemAppId, appDefId, { type })
         → PermissionsManager.new() → processAppId
         → 建立 Process 實例
@@ -44,7 +44,7 @@ launchApplication(deps, { app, type: 'Console' })
 
 ```
 使用者在 Console 輸入框按 Enter
-  → inputHandler(text)                    [WindowSystem.ts]
+  → inputHandler(text)                    [WindowManager.ts]
     → ScriptRuntime.dispatchConsoleInput(processAppId, line)
       → evalCode: 'onConsoleInput("...")'
         → app 內 globalThis.onConsoleInput(line)
@@ -107,7 +107,7 @@ Console 使用者輸入 "factorial 5"（未識別的命令）
   → DOM click event
     → WindowManager eventBinding listener
       → uiEventHandler(WindowUiEvent)
-        → onWindowUiEvent(deps, event)      [systemBootstrap.ts]
+        → onWindowUiEvent(event)              [ApplicationLauncher.ts]
           → ScriptRuntime.dispatchUiEvent(processAppId, event)
             → evalCode: 'onWindowEvent(${JSON.stringify(event)})'
               → app 內 globalThis.onWindowEvent(event)
@@ -127,7 +127,7 @@ Console 使用者輸入 "factorial 5"（未識別的命令）
     → 移除 DOM 節點
     → 清除 eventBindings（pruneBindings）
     → emitWindowChange('closed', descriptor)
-      → windowChangeListener            [systemBootstrap.ts]
+      → windowChangeListener            [ApplicationLauncher.ts]
         ├─ syncOpenWindows()             更新工作列
         └─ 檢查 remainingWindows
            └─ if (remainingWindows === 0)

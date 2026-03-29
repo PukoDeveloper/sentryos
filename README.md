@@ -57,24 +57,51 @@ sentryos/
 ├── src/
 │   ├── main.ts             # 應用程式入口
 │   ├── style.css            # 全域樣式
-│   ├── bootstrap/
-│   │   ├── bios.ts          # 開機日誌 & 錯誤畫面
-│   │   └── systemBootstrap.ts  # 系統初始化與 API 註冊
-│   ├── core/
-│   │   ├── App.ts           # ApplicationManager & ProcessManager
+│   ├── api/                 # Host API 註冊層
+│   │   ├── index.ts         # 集中註冊入口
+│   │   ├── consoleApi.ts    # Console 輸出
+│   │   ├── envApi.ts        # 環境變數 / Library / 命令
+│   │   ├── monitorApi.ts    # 系統監控統計
+│   │   ├── notificationApi.ts # 通知系統
+│   │   ├── shellApi.ts      # 系統指令
+│   │   ├── storageApi.ts    # 儲存查詢
+│   │   ├── systemApi.ts     # 程序終止
+│   │   └── uiApi.ts         # 視窗 & UI tree
+│   ├── application/         # 應用程式管理
 │   │   ├── ApplicationCatalog.ts  # Manifest 載入器
+│   │   ├── ApplicationLauncher.ts # 集中啟動邏輯
+│   │   └── ApplicationManager.ts  # 應用定義登錄簿
+│   ├── bootstrap/
+│   │   └── systemBootstrap.ts  # 系統初始化與 API 註冊
+│   ├── environment/
+│   │   └── EnvironmentManager.ts  # 環境變數、自動啟動、程式庫
+│   ├── events/
+│   │   └── EventBus.ts      # 權限門控事件匯流排
+│   ├── kernel/              # 核心抽象
+│   │   ├── Kernel.ts        # 服務定位容器
 │   │   ├── constants.ts     # 權限字串、事件名稱、預設值
-│   │   ├── EnvironmentManager.ts  # 環境變數、自動啟動、程式庫
-│   │   ├── EventBus.ts      # 權限門控事件匯流排
-│   │   ├── NotificationManager.ts # 全域通知系統
-│   │   ├── PermissionsManager.ts  # 萬用字元權限管理
-│   │   ├── ScriptRuntime.ts  # QuickJS 沙箱執行引擎
-│   │   ├── storage.ts       # 虛擬檔案系統
-│   │   ├── SystemMonitor.ts  # 系統監控追蹤器
-│   │   ├── types.ts         # 共用型別定義
-│   │   └── WindowSystem.ts  # 視窗建立、拖曳、狀態管理
-│   └── ui/
-│       └── DesktopShell.ts  # 工作列、開始選單、覆蓋層
+│   │   └── types.ts         # 共用型別定義
+│   ├── monitor/
+│   │   └── SystemMonitor.ts  # 系統監控追蹤器
+│   ├── notification/
+│   │   └── NotificationManager.ts # 全域通知系統
+│   ├── permissions/
+│   │   └── PermissionsManager.ts  # 萬用字元權限管理
+│   ├── process/
+│   │   ├── Process.ts       # 程序資料模型
+│   │   └── ProcessManager.ts # 程序生命週期管理
+│   ├── runtime/
+│   │   ├── QuickJsInit.ts   # QuickJS WASM 初始化
+│   │   ├── ScriptRuntime.ts # QuickJS 沙箱執行引擎
+│   │   └── types.ts         # Runtime 型別定義
+│   ├── storage/
+│   │   └── FileSystem.ts    # 虛擬檔案系統
+│   ├── ui/
+│   │   ├── Bios.ts          # 開機日誌 & 錯誤畫面
+│   │   └── DesktopShell.ts  # 工作列、開始選單、覆蓋層
+│   └── window/
+│       ├── WindowManager.ts # 視窗管理、拖曳、焦點
+│       └── types.ts         # 視窗型別定義
 ├── public/
 │   ├── app.json             # 應用程式目錄
 │   └── apps/                # 內建應用程式
@@ -93,15 +120,23 @@ sentryos/
 │                 main.ts                      │
 ├─────────────────────────────────────────────┤
 │               Bootstrap                      │
-│    systemBootstrap.ts  ←  bios.ts           │
+│            systemBootstrap.ts                │
 ├─────────────────────────────────────────────┤
-│                  Core                        │
+│          Kernel (Service Locator)            │
+│         Kernel.ts │ constants │ types        │
+├─────────────────────────────────────────────┤
+│              Core Modules                    │
 │  ScriptRuntime │ ProcessManager │ EventBus  │
-│  Permissions   │ WindowSystem   │ Storage   │
+│  Permissions   │ WindowManager  │ Storage   │
 │  Environment   │ Notification   │ Monitor   │
+│  ApplicationManager │ ApplicationLauncher    │
+├─────────────────────────────────────────────┤
+│                 API Layer                    │
+│  ui │ system │ storage │ env │ console      │
+│  shell │ notification │ monitor              │
 ├─────────────────────────────────────────────┤
 │                   UI                         │
-│              DesktopShell                    │
+│          Bios │ DesktopShell                 │
 ├─────────────────────────────────────────────┤
 │             Public Apps (沙箱)               │
 │   example │ terminal │ task-manager │ stdlib │
@@ -148,6 +183,11 @@ sentryos/
 | `ui` | 視窗建立與 UI 元件 | `window.create` |
 | `systemApi` | 系統級操作 | `process.terminate` |
 | `storageApi` | 儲存空間查詢 | `storage.usage` |
+| `envApi` | 環境變數、程式庫、命令註冊 | `env.read` / `env.write` / `env.library.load` |
+| `consoleApi` | Console 輸出 | `console.write` |
+| `shellApi` | 系統指令（程序/應用/視窗/sysinfo） | `process.list` / `shell.*` |
+| `notificationApi` | 通知系統（發送/關閉） | `notification.send` |
+| `monitorApi` | 系統監控統計（事件/API/權限/程序） | `monitor.read` |
 | `envApi` | 環境變數、程式庫載入 | `env.*` |
 | `consoleApi` | 主控台讀寫 | `console.*` |
 | `shellApi` | 系統命令（僅限 Console 類型） | `shell.*` |

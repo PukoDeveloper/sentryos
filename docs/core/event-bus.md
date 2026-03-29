@@ -1,6 +1,6 @@
 # EventBus
 
-**檔案**：`src/core/EventBus.ts`
+**檔案**：`src/events/EventBus.ts`
 
 權限門控的發布/訂閱（pub/sub）事件系統。所有 `on`/`emit` 操作皆需通過權限檢查。
 

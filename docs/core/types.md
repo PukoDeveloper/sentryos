@@ -1,6 +1,6 @@
 # 共用型別
 
-**檔案**：`src/core/types.ts`
+**檔案**：`src/kernel/types.ts`
 
 定義所有核心元件共用的基礎型別。
 

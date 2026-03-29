@@ -24,8 +24,8 @@
 | [WindowManager](./core/window-manager.md) | 視窗管理、UI tree 渲染、拖曳與焦點 |
 | [EnvironmentManager](./core/environment-manager.md) | 環境變數、程式庫快取、命令註冊表 |
 | [WebFileSystemAdapter](./core/file-system.md) | 虛擬檔案系統（分層容量管理） |
-| [ApplicationCatalog](./core/application-catalog.md) | App Manifest 載入與解析（Package / Legacy 格式） |
-| [共用型別](./core/types.md) | Result、EventBusResult、ProcessResult 等 |
+| [ApplicationCatalog](./core/application-catalog.md) | App Manifest 載入與解析（Package / Legacy 格式） || [NotificationManager](./core/notification-manager.md) | 全域通知系統（佇列、DOM 渲染、自動消失） |
+| [SystemMonitor](./core/system-monitor.md) | 系統監控追蹤器（事件/API/權限/程序統計） || [共用型別](./core/types.md) | Result、EventBusResult、ProcessResult 等 |
 
 ### 視窗系統
 
@@ -44,7 +44,7 @@
 
 | 文件 | 說明 |
 |------|------|
-| [Host API 參考](./app-development/host-api.md) | 沙箱內可用的全域 API（processApi、eventApi、ipcApi、ui、envApi、shellApi、consoleApi） |
+| [Host API 參考](./app-development/host-api.md) | 沙箱內可用的全域 API（processApi、eventApi、ipcApi、ui、envApi、shellApi、consoleApi、notificationApi、monitorApi） |
 | [Manifest 格式](./app-development/manifest.md) | manifest.json 欄位規格（Package / Legacy 格式） |
 | [開發指南](./app-development/guide.md) | 新增應用程式步驟、範本（Window / Service / Console / Library）、設計模式 |
 

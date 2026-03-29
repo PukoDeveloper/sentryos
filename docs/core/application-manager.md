@@ -1,6 +1,6 @@
 # ApplicationManager
 
-**檔案**：`src/core/App.ts`
+**檔案**：`src/application/ApplicationManager.ts`
 
 應用程式定義的登錄簿。每個應用程式（Application）在系統內經由此管理器取得唯一的 `appDefId`。
 

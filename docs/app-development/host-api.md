@@ -380,3 +380,95 @@ if (resolved.success) {
   }
 }
 ```
+
+---
+
+## notificationApi（通知 API）
+
+**Scope**: `all`
+
+提供全域通知功能，可由任何應用類型使用。
+
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `notificationApi.notify(title, body?, type?, duration?)` | `(string, string?, string?, number?) → { success, data? }` | 發送通知（需 `notification.send`） |
+| `notificationApi.dismiss(id)` | `(string) → { success }` | 關閉指定通知（需 `notification.send`） |
+
+### notify 參數
+
+| 參數 | 型別 | 說明 |
+|------|------|------|
+| `title` | `string` | 通知標題（必填） |
+| `body` | `string` | 通知內容（選填） |
+| `type` | `string` | 通知類型：`'info'`（預設）、`'success'`、`'warning'`、`'error'` |
+| `duration` | `number` | 自動消失時間（毫秒），`0` 表示不自動消失 |
+
+### 用法範例
+
+```javascript
+// 基本通知
+notificationApi.notify('操作完成');
+
+// 帶類型與內容的通知
+notificationApi.notify('儲存成功', '檔案已成功寫入', 'success');
+
+// 不自動消失的錯誤通知
+notificationApi.notify('錯誤', '無法連接伺服器', 'error', 0);
+
+// 手動關閉通知
+var result = notificationApi.notify('處理中...');
+if (result.success) {
+  // result.data 為通知 ID
+  notificationApi.dismiss(result.data);
+}
+```
+
+---
+
+## monitorApi（系統監控 API）
+
+**Scope**: `all`
+
+提供系統監控統計數據，所有方法均需 `monitor.read` 權限。
+
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `monitorApi.snapshot()` | `() → { success, data? }` | 取得完整監控快照 |
+| `monitorApi.eventStats()` | `() → { success, data? }` | 取得事件統計 |
+| `monitorApi.apiStats()` | `() → { success, data? }` | 取得 API 呼叫統計 |
+| `monitorApi.permissionStats()` | `() → { success, data? }` | 取得權限檢查統計 |
+| `monitorApi.recentEvents(limit?)` | `(number?) → { success, data? }` | 取得最近事件記錄 |
+| `monitorApi.recentApiCalls(limit?)` | `(number?) → { success, data? }` | 取得最近 API 呼叫記錄 |
+| `monitorApi.processHistory()` | `() → { success, data? }` | 取得程序歷史記錄 |
+
+### snapshot 回傳
+
+```javascript
+{
+  success: true,
+  data: {
+    events: { total: 42, byName: { 'window.ui': 15, ... } },
+    api: { total: 100, byName: { 'ui.createWindow': 5, ... } },
+    permissions: { total: 200, granted: 195, denied: 5 },
+    processes: { launched: 8, terminated: 3 },
+    uptime: '5m 30s'
+  }
+}
+```
+
+### 用法範例
+
+```javascript
+// 取得完整快照
+var snap = monitorApi.snapshot();
+if (snap.success) {
+  consoleApi.writeLine('Events: ' + snap.data.events.total);
+  consoleApi.writeLine('API calls: ' + snap.data.api.total);
+}
+
+// 取得最近 10 筆事件
+var events = monitorApi.recentEvents(10);
+
+// 取得權限統計
+var perms = monitorApi.permissionStats();
+```

@@ -1,6 +1,6 @@
 # ApplicationCatalog
 
-**檔案**：`src/core/ApplicationCatalog.ts`
+**檔案**：`src/application/ApplicationCatalog.ts`
 
 負責從 `public/app.json` 讀取應用清單，逐一 fetch 各 app 的 `manifest.json`，支援 **PackageManifest**（多應用套件）與 **LegacyManifest**（單一應用）兩種格式，解析為 `RegisteredApplication` 陣列。
 

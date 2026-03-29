@@ -1,6 +1,6 @@
 # 視窗系統
 
-**檔案**：`src/core/WindowSystem.ts`
+**檔案**：`src/window/WindowManager.ts`（型別定義：`src/window/types.ts`）
 
 本文件詳述視窗系統的 DOM 結構、狀態機、拖曳機制、Z-Index 設計與生命週期事件。
 

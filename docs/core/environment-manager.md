@@ -1,6 +1,6 @@
 # EnvironmentManager
 
-**檔案**：`src/core/EnvironmentManager.ts`
+**檔案**：`src/environment/EnvironmentManager.ts`
 
 管理系統執行期環境狀態，包含四個功能區：
 

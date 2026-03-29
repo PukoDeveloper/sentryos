@@ -1,6 +1,6 @@
 # BIOS
 
-**檔案**：`src/bootstrap/bios.ts`
+**檔案**：`src/ui/Bios.ts`
 
 開機分階段日誌系統。匯出 `bios` 單例、`BIOS` 類別與 `getAppDiv()` 輔助函式。
 

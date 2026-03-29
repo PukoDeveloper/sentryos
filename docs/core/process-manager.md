@@ -1,6 +1,6 @@
 # ProcessManager
 
-**檔案**：`src/core/App.ts`
+**檔案**：`src/process/ProcessManager.ts`（程序模型：`src/process/Process.ts`）
 
 程序（Process）的生命週期管理器。每次 `launch()` 會建立一個 `Process` 實例，具有獨立的 `processAppId`（權限憑證 ID）。支援父子程序關係與遞迴終止。
 

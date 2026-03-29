@@ -1,6 +1,6 @@
 # WebFileSystemAdapter
 
-**檔案**：`src/core/storage.ts`
+**檔案**：`src/storage/FileSystem.ts`
 
 記憶體內的虛擬檔案系統，以 Storage Tier 劃分容量。所有操作皆需通過權限檢查。
 

@@ -1,6 +1,6 @@
 # ScriptRuntime
 
-**檔案**：`src/core/ScriptRuntime.ts`
+**檔案**：`src/runtime/ScriptRuntime.ts`（WASM 初始化：`src/runtime/QuickJsInit.ts`）
 
 基於 QuickJS（WASM）的沙箱 JavaScript 執行環境，負責為每個程序建立隔離的 Runtime/Context 並注入 Host API。
 
@@ -60,6 +60,8 @@ ScriptRuntime 自身註冊的 API：
 | `envApi` | all | `envApi` | `getVariable()`, `getAllVariables()`, `setVariable()`, `removeVariable()`, `registerAutoStart()`, `unregisterAutoStart()`, `loadLibrary()`, `listLibraries()`, `registerCommand()` |
 | `consoleApi` | console | `consoleApi` | `writeLine()`, `write()`, `clear()`（覆寫內建版本，直接操作 Console 視窗 DOM） |
 | `shellApi` | console | `shellApi` | `listProcesses()`, `killProcess()`, `listApps()`, `launch()`, `listWindows()`, `sysinfo()`, `listCommands()`, `resolveCommand()` |
+| `notificationApi` | all | `notificationApi` | `notify()`, `dismiss()`（覆寫內建版本，發送通知到通知系統） |
+| `monitorApi` | all | `monitorApi` | `snapshot()`, `eventStats()`, `apiStats()`, `permissionStats()`, `recentEvents()`, `recentApiCalls()`, `processHistory()` |
 
 > Bootstrap 的 `consoleApi` 會覆寫 ScriptRuntime 內建版本，提供實際操作 Console 視窗 DOM 的功能。
 
@@ -116,6 +118,8 @@ IPC 權限要求：
    globalThis.storageApi  = Sentry.storageApi ?? {};
    globalThis.envApi      = Sentry.envApi ?? {};
    globalThis.shellApi    = Sentry.shellApi ?? {};
+   globalThis.notificationApi = Sentry.notificationApi ?? {};
+   globalThis.monitorApi  = Sentry.monitorApi ?? {};
    ```
 4. **`toHandle()`**：遞迴將 JS 值轉換為 QuickJS Handle（支援 function、object、array、primitives）
 5. **`normalizeReturnValue()`**：將 Host function 回傳值正規化為可序列化格式

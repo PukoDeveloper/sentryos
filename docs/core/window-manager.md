@@ -1,6 +1,6 @@
 # WindowManager
 
-**檔案**：`src/core/WindowSystem.ts`
+**檔案**：`src/window/WindowManager.ts`（型別定義：`src/window/types.ts`）
 
 管理視窗的建立、狀態轉換、UI tree 渲染、拖曳與焦點。完整的視窗系統文件請參考 [視窗系統](../window-system/window-system.md)。
 
