@@ -1,3 +1,5 @@
+var styles = imports('styles.js');
+
 var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
@@ -155,19 +157,19 @@ var app = UI.createApp({
           UI.row([
             UI.button('Info', {
               onClick: function () { notificationApi.notify('Hello!', 'This is an info notification.', 'info'); },
-              style: { background: 'rgba(109,213,255,0.15)', color: '#6dd5ff', padding: '8px 14px', borderRadius: '8px', fontSize: '12px' },
+              style: styles.notifButton(styles.colors.info),
             }),
             UI.button('Success', {
               onClick: function () { notificationApi.notify('Done', 'Operation completed successfully.', 'success'); },
-              style: { background: 'rgba(80,250,123,0.15)', color: '#50fa7b', padding: '8px 14px', borderRadius: '8px', fontSize: '12px' },
+              style: styles.notifButton(styles.colors.success),
             }),
             UI.button('Warning', {
               onClick: function () { notificationApi.notify('Caution', 'Something needs your attention.', 'warning'); },
-              style: { background: 'rgba(255,183,77,0.15)', color: '#ffb74d', padding: '8px 14px', borderRadius: '8px', fontSize: '12px' },
+              style: styles.notifButton(styles.colors.warning),
             }),
             UI.button('Error', {
               onClick: function () { notificationApi.notify('Error', 'Something went wrong!', 'error'); },
-              style: { background: 'rgba(255,85,85,0.15)', color: '#ff5555', padding: '8px 14px', borderRadius: '8px', fontSize: '12px' },
+              style: styles.notifButton(styles.colors.error),
             }),
           ]),
         ], { gap: '8px', alignItems: 'center' }),
@@ -177,12 +179,12 @@ var app = UI.createApp({
       ui.panel([
         ui.label('PID: ' + processApi.pid + '  |  Type: ' + processApi.type, {
           fontSize: '11px',
-          color: 'rgba(216, 232, 255, 0.4)',
+          color: styles.colors.textDim,
         }),
       ], {
         padding: '8px 12px',
         borderRadius: '8px',
-        background: 'rgba(0, 0, 0, 0.2)',
+        background: styles.colors.background,
       }),
     ], { padding: '18px' });
   },

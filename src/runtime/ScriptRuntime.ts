@@ -44,12 +44,15 @@ class ScriptRuntime {
         return this.apiFactories.get(scope)!.delete(name);
     }
 
-    execute(pid: number, code: string, timeoutMs = DEFAULT_EXECUTION_TIMEOUT_MS): RuntimeResult<unknown> {
+    execute(pid: number, code: string, timeoutMs = DEFAULT_EXECUTION_TIMEOUT_MS, entryPath?: string): RuntimeResult<unknown> {
         const proc = this.getProcess(pid);
         if (!proc) return { success: false, error: 'ProcessNotFound' };
         if (proc.status !== 'running') return { success: false, error: 'ProcessNotRunning' };
 
         const runtimeProcess = this.ensureRuntimeProcess(proc);
+        if (entryPath !== undefined) {
+            runtimeProcess.entryPath = entryPath;
+        }
         this.injectApis(runtimeProcess.context, proc);
 
         runtimeProcess.runtime.setInterruptHandler(
@@ -81,6 +84,11 @@ class ScriptRuntime {
                 this.eventBus.off(proc.processAppId, eventName, listener);
             }
         }
+        // 釋放模組快取中的 QuickJS handle
+        for (const handle of runtimeProcess.moduleCache.values()) {
+            try { (handle as any).dispose(); } catch { /* already disposed */ }
+        }
+        runtimeProcess.moduleCache.clear();
         try { runtimeProcess.context.dispose(); } catch { /* already disposed or in-flight */ }
         try { runtimeProcess.runtime.dispose(); } catch { /* already disposed */ }
     }
@@ -233,7 +241,9 @@ class ScriptRuntime {
             runtime,
             context,
             inbox: [],
-            eventSubscriptions: new Map()
+            eventSubscriptions: new Map(),
+            moduleCache: new Map(),
+            entryPath: null,
         };
         this.processRuntimes.set(proc.pid, runtimeProcess);
         return runtimeProcess;
@@ -242,6 +252,7 @@ class ScriptRuntime {
     // ── API 注入 / 編排 ─────────────────────────────────────
 
     private injectApis(context: any, process: ProcessView): void {
+        const runtimeProcess = this.processRuntimes.get(process.pid);
         const global = context.global;
         const sentryApi = context.newObject();
         const surface = this.buildApiSurface(process);
@@ -274,6 +285,11 @@ class ScriptRuntime {
             prelude.value.dispose();
         } else {
             prelude.error.dispose();
+        }
+
+        // 注入 imports() 函式（僅限有 entryPath 的程序）
+        if (runtimeProcess?.entryPath) {
+            this.injectImportsFunction(context, global, runtimeProcess);
         }
 
         global.dispose();
@@ -327,6 +343,104 @@ class ScriptRuntime {
         if (type === 'Window') return 'window';
         if (type === 'Library') return 'library';
         return 'console';
+    }
+
+    // ── imports() 機制 ──────────────────────────────────────
+
+    /**
+     * 注入 imports() 全域函式，讓應用程式可以載入同一套件中的其他檔案。
+     * 使用 CommonJS-like 的 module.exports 慣例。
+     */
+    private injectImportsFunction(context: any, global: any, runtimeProcess: RuntimeProcess): void {
+        const self = this;
+
+        const importsFn = context.newFunction('imports', (...args: any[]) => {
+            if (args.length === 0) return context.undefined;
+
+            const modulePath = context.dump(args[0]);
+            if (typeof modulePath !== 'string' || modulePath.length === 0) {
+                return context.undefined;
+            }
+
+            const entryPath = runtimeProcess.entryPath;
+            if (!entryPath) return context.undefined;
+
+            // 解析並驗證路徑
+            const resolvedPath = self.resolveModulePath(entryPath, modulePath);
+            if (!resolvedPath) return context.undefined;
+
+            // 快取命中：回傳 handle 的複本（保留函式等不可序列化的值）
+            if (runtimeProcess.moduleCache.has(resolvedPath)) {
+                const cached = runtimeProcess.moduleCache.get(resolvedPath) as any;
+                return cached.dup();
+            }
+
+            // 同步載入檔案
+            const code = self.syncFetch(resolvedPath);
+            if (code === null) return context.undefined;
+
+            // 以 CommonJS-like IIFE 包裝，提供 module.exports / exports
+            const wrapped =
+                '(function(){var module={exports:{}};var exports=module.exports;\n' +
+                code +
+                '\n;return module.exports;})()';
+
+            const result = context.evalCode(wrapped);
+            if (result.error) {
+                context.dump(result.error);
+                result.error.dispose();
+                return context.undefined;
+            }
+
+            // 快取 QuickJS handle（保持存活），回傳複本給呼叫端
+            runtimeProcess.moduleCache.set(resolvedPath, result.value);
+            return result.value.dup();
+        });
+
+        context.setProp(global, 'imports', importsFn);
+        importsFn.dispose();
+    }
+
+    /**
+     * 將相對模組路徑解析為絕對 URL 路徑，並驗證不會逃離套件目錄。
+     */
+    private resolveModulePath(entryPath: string, modulePath: string): string | null {
+        // 拒絕絕對路徑
+        if (modulePath.startsWith('/') || modulePath.startsWith('\\')) return null;
+        // 拒絕含有 protocol 的路徑
+        if (/^[a-z]+:/i.test(modulePath)) return null;
+
+        try {
+            const base = new URL(entryPath + '/', globalThis.location.origin);
+            const resolved = new URL(modulePath, base);
+
+            // 必須同源
+            if (resolved.origin !== globalThis.location.origin) return null;
+
+            const resolvedPath = resolved.pathname;
+            const boundary = entryPath.endsWith('/') ? entryPath : entryPath + '/';
+
+            // 安全性：解析後的路徑必須在套件目錄內
+            if (!resolvedPath.startsWith(boundary)) return null;
+
+            return resolvedPath;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 同步讀取指定路徑的檔案內容（使用 XMLHttpRequest 同步模式）。
+     */
+    private syncFetch(path: string): string | null {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', path, false);
+            xhr.send();
+            return xhr.status === 200 ? xhr.responseText : null;
+        } catch {
+            return null;
+        }
     }
 
     // ── 型別轉換 ────────────────────────────────────────────

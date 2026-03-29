@@ -49,6 +49,10 @@ type RuntimeProcess = {
     context: any;
     inbox: Message[];
     eventSubscriptions: Map<string, (...args: unknown[]) => void>;
+    /** 模組快取：已載入模組的路徑 → 匯出值 */
+    moduleCache: Map<string, unknown>;
+    /** 應用程式套件根目錄（用於 imports() 路徑解析） */
+    entryPath: string | null;
 };
 
 export type {

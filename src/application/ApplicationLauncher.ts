@@ -159,7 +159,7 @@ export class ApplicationLauncher {
       this.consoleControllers.set(proc.processAppId, controller);
     }
 
-    const executed = this.runtime.execute(pid, code);
+    const executed = this.runtime.execute(pid, code, undefined, app.entryPath);
     if (!executed.success) {
       const errorDetail = this.formatError(executed.data ?? executed.error);
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
