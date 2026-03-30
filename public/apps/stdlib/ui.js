@@ -137,6 +137,16 @@
       }
       return ui.input(options.value, options.placeholder, options.style, id);
     },
+    textarea: function (options) {
+      options = options || {};
+      var id = options.id || allocId();
+      if (options.onChange) {
+        handlers[id] = function (event) {
+          if (event.type === 'change') options.onChange(event.value, event);
+        };
+      }
+      return ui.textarea(options.value, options.placeholder, options.rows, options.style, id);
+    },
     checkbox: function (options) {
       options = options || {};
       var id = options.id || allocId();

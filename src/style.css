@@ -343,6 +343,27 @@ body {
 	color: rgba(255, 255, 255, 0.3);
 }
 
+.window-ui-textarea {
+	padding: 8px 12px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.06);
+	color: inherit;
+	font-family: 'Consolas', 'Monaco', monospace;
+	font-size: 13px;
+	outline: none;
+	resize: vertical;
+	transition: border-color 0.2s ease;
+}
+
+.window-ui-textarea:focus {
+	border-color: rgba(109, 213, 255, 0.5);
+}
+
+.window-ui-textarea::placeholder {
+	color: rgba(255, 255, 255, 0.3);
+}
+
 .window-ui-checkbox {
 	display: flex;
 	align-items: center;
@@ -481,6 +502,7 @@ body {
 }
 
 .desktop-taskbar-app {
+	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -507,6 +529,88 @@ body {
 
 .desktop-taskbar-app[data-window-state="minimized"] {
 	opacity: 0.45;
+}
+
+.desktop-taskbar-app-badge {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	min-width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 4px;
+	border-radius: 8px;
+	background: rgba(96, 165, 250, 0.9);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 1;
+	pointer-events: none;
+}
+
+.desktop-taskbar-group-popup {
+	position: absolute;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	min-width: 180px;
+	max-width: 280px;
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	background: rgba(7, 12, 20, 0.82);
+	backdrop-filter: blur(18px);
+	box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+	z-index: 99999;
+	animation: taskbar-group-popup-enter 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes taskbar-group-popup-enter {
+	from {
+		opacity: 0;
+		transform: translateX(-50%) translateY(8px) scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0) scale(1);
+	}
+}
+
+.desktop-taskbar-group-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: #f4f7fb;
+	font-size: 13px;
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.desktop-taskbar-group-item:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.desktop-taskbar-group-item:active {
+	background: rgba(255, 255, 255, 0.18);
+}
+
+.desktop-taskbar-group-item[data-window-state="minimized"] {
+	opacity: 0.5;
+}
+
+.desktop-taskbar-group-item-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .desktop-taskbar-app-icon {

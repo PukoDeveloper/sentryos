@@ -104,6 +104,10 @@ export const Permissions = {
 
   // Monitor
   MONITOR_READ: 'monitor.read',
+
+  // Settings
+  SETTINGS_READ: 'settings.read',
+  SETTINGS_WRITE: 'settings.write',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────

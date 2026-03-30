@@ -1,0 +1,26 @@
+{
+    "name": "Text Manager",
+    "version": "1.0.0",
+    "description": "A simple text document manager for SentryOS.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "text-manager-app",
+            "name": "文字管理器",
+            "main": "main.js",
+            "type": "Window",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.user",
+                "file.write.user",
+                "file.delete.user",
+                "file.list.user",
+                "notification.send"
+            ],
+            "maxInstances": 1
+        }
+    ]
+}
