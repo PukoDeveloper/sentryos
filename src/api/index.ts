@@ -7,6 +7,7 @@ import { registerConsoleApi } from './consoleApi';
 import { registerShellApi } from './shellApi';
 import { registerNotificationApi } from './notificationApi';
 import { registerMonitorApi } from './monitorApi';
+import { registerSettingsApi } from './settingsApi';
 
 export function registerAllHostApis(kernel: Kernel): void {
   registerUiApi(kernel);
@@ -17,4 +18,5 @@ export function registerAllHostApis(kernel: Kernel): void {
   registerShellApi(kernel);
   registerNotificationApi(kernel);
   registerMonitorApi(kernel);
+  registerSettingsApi(kernel);
 }

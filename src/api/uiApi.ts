@@ -61,6 +61,8 @@ export function registerUiApi(kernel: Kernel): void {
         ({ type: 'panel', children, style, id }),
       input: (value?: string, placeholder?: string, style?: Record<string, string>, id?: string) =>
         ({ type: 'input', value, placeholder, style, id }),
+      textarea: (value?: string, placeholder?: string, rows?: number, style?: Record<string, string>, id?: string) =>
+        ({ type: 'textarea', value, placeholder, rows, style, id }),
       checkbox: (checked?: boolean, label?: string, style?: Record<string, string>, id?: string) =>
         ({ type: 'checkbox', checked, label, style, id }),
       select: (options: unknown[], value?: string, style?: Record<string, string>, id?: string) =>

@@ -22,7 +22,7 @@
                 "shell.windows",
                 "shell.sysinfo"
             ],
-            "maxInstances": 1
+            "maxInstances": 8
         }
     ]
 }

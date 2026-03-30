@@ -2,5 +2,8 @@
     "app/stdlib",
     "app/example",
     "app/terminal",
-    "app/task-manager"
+    "app/task-manager",
+    "app/text-manager",
+    "app/utilities",
+    "app/settings"
 ]

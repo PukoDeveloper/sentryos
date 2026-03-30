@@ -73,6 +73,7 @@ interface FileSystemAdapter {
 interface FileSystemOptions {
 	totalCapacity?: number;
 	tierCapacities?: Partial<Record<StorageTier, number>>;
+	persistenceKey?: string;
 }
 
 const STORAGE_TIERS: StorageTier[] = ['sys', 'app', 'user', 'cache'];
@@ -106,6 +107,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	private readonly totalCapacity: number;
 	private readonly tierCapacities: Record<StorageTier, number>;
 	private readonly storage = new Map<StorageTier, Map<string, StorageEntry>>();
+	private readonly persistenceKey: string | null;
 
 	constructor(kernel: Kernel, options: FileSystemOptions = {}) {
 		this.kernel = kernel;
@@ -114,10 +116,13 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			...DEFAULT_TIER_CAPACITIES,
 			...options.tierCapacities,
 		};
+		this.persistenceKey = options.persistenceKey ?? 'sentryos:fs';
 
 		for (const tier of STORAGE_TIERS) {
 			this.storage.set(tier, new Map());
 		}
+
+		this.loadFromStorage();
 	}
 
 	private get permissions() { return this.kernel.resolve('permissions'); }
@@ -180,6 +185,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		};
 
 		tierStorage.set(key, nextEntry);
+		this.persistTier(tier);
 		return {
 			success: true,
 			data: {
@@ -201,6 +207,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		}
 
 		tierStorage.delete(key);
+		this.persistTier(tier);
 		return { success: true, data: key };
 	}
 
@@ -353,6 +360,32 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			...entry,
 			data: cloneStorageData(entry.data),
 		}));
+	}
+
+	// ── Persistence ────────────────────────────────────────────
+
+	private persistTier(tier: StorageTier): void {
+		if (!this.persistenceKey) return;
+		try {
+			const tierMap = this.storage.get(tier)!;
+			const entries = Array.from(tierMap.values());
+			localStorage.setItem(`${this.persistenceKey}:${tier}`, JSON.stringify(entries));
+		} catch { /* quota exceeded or unavailable — silently skip */ }
+	}
+
+	private loadFromStorage(): void {
+		if (!this.persistenceKey) return;
+		for (const tier of STORAGE_TIERS) {
+			try {
+				const raw = localStorage.getItem(`${this.persistenceKey}:${tier}`);
+				if (!raw) continue;
+				const entries: StorageEntry[] = JSON.parse(raw);
+				const tierMap = this.storage.get(tier)!;
+				for (const entry of entries) {
+					tierMap.set(entry.key, entry);
+				}
+			} catch { /* corrupted data — start fresh for this tier */ }
+		}
 	}
 }
 

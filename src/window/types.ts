@@ -6,7 +6,7 @@ type WindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 
 type WindowControlType =
     | 'label' | 'button' | 'stack' | 'panel'
-    | 'input' | 'checkbox' | 'select'
+    | 'input' | 'textarea' | 'checkbox' | 'select'
     | 'image' | 'separator' | 'progress' | 'list';
 
 type WindowUiEventType = 'click' | 'change' | 'submit';
@@ -108,6 +108,13 @@ interface WindowInputNode extends WindowUiNodeBase {
     placeholder?: string;
 }
 
+interface WindowTextareaNode extends WindowUiNodeBase {
+    type: 'textarea';
+    value?: string;
+    placeholder?: string;
+    rows?: number;
+}
+
 interface WindowCheckboxNode extends WindowUiNodeBase {
     type: 'checkbox';
     checked?: boolean;
@@ -143,7 +150,7 @@ interface WindowListNode extends WindowUiNodeBase {
 
 type WindowUiNode =
     | WindowLabelNode | WindowButtonNode | WindowPanelNode | WindowStackNode
-    | WindowInputNode | WindowCheckboxNode | WindowSelectNode
+    | WindowInputNode | WindowTextareaNode | WindowCheckboxNode | WindowSelectNode
     | WindowImageNode | WindowSeparatorNode | WindowProgressNode | WindowListNode;
 
 interface WindowUiNodePatch {
@@ -157,6 +164,7 @@ interface WindowUiNodePatch {
     placeholder?: string;
     label?: string;
     color?: string;
+    rows?: number;
 }
 
 interface WindowUiEvent {

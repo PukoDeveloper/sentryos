@@ -3,7 +3,7 @@ import type { EventBus } from '../events/EventBus';
 import type { ApplicationManager } from '../application/ApplicationManager';
 import type { ProcessManager } from '../process/ProcessManager';
 import type { ScriptRuntime } from '../runtime/ScriptRuntime';
-import type { WebFileSystemAdapter } from '../storage/FileSystem';
+import type { FileSystemAdapter } from '../storage/FileSystem';
 import type { WindowManager } from '../window/WindowManager';
 import type { ConsoleWindowController } from '../window/types';
 import type { EnvironmentManager } from '../environment/EnvironmentManager';
@@ -19,7 +19,7 @@ export interface ServiceMap {
   appManager: ApplicationManager;
   processManager: ProcessManager;
   runtime: ScriptRuntime;
-  fileSystem: WebFileSystemAdapter;
+  fileSystem: FileSystemAdapter;
   windowManager: WindowManager;
   environmentManager: EnvironmentManager;
   notificationManager: NotificationManager;

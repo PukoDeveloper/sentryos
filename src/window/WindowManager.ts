@@ -166,7 +166,7 @@ class WindowManager {
             focusControlId = htmlActive.dataset.controlId
                 ?? (htmlActive.closest('[data-control-id]') as HTMLElement | null)?.dataset.controlId
                 ?? null;
-            if (activeEl instanceof HTMLInputElement) {
+            if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) {
                 focusCursorStart = activeEl.selectionStart;
                 focusCursorEnd = activeEl.selectionEnd;
             }
@@ -187,9 +187,9 @@ class WindowManager {
         if (focusControlId) {
             const target = nodeMap.get(focusControlId);
             if (target) {
-                if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
+                if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
                     target.focus();
-                    if (target instanceof HTMLInputElement && focusCursorStart !== null) {
+                    if ((target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) && focusCursorStart !== null) {
                         target.setSelectionRange(focusCursorStart, focusCursorEnd);
                     }
                 } else {
@@ -227,6 +227,8 @@ class WindowManager {
         if (patch.value !== undefined) {
             if (controlType === 'input') {
                 (element as HTMLInputElement).value = String(patch.value);
+            } else if (controlType === 'textarea') {
+                (element as HTMLTextAreaElement).value = String(patch.value);
             } else if (controlType === 'select') {
                 (element as HTMLSelectElement).value = String(patch.value);
             } else if (controlType === 'progress') {
@@ -253,6 +255,14 @@ class WindowManager {
 
         if (patch.placeholder !== undefined && controlType === 'input') {
             (element as HTMLInputElement).placeholder = patch.placeholder;
+        }
+
+        if (patch.placeholder !== undefined && controlType === 'textarea') {
+            (element as HTMLTextAreaElement).placeholder = patch.placeholder;
+        }
+
+        if (patch.rows !== undefined && controlType === 'textarea') {
+            (element as HTMLTextAreaElement).rows = patch.rows;
         }
 
         if (patch.color !== undefined && controlType === 'progress') {
@@ -468,10 +478,11 @@ class WindowManager {
         return { success: true, data: windowId };
     }
 
-    getOpenWindowSummaries(): Array<{ windowId: string; processAppId: string; title: string; state: WindowState; icon?: string }> {
+    getOpenWindowSummaries(): Array<{ windowId: string; processAppId: string; appDefId: string; title: string; state: WindowState; icon?: string }> {
         return Array.from(this.windows.values()).map(descriptor => ({
             windowId: descriptor.id,
             processAppId: descriptor.processAppId,
+            appDefId: descriptor.appDefId,
             title: descriptor.title,
             state: descriptor.state,
             icon: descriptor.icon,
@@ -673,6 +684,46 @@ class WindowManager {
 
             this.registerNode(descriptor.id, node.id, input);
             return input;
+        }
+
+        if (node.type === 'textarea') {
+            const textarea = document.createElement('textarea');
+            textarea.className = 'window-ui-textarea';
+            textarea.dataset.controlType = 'textarea';
+            if (node.id) {
+                textarea.dataset.controlId = node.id;
+                textarea.name = node.id;
+            }
+            if (node.value !== undefined) {
+                textarea.value = node.value;
+            }
+            if (node.placeholder) {
+                textarea.placeholder = node.placeholder;
+            }
+            if (node.rows) {
+                textarea.rows = node.rows;
+            }
+            this.applyNodeStyle(textarea, node.style);
+
+            if (node.id) {
+                const changeEventId = this.allocateEventId();
+                this.eventBindings.set(changeEventId, {
+                    eventId: changeEventId,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: 'change',
+                    controlId: node.id,
+                });
+                textarea.addEventListener('input', () => {
+                    const binding = this.eventBindings.get(changeEventId);
+                    if (binding) {
+                        this.uiEventHandler({ ...binding, value: textarea.value });
+                    }
+                });
+            }
+
+            this.registerNode(descriptor.id, node.id, textarea);
+            return textarea;
         }
 
         if (node.type === 'checkbox') {
