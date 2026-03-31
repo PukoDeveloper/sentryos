@@ -472,3 +472,123 @@ var events = monitorApi.recentEvents(10);
 // 取得權限統計
 var perms = monitorApi.permissionStats();
 ```
+
+---
+
+## networkApi（網路 API）
+
+**Scope**: `all`
+
+提供受控的 HTTP 連線功能。所有連線受允許清單約束，僅匹配的網域可發送請求。
+
+### 請求
+
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `networkApi.request(url, options?)` | `(string, object?) → Promise<{ success, data? }>` | 發送 HTTP 請求（需 `network.request`） |
+| `networkApi.isAllowed(url)` | `(string) → { success, data? }` | 檢查 URL 是否在允許清單中（需 `network.status`） |
+
+#### request options
+
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `method` | `string` | HTTP 方法：`GET`、`POST`、`PUT`、`DELETE`、`PATCH`、`HEAD`、`OPTIONS`（預設 `GET`） |
+| `headers` | `object` | 請求標頭 |
+| `body` | `string` | 請求主體（GET / HEAD 時忽略） |
+| `timeout` | `number` | 逾時時間（毫秒），預設 10000 |
+
+#### request 回傳
+
+```javascript
+{
+  success: true,
+  data: {
+    status: 200,
+    statusText: 'OK',
+    headers: { 'content-type': 'application/json' },
+    body: '{"key": "value"}'
+  }
+}
+```
+
+#### 錯誤碼
+
+| 錯誤 | 說明 |
+|------|------|
+| `PermissionDenied` | 缺少 `network.request` 權限 |
+| `NotAllowed` | URL 不在允許清單中 |
+| `Disabled` | 網路功能已停用 |
+| `Timeout` | 請求逾時 |
+| `ConnectionFailed` | 連線失敗 |
+| `InvalidUrl` | URL 格式無效 |
+
+### 狀態查詢
+
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `networkApi.getStatus()` | `() → { success, data? }` | 取得網路狀態摘要（需 `network.status`） |
+
+#### getStatus 回傳
+
+```javascript
+{
+  success: true,
+  data: {
+    enabled: true,
+    allowlistCount: 3,
+    totalRequests: 15,
+    blockedRequests: 2
+  }
+}
+```
+
+### 允許清單管理（管理員）
+
+以下方法需要 `network.manage` 權限：
+
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `networkApi.getAllowlist()` | `() → { success, data? }` | 取得完整允許清單 |
+| `networkApi.addAllowlistEntry(pattern, description?)` | `(string, string?) → { success, data? }` | 新增允許規則 |
+| `networkApi.removeAllowlistEntry(pattern)` | `(string) → { success, data? }` | 移除允許規則 |
+| `networkApi.setEnabled(enabled)` | `(boolean) → { success }` | 啟用或停用網路功能 |
+
+#### 允許規則格式
+
+| 格式 | 範例 | 說明 |
+|------|------|------|
+| 全域萬用字元 | `*` | 允許所有網域 |
+| 萬用字元子網域 | `*.example.com` | 匹配所有子網域 |
+| 精確匹配 | `api.github.com` | 僅匹配該網域 |
+
+### 用法範例
+
+```javascript
+// 發送 GET 請求
+var result = networkApi.request('https://api.example.com/data');
+if (result.success) {
+  var body = JSON.parse(result.data.body);
+}
+
+// 發送 POST 請求
+var result = networkApi.request('https://api.example.com/submit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'test' }),
+  timeout: 5000
+});
+
+// 檢查 URL 是否允許
+var check = networkApi.isAllowed('https://api.example.com');
+if (check.success && check.data) {
+  // URL 在允許清單中
+}
+
+// 查詢網路狀態
+var status = networkApi.getStatus();
+
+// 管理允許清單
+networkApi.addAllowlistEntry('*.github.com', 'GitHub API');
+networkApi.removeAllowlistEntry('*.github.com');
+networkApi.setEnabled(false);  // 停用網路
+```

@@ -5,32 +5,32 @@ if (!_loadResult.success) {
 
 // ── Presets ──────────────────────────────────────────────────
 var wallpapers = [
-  { name: '深海藍',   value: 'linear-gradient(135deg, #08111f 0%, #12344d 52%, #27698f 100%)' },
-  { name: '極光綠',   value: 'linear-gradient(135deg, #0a1628 0%, #0d3b2e 50%, #1a7a5a 100%)' },
-  { name: '暮光紫',   value: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' },
-  { name: '日落橙',   value: 'linear-gradient(135deg, #1a0a00 0%, #4a1a08 40%, #a8430a 100%)' },
-  { name: '午夜黑',   value: 'linear-gradient(135deg, #050505 0%, #111111 50%, #1a1a2e 100%)' },
-  { name: '玫瑰金',   value: 'linear-gradient(135deg, #1a0c14 0%, #3d1c2e 50%, #8b4560 100%)' },
-  { name: '北極光',   value: 'linear-gradient(135deg, #020111 0%, #1b2735 40%, #090a0f 70%)' },
-  { name: '銀河',     value: 'linear-gradient(135deg, #0d0221 0%, #150540 40%, #261447 70%, #0d0221 100%)' },
+  { name: '深海藍', value: 'linear-gradient(135deg, #08111f 0%, #12344d 52%, #27698f 100%)' },
+  { name: '極光綠', value: 'linear-gradient(135deg, #0a1628 0%, #0d3b2e 50%, #1a7a5a 100%)' },
+  { name: '暮光紫', value: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' },
+  { name: '日落橙', value: 'linear-gradient(135deg, #1a0a00 0%, #4a1a08 40%, #a8430a 100%)' },
+  { name: '午夜黑', value: 'linear-gradient(135deg, #050505 0%, #111111 50%, #1a1a2e 100%)' },
+  { name: '玫瑰金', value: 'linear-gradient(135deg, #1a0c14 0%, #3d1c2e 50%, #8b4560 100%)' },
+  { name: '北極光', value: 'linear-gradient(135deg, #020111 0%, #1b2735 40%, #090a0f 70%)' },
+  { name: '銀河', value: 'linear-gradient(135deg, #0d0221 0%, #150540 40%, #261447 70%, #0d0221 100%)' },
 ];
 
 var accents = [
-  { name: '天藍',     primary: '#6dd5ff', secondary: '#3f8efc' },
-  { name: '翠綠',     primary: '#6be68a', secondary: '#22c55e' },
-  { name: '紫羅蘭',   primary: '#c084fc', secondary: '#8b5cf6' },
-  { name: '珊瑚橙',   primary: '#fb923c', secondary: '#f97316' },
-  { name: '玫瑰粉',   primary: '#fb7185', secondary: '#e11d48' },
-  { name: '金黃',     primary: '#fbbf24', secondary: '#d97706' },
-  { name: '冰白',     primary: '#e2e8f0', secondary: '#94a3b8' },
-  { name: '霓虹青',   primary: '#22d3ee', secondary: '#06b6d4' },
+  { name: '天藍', primary: '#6dd5ff', secondary: '#3f8efc' },
+  { name: '翠綠', primary: '#6be68a', secondary: '#22c55e' },
+  { name: '紫羅蘭', primary: '#c084fc', secondary: '#8b5cf6' },
+  { name: '珊瑚橙', primary: '#fb923c', secondary: '#f97316' },
+  { name: '玫瑰粉', primary: '#fb7185', secondary: '#e11d48' },
+  { name: '金黃', primary: '#fbbf24', secondary: '#d97706' },
+  { name: '冰白', primary: '#e2e8f0', secondary: '#94a3b8' },
+  { name: '霓虹青', primary: '#22d3ee', secondary: '#06b6d4' },
 ];
 
 var opacitySteps = [
-  { name: '透明',   value: 0.3 },
+  { name: '透明', value: 0.3 },
   { name: '半透明', value: 0.5 },
-  { name: '預設',   value: 0.64 },
-  { name: '深色',   value: 0.8 },
+  { name: '預設', value: 0.64 },
+  { name: '深色', value: 0.8 },
   { name: '不透明', value: 0.95 },
 ];
 
@@ -182,6 +182,8 @@ var stubPageStyle = {
   textAlign: 'center',
 };
 
+var itemCardStyle = { alignItems: 'center', gap: '12px', justifyContent: 'space-between', width: '100%' };
+
 // ── Helpers ──────────────────────────────────────────────────
 function buildThemeObject() {
   return {
@@ -222,15 +224,15 @@ function collapsible(key, title, renderBody, self) {
 
 // ── Navigation items ─────────────────────────────────────────
 var pages = [
-  { id: 'home',         label: '🏠  首頁' },
-  { id: 'appearance',   label: '🎨  外觀' },
-  { id: 'notifications',label: '🔔  通知' },
-  { id: 'apps',         label: '📦  應用程式' },
-  { id: 'storage',      label: '💾  儲存空間' },
-  { id: 'network',      label: '🌐  網路' },
-  { id: 'security',     label: '🔒  安全性' },
-  { id: 'accessibility',label: '♿  無障礙' },
-  { id: 'about',        label: 'ℹ️  關於' },
+  { id: 'home', label: '🏠  首頁' },
+  { id: 'appearance', label: '🎨  外觀' },
+  { id: 'notifications', label: '🔔  通知' },
+  { id: 'apps', label: '📦  應用程式' },
+  { id: 'storage', label: '💾  儲存空間' },
+  { id: 'network', label: '🌐  網路' },
+  { id: 'security', label: '🔒  安全性' },
+  { id: 'accessibility', label: '♿  無障礙' },
+  { id: 'about', label: 'ℹ️  關於' },
 ];
 
 // ── Page renderers ───────────────────────────────────────────
@@ -539,7 +541,7 @@ function renderNotificationsPage(self) {
             border: notifSettings.doNotDisturb ? '1px solid rgba(255,85,85,0.25)' : '1px solid rgba(80,250,123,0.25)',
           },
         }),
-      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+      ], itemCardStyle),
     ]),
 
     // ── 顯示時長 ──
@@ -571,7 +573,7 @@ function renderNotificationsPage(self) {
           }),
           { gap: '4px', flexShrink: '0' }
         ),
-      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+      ], itemCardStyle),
     ]),
 
     // ── 最大顯示數量 ──
@@ -603,7 +605,7 @@ function renderNotificationsPage(self) {
           }),
           { gap: '4px', flexShrink: '0' }
         ),
-      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+      ], itemCardStyle),
     ]),
 
     // ── 測試通知 ──
@@ -627,7 +629,7 @@ function renderNotificationsPage(self) {
             color: '#05101c',
           },
         }),
-      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+      ], itemCardStyle),
     ]),
 
   ], { gap: '8px', flex: '1' });
@@ -823,10 +825,10 @@ function renderAppDetail(app, runningCount, self) {
 
     perms.length > 0
       ? UI.box(permItems, {
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '4px',
-        })
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '4px',
+      })
       : UI.text('此應用程式無需任何權限', { fontSize: '12px', color: 'rgba(216,232,255,0.35)' }),
 
   ], { gap: '8px', flex: '1' });
@@ -851,14 +853,176 @@ function renderStoragePage(self) {
   ], { gap: '8px', flex: '1' });
 }
 
-// ── 網路頁面（預留）──────────────────────────────────────────
+// ── 網路頁面 ────────────────────────────────────────────────
+var networkNewPattern = '';
+var networkNewDesc = '';
+
+function loadNetworkData() {
+  var statusResult = networkApi.getStatus();
+  var listResult = networkApi.getAllowlist();
+  return {
+    status: (statusResult.success && statusResult.data) ? statusResult.data : { enabled: true, allowlistCount: 0, totalRequests: 0, blockedRequests: 0 },
+    allowlist: (listResult.success && listResult.data) ? listResult.data : [],
+  };
+}
+
 function renderNetworkPage(self) {
+  var net = loadNetworkData();
+  var status = net.status;
+  var allowlist = net.allowlist;
+
   return UI.column([
     UI.heading('網路', { color: '#ecf4ff' }),
-    UI.text('網路連線與通訊設定', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+    UI.text('管理網路連線與允許清單', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+
     UI.box([], { height: '8px' }),
-    stubSection('連線狀態', '顯示目前的網路介面狀態與位址資訊。'),
-    stubSection('IPC 通道', '管理程序間通訊(IPC)的連線與授權。'),
+
+    // ── 網路開關 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('網路功能', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('啟用或停用所有網路連線', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.button(status.enabled ? '🌐 已啟用' : '🚫 已停用', {
+          onClick: function () {
+            networkApi.setEnabled(!status.enabled);
+            self.rerender();
+          },
+          style: {
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            flexShrink: '0',
+            background: status.enabled ? 'rgba(80,250,123,0.15)' : 'rgba(255,85,85,0.15)',
+            color: status.enabled ? '#50fa7b' : '#ff5555',
+            border: status.enabled ? '1px solid rgba(80,250,123,0.25)' : '1px solid rgba(255,85,85,0.25)',
+          },
+        }),
+      ], itemCardStyle),
+    ]),
+
+    // ── 連線統計 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('連線統計', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('允許清單 ' + status.allowlistCount + ' 條規則', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.row([
+          UI.column([
+            UI.text(String(status.totalRequests), { fontSize: '16px', fontWeight: 'bold', color: '#67b8ff', textAlign: 'center' }),
+            UI.text('總請求', { fontSize: '10px', color: 'rgba(216,232,255,0.4)', textAlign: 'center' }),
+          ], { alignItems: 'center', gap: '2px' }),
+          UI.column([
+            UI.text(String(status.blockedRequests), { fontSize: '16px', fontWeight: 'bold', color: '#ff5555', textAlign: 'center' }),
+            UI.text('已攔截', { fontSize: '10px', color: 'rgba(216,232,255,0.4)', textAlign: 'center' }),
+          ], { alignItems: 'center', gap: '2px' }),
+        ], { gap: '16px', flexShrink: '0' }),
+      ], itemCardStyle),
+    ]),
+
+    // ── 新增規則 ──
+    UI.card([
+      UI.column([
+        UI.text('新增允許規則', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+        UI.text('支援格式：example.com、*.example.com、*（全部允許）', { fontSize: '12px', color: 'rgba(216,232,255,0.4)', marginBottom: '8px' }),
+        UI.row([
+          UI.input({
+            value: networkNewPattern,
+            placeholder: '輸入網域，例如 api.example.com',
+            onChange: function (v) { networkNewPattern = v; },
+            style: { flex: '1', fontSize: '12px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: '#d8e8ff', border: '1px solid rgba(255,255,255,0.1)' },
+          }),
+          UI.input({
+            value: networkNewDesc,
+            placeholder: '說明（選填）',
+            onChange: function (v) { networkNewDesc = v; },
+            style: { flex: '1', fontSize: '12px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: '#d8e8ff', border: '1px solid rgba(255,255,255,0.1)' },
+          }),
+          UI.button('新增', {
+            onClick: function () {
+              var pat = networkNewPattern.trim();
+              if (!pat) {
+                notificationApi.notify('新增失敗', '請輸入網域規則', 'warning');
+                return;
+              }
+              // 驗證格式：* | *.domain.tld | sub.domain.tld
+              // 需至少含一個 '.'，且頂級域必須為純字母（2 字以上）
+              var label = '[a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?';
+              var tld = '[a-zA-Z]{2,}';
+              var domainRegex = new RegExp('^(\\*|\\*\\.' + label + '(\\.' + label + ')*\\.' + tld + '|' + label + '(\\.' + label + ')*\\.' + tld + ')$');
+              var valid = domainRegex.test(pat);
+              if (!valid) {
+                notificationApi.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
+                return;
+              }
+              var result = networkApi.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
+              if (result.success) {
+                notificationApi.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
+                networkNewPattern = '';
+                networkNewDesc = '';
+              } else {
+                notificationApi.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
+              }
+              self.rerender();
+            },
+            style: {
+              padding: '8px 18px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              flexShrink: '0',
+              background: 'linear-gradient(135deg, #4a7fff, #67b8ff)',
+              color: '#05101c',
+            },
+          }),
+        ], { flex: '1', gap: '4px', width: '100%'}),
+      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }),
+    ]),
+
+    // ── 允許清單 ──
+    UI.card([
+      UI.column([
+      UI.text('允許清單', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff', marginBottom: '4px' }),
+      allowlist.length === 0
+        ? UI.text('尚無任何規則，所有連線將被拒絕', { fontSize: '12px', color: 'rgba(216,232,255,0.35)', fontStyle: 'italic' })
+        : UI.column(allowlist.map(function (entry) {
+          return UI.row([
+            UI.column([
+              UI.text(entry.pattern, { fontSize: '13px', fontWeight: 'bold', color: '#d8e8ff', fontFamily: 'monospace' }),
+              entry.description
+                ? UI.text(entry.description, { fontSize: '11px', color: 'rgba(216,232,255,0.4)' })
+                : UI.text(''),
+            ], { flex: '1', gap: '1px' }),
+            UI.button('移除', {
+              onClick: function () {
+                networkApi.removeAllowlistEntry(entry.pattern);
+                self.rerender();
+              },
+              style: {
+                padding: '4px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                flexShrink: '0',
+                background: 'rgba(255,85,85,0.12)',
+                color: '#ff5555',
+                border: '1px solid rgba(255,85,85,0.2)',
+              },
+            }),
+          ], {
+            alignItems: 'center',
+            gap: '8px',
+            justifyContent: 'space-between',
+            padding: '8px 10px',
+            borderRadius: '6px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.05)',
+          });
+        }), { gap: '4px' }),
+      ], { gap: '6px' }),
+    ]),
   ], { gap: '8px', flex: '1' });
 }
 
@@ -982,15 +1146,15 @@ var app = UI.createApp({
     // Route to page
     var content;
     switch (currentPage) {
-      case 'appearance':    content = renderAppearancePage(self); break;
+      case 'appearance': content = renderAppearancePage(self); break;
       case 'notifications': content = renderNotificationsPage(self); break;
-      case 'apps':          content = renderAppsPage(self); break;
-      case 'storage':       content = renderStoragePage(self); break;
-      case 'network':       content = renderNetworkPage(self); break;
-      case 'security':      content = renderSecurityPage(self); break;
+      case 'apps': content = renderAppsPage(self); break;
+      case 'storage': content = renderStoragePage(self); break;
+      case 'network': content = renderNetworkPage(self); break;
+      case 'security': content = renderSecurityPage(self); break;
       case 'accessibility': content = renderAccessibilityPage(self); break;
-      case 'about':         content = renderAboutPage(self); break;
-      default:              content = renderHomePage(self); break;
+      case 'about': content = renderAboutPage(self); break;
+      default: content = renderHomePage(self); break;
     }
 
     return UI.row([

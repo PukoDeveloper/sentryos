@@ -17,7 +17,9 @@
                 "env.library.load",
                 "settings.read",
                 "settings.write",
-                "notification.send"
+                "notification.send",
+                "network.status",
+                "network.manage"
             ],
             "maxInstances": 1
         }

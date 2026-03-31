@@ -114,6 +114,11 @@ export const Permissions = {
   // Settings
   SETTINGS_READ: 'settings.read',
   SETTINGS_WRITE: 'settings.write',
+
+  // Network
+  NETWORK_REQUEST: 'network.request',
+  NETWORK_STATUS: 'network.status',
+  NETWORK_MANAGE: 'network.manage',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────

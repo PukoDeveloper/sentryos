@@ -297,6 +297,7 @@ class ScriptRuntime {
             globalThis.notificationApi = Sentry.notificationApi ?? {};
             globalThis.monitorApi = Sentry.monitorApi ?? {};
             globalThis.settingsApi = Sentry.settingsApi ?? {};
+            globalThis.networkApi = Sentry.networkApi ?? {};
         `);
         if (!prelude.error) {
             prelude.value.dispose();
