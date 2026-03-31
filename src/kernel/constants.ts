@@ -44,6 +44,9 @@ export const ID_PREFIX_APP_DEF = 'appdef_';
 // ── Application Types ───────────────────────────────────────
 export type AppType = 'Service' | 'Window' | 'Console' | 'Library';
 
+// ── Built-in App IDs ────────────────────────────────────────
+export const BUILTIN_KERNEL_CONSOLE = 'builtin_kernel_console';
+
 // ── Permission Strings ──────────────────────────────────────
 export const Permissions = {
   // Permission management

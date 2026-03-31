@@ -12,6 +12,7 @@ import type { SystemMonitor } from '../monitor/SystemMonitor';
 import type { ApplicationLauncher } from '../application/ApplicationLauncher';
 import type { DesktopShell } from '../ui/DesktopShell';
 import type { SystemAlert } from '../notification/SystemAlert';
+import type { KernelConsole } from '../console/KernelConsole';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
 
 export interface ServiceMap {
@@ -28,6 +29,7 @@ export interface ServiceMap {
   desktopShell: DesktopShell;
   applicationLauncher: ApplicationLauncher;
   systemAlert: SystemAlert;
+  kernelConsole: KernelConsole;
 }
 
 export interface ValueMap {

@@ -1,5 +1,5 @@
 import type { Kernel } from '../kernel/Kernel';
-import { Permissions } from '../kernel/constants';
+import { Permissions, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 
 export function registerShellApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');
@@ -66,7 +66,11 @@ export function registerShellApi(kernel: Kernel): void {
       if (!app) return { success: false, error: 'AppNotFound' };
       if (app.runtimeType === 'Library') return { success: false, error: 'CannotLaunchLibrary' };
       // Fire-and-forget launch (async)
-      launcher.launchApplication({ app, type: app.runtimeType });
+      if (app.appId === BUILTIN_KERNEL_CONSOLE) {
+        launcher.launchKernelConsole(BUILTIN_KERNEL_CONSOLE, app.name, app.icon);
+      } else {
+        launcher.launchApplication({ app, type: app.runtimeType });
+      }
       return { success: true, data: app.name };
     },
     listWindows: () => {
