@@ -9,6 +9,7 @@
             "name": "計算機",
             "main": "calculator.js",
             "type": "Window",
+            "icon": "calculator-icon.svg",
             "permissions": [
                 "window.create",
                 "event.subscribe.window.ui",
@@ -22,6 +23,7 @@
             "name": "時鐘",
             "main": "clock.js",
             "type": "Window",
+            "icon": "clock-icon.svg",
             "permissions": [
                 "window.create",
                 "event.subscribe.window.ui",

@@ -9,6 +9,7 @@
             "name": "系統設定",
             "main": "main.js",
             "type": "Window",
+            "icon": "icon.svg",
             "permissions": [
                 "window.create",
                 "event.subscribe.window.ui",

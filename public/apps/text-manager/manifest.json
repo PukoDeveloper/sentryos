@@ -9,6 +9,7 @@
             "name": "文字管理器",
             "main": "main.js",
             "type": "Window",
+            "icon": "icon.svg",
             "permissions": [
                 "window.create",
                 "event.subscribe.window.ui",

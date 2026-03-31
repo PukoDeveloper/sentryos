@@ -15,7 +15,7 @@ import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
-import { Events } from '../kernel/constants';
+import { Events, USER_DEFAULT_PERMISSIONS } from '../kernel/constants';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -165,14 +165,16 @@ async function bootstrapSystem(): Promise<void> {
   });
 
   // 8. Boot auto-start apps (Library → Service → Window/Console)
+  // 自動啟動由系統發起，使用 systemAppId 繞過使用者權限限制
+  const systemAppIdForBoot = kernel.get('systemAppId');
   const libraries = catalogApps.filter(a => a.runtimeType === 'Library');
   const autoStartApps = catalogApps.filter(a => a.runtimeType !== 'Library' && a.autoStart);
 
   for (const lib of libraries) {
-    await launcher.launchApplication({ app: lib, type: 'Library' });
+    await launcher.launchApplication({ app: lib, type: 'Library', callerAppId: systemAppIdForBoot });
   }
   for (const app of autoStartApps) {
-    await launcher.launchApplication({ app, type: app.runtimeType });
+    await launcher.launchApplication({ app, type: app.runtimeType, callerAppId: systemAppIdForBoot });
   }
 
   bios.destroyBootTerminal();
@@ -194,6 +196,14 @@ async function initializeCore(): Promise<Kernel> {
 
   const systemAppId = initResult.data;
   kernel.set('systemAppId', systemAppId);
+
+  // 建立使用者權限實體（與系統分離，受 USER_DEFAULT_PERMISSIONS 約束）
+  const userResult = permissions.createUser(systemAppId, USER_DEFAULT_PERMISSIONS);
+  if (!userResult.success || typeof userResult.data !== 'string') {
+    throw new Error('User session creation failed');
+  }
+  kernel.set('userAppId', userResult.data);
+  bufferedLog('BOOT', 'INFO', 'User session created');
 
   const eventBus = new EventBus(kernel);
   kernel.register('eventBus', eventBus);

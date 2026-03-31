@@ -30,6 +30,7 @@ export interface ServiceMap {
 
 export interface ValueMap {
   systemAppId: string;
+  userAppId: string;
   bootStartTime: number;
   catalogApps: RegisteredApplication[];
   iconMap: Map<string, string>;

@@ -7,6 +7,8 @@ import { Events, type AppType } from '../kernel/constants';
 export interface LaunchContext {
   app: RegisteredApplication;
   type: AppType;
+  /** 發起啟動請求的權限實體。省略時使用 userAppId（使用者發起）。 */
+  callerAppId?: string;
 }
 
 export class ApplicationLauncher {
@@ -18,6 +20,7 @@ export class ApplicationLauncher {
   }
 
   private get systemAppId() { return this.kernel.get('systemAppId'); }
+  private get userAppId() { return this.kernel.get('userAppId'); }
   private get eventBus() { return this.kernel.resolve('eventBus'); }
   private get appManager() { return this.kernel.resolve('appManager'); }
   private get processManager() { return this.kernel.resolve('processManager'); }
@@ -75,12 +78,13 @@ export class ApplicationLauncher {
   }
 
   async launchApplication(context: LaunchContext): Promise<void> {
-    const { app, type } = context;
+    const { app, type, callerAppId } = context;
+    const caller = callerAppId ?? this.userAppId;
     if (!app.appId) {
       return;
     }
 
-    const launch = this.processManager.launch(this.systemAppId, app.appId, { type });
+    const launch = this.processManager.launch(caller, app.appId, { type });
     if (!launch.success || typeof launch.data !== 'number') {
       if (launch.error === 'MaxInstancesReached') {
         this.focusExistingInstance(app.appId);
