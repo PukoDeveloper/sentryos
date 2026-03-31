@@ -7,6 +7,8 @@ import { Events, type AppType } from '../kernel/constants';
 export interface LaunchContext {
   app: RegisteredApplication;
   type: AppType;
+  /** 發起啟動請求的權限實體。省略時使用 userAppId（使用者發起）。 */
+  callerAppId?: string;
 }
 
 export class ApplicationLauncher {
@@ -18,6 +20,7 @@ export class ApplicationLauncher {
   }
 
   private get systemAppId() { return this.kernel.get('systemAppId'); }
+  private get userAppId() { return this.kernel.get('userAppId'); }
   private get eventBus() { return this.kernel.resolve('eventBus'); }
   private get appManager() { return this.kernel.resolve('appManager'); }
   private get processManager() { return this.kernel.resolve('processManager'); }
@@ -25,6 +28,8 @@ export class ApplicationLauncher {
   private get windowManager() { return this.kernel.resolve('windowManager'); }
   private get environmentManager() { return this.kernel.resolve('environmentManager'); }
   private get systemMonitor() { return this.kernel.resolve('systemMonitor'); }
+  private get systemAlert() { return this.kernel.resolve('systemAlert'); }
+  private get kernelConsole() { return this.kernel.resolve('kernelConsole'); }
 
   getConsoleControllers(): Map<string, ConsoleWindowController> {
     return this.consoleControllers;
@@ -42,6 +47,9 @@ export class ApplicationLauncher {
 
     // Clean up console controller if present
     this.consoleControllers.delete(processAppId);
+
+    // Clean up kernel console session
+    this.kernelConsole.closeSessionByProcess(processAppId);
 
     // Close all windows owned by this process
     const windowIds = this.windowManager.getWindowsByProcess(processAppId);
@@ -75,17 +83,22 @@ export class ApplicationLauncher {
   }
 
   async launchApplication(context: LaunchContext): Promise<void> {
-    const { app, type } = context;
+    const { app, type, callerAppId } = context;
+    const caller = callerAppId ?? this.userAppId;
     if (!app.appId) {
       return;
     }
 
-    const launch = this.processManager.launch(this.systemAppId, app.appId, { type });
+    const launch = this.processManager.launch(caller, app.appId, { type });
     if (!launch.success || typeof launch.data !== 'number') {
       if (launch.error === 'MaxInstancesReached') {
         this.focusExistingInstance(app.appId);
+      } else if (launch.error === 'PermissionDenied') {
+        bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error}`);
+        this.systemAlert.show({ code: 'PERMISSION_DENIED', detail: `無法啟動「${app.name}」` });
       } else {
         bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error ?? 'UnknownError'}`);
+        this.systemAlert.show({ code: 'APP_LAUNCH_FAILED', detail: `${app.name}: ${launch.error ?? 'UnknownError'}` });
       }
       return;
     }
@@ -104,12 +117,14 @@ export class ApplicationLauncher {
       source = await fetch(app.mainPath);
     } catch (err) {
       bios.log('PROC', 'ERROR', `Failed to fetch main script: ${app.mainPath}`);
+      this.systemAlert.show({ code: 'APP_FETCH_FAILED', detail: app.name });
       this.terminateApplication(proc.processAppId, `Fetch error: ${app.mainPath}`);
       return;
     }
 
     if (!source.ok) {
       bios.log('PROC', 'ERROR', `HTTP ${source.status} fetching ${app.mainPath}`);
+      this.systemAlert.show({ code: 'APP_FETCH_FAILED', detail: `${app.name} (HTTP ${source.status})` });
       this.terminateApplication(proc.processAppId, `HTTP ${source.status}: ${app.mainPath}`);
       return;
     }
@@ -199,5 +214,56 @@ export class ApplicationLauncher {
     if (value === null || value === undefined) return 'Unknown error';
     if (typeof value === 'string') return value;
     try { return JSON.stringify(value); } catch { return String(value); }
+  }
+
+  // ── Kernel Console (native terminal) ────────────────────
+
+  /**
+   * 啟動內核原生終端機。
+   * 不經過 QuickJS，命令直接在內核層以 userAppId 權限執行。
+   */
+  async launchKernelConsole(appDefId: string, appName: string, icon?: string): Promise<void> {
+    const caller = this.userAppId;
+
+    const launch = this.processManager.launch(caller, appDefId, { type: 'Console' });
+    if (!launch.success || typeof launch.data !== 'number') {
+      if (launch.error === 'MaxInstancesReached') {
+        this.focusExistingInstance(appDefId);
+      } else if (launch.error === 'PermissionDenied') {
+        this.systemAlert.show({ code: 'PERMISSION_DENIED', detail: `無法啟動「${appName}」` });
+      } else {
+        this.systemAlert.show({ code: 'APP_LAUNCH_FAILED', detail: `${appName}: ${launch.error ?? 'UnknownError'}` });
+      }
+      return;
+    }
+
+    const pid = launch.data;
+    const proc = this.processManager.get(pid);
+    if (!proc) return;
+
+    this.systemMonitor.recordProcessLaunch(proc.pid, proc.appDefId, proc.processAppId, proc.type);
+
+    let sessionId: string;
+    const controller = this.windowManager.createConsoleWindow(
+      {
+        processAppId: proc.processAppId,
+        appDefId,
+        appName,
+        icon,
+      },
+      appName,
+      (line: string) => {
+        this.kernelConsole.handleInput(sessionId, line);
+      }
+    );
+    this.consoleControllers.set(proc.processAppId, controller);
+
+    sessionId = this.kernelConsole.openSession(proc.processAppId, pid, controller);
+
+    this.eventBus.emit(this.systemAppId, Events.PROCESS_STARTED, {
+      pid: proc.pid,
+      appDefId: proc.appDefId,
+      type: proc.type,
+    });
   }
 }

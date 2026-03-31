@@ -11,11 +11,13 @@ import { EnvironmentManager } from '../environment/EnvironmentManager';
 import { DesktopShell } from '../ui/DesktopShell';
 import { NotificationManager } from '../notification/NotificationManager';
 import { SystemMonitor } from '../monitor/SystemMonitor';
+import { SystemAlert } from '../notification/SystemAlert';
+import { KernelConsole } from '../console/KernelConsole';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
-import { Events } from '../kernel/constants';
+import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -79,6 +81,31 @@ async function bootstrapSystem(): Promise<void> {
 
   // 3. Register applications
   const { applications, iconMap } = registerApplications(appManager, catalogApps);
+
+  // Register built-in kernel console as a native application
+  appManager.registerBuiltin(BUILTIN_KERNEL_CONSOLE, {
+    name: 'System Terminal',
+    version: '1.0.0',
+    permissions: [],     // 權限由 userAppId 管理，不需 manifest 層權限
+    maxInstances: 8,
+  });
+
+  const kernelConsoleEntry: RegisteredApplication = {
+    name: 'System Terminal',
+    version: '1.0.0',
+    permissions: [],
+    maxInstances: 8,
+    appId: BUILTIN_KERNEL_CONSOLE,
+    packageName: 'system',
+    entryPath: '',
+    mainPath: '',
+    icon: '🖥',
+    runtimeType: 'Console',
+    autoStart: false,
+  };
+  catalogApps.push(kernelConsoleEntry);
+  applications.push({ ...kernelConsoleEntry });
+
   kernel.set('catalogApps', catalogApps);
   kernel.set('iconMap', iconMap);
 
@@ -95,6 +122,11 @@ async function bootstrapSystem(): Promise<void> {
   const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });
 
+  // Register system alert overlay
+  const systemAlert = kernel.resolve('systemAlert');
+  const alertContainer = systemAlert.createContainer();
+  desktopShell.registerOverlay({ id: 'system-alert-layer', element: alertContainer, order: 200 });
+
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
   if (!windowHost) {
@@ -110,6 +142,9 @@ async function bootstrapSystem(): Promise<void> {
     launcher.onWindowUiEvent(event);
   });
   kernel.register('windowManager', windowManager);
+
+  const kernelConsole = new KernelConsole(kernel);
+  kernel.register('kernelConsole', kernelConsole);
 
   const systemAppId = kernel.get('systemAppId');
   const processManager = kernel.resolve('processManager');
@@ -161,18 +196,24 @@ async function bootstrapSystem(): Promise<void> {
   });
 
   desktopShell.onLaunchRequest((app) => {
-    launcher.launchApplication({ app, type: app.runtimeType });
+    if (app.appId === BUILTIN_KERNEL_CONSOLE) {
+      launcher.launchKernelConsole(BUILTIN_KERNEL_CONSOLE, app.name, app.icon);
+    } else {
+      launcher.launchApplication({ app, type: app.runtimeType });
+    }
   });
 
   // 8. Boot auto-start apps (Library → Service → Window/Console)
+  // 自動啟動由系統發起，使用 systemAppId 繞過使用者權限限制
+  const systemAppIdForBoot = kernel.get('systemAppId');
   const libraries = catalogApps.filter(a => a.runtimeType === 'Library');
   const autoStartApps = catalogApps.filter(a => a.runtimeType !== 'Library' && a.autoStart);
 
   for (const lib of libraries) {
-    await launcher.launchApplication({ app: lib, type: 'Library' });
+    await launcher.launchApplication({ app: lib, type: 'Library', callerAppId: systemAppIdForBoot });
   }
   for (const app of autoStartApps) {
-    await launcher.launchApplication({ app, type: app.runtimeType });
+    await launcher.launchApplication({ app, type: app.runtimeType, callerAppId: systemAppIdForBoot });
   }
 
   bios.destroyBootTerminal();
@@ -195,6 +236,14 @@ async function initializeCore(): Promise<Kernel> {
   const systemAppId = initResult.data;
   kernel.set('systemAppId', systemAppId);
 
+  // 建立使用者權限實體（與系統分離，受 USER_DEFAULT_PERMISSIONS 約束）
+  const userResult = permissions.createUser(systemAppId, USER_DEFAULT_PERMISSIONS);
+  if (!userResult.success || typeof userResult.data !== 'string') {
+    throw new Error('User session creation failed');
+  }
+  kernel.set('userAppId', userResult.data);
+  bufferedLog('BOOT', 'INFO', 'User session created');
+
   const eventBus = new EventBus(kernel);
   kernel.register('eventBus', eventBus);
 
@@ -215,6 +264,9 @@ async function initializeCore(): Promise<Kernel> {
 
   const notificationManager = new NotificationManager();
   kernel.register('notificationManager', notificationManager);
+
+  const sysAlert = new SystemAlert(kernel);
+  kernel.register('systemAlert', sysAlert);
 
   const desktopShell = new DesktopShell();
   kernel.register('desktopShell', desktopShell);

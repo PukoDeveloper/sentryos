@@ -37,11 +37,15 @@ export const STORAGE_TIER_CAPACITIES = {
 
 // ── ID Prefixes ─────────────────────────────────────────────
 export const ID_PREFIX_SYSTEM = 'sys_';
+export const ID_PREFIX_USER = 'user_';
 export const ID_PREFIX_APP_INSTANCE = 'app_';
 export const ID_PREFIX_APP_DEF = 'appdef_';
 
 // ── Application Types ───────────────────────────────────────
 export type AppType = 'Service' | 'Window' | 'Console' | 'Library';
+
+// ── Built-in App IDs ────────────────────────────────────────
+export const BUILTIN_KERNEL_CONSOLE = 'builtin_kernel_console';
 
 // ── Permission Strings ──────────────────────────────────────
 export const Permissions = {
@@ -120,3 +124,59 @@ export const Events = {
   PROCESS_STOPPED: 'process.stopped',
   NOTIFICATION: 'notification',
 } as const;
+
+// ── User Default Permissions ────────────────────────────────
+// 使用者登入後取得的預設權限。可在此調整使用者能存取的功能範圍。
+// 系統內部操作（程序清理、事件廣播等）仍使用 systemAppId (WILDCARD)。
+export const USER_DEFAULT_PERMISSIONS: string[] = [
+  // 程序啟動（萬用字元：可啟動所有已註冊 App）
+  'process.launch.*',
+  Permissions.PROCESS_TERMINATE,
+  Permissions.PROCESS_LIST,
+
+  // 視窗
+  Permissions.WINDOW_CREATE,
+
+  // 檔案系統 — 使用者與 App 區域
+  'file.read.user',
+  'file.write.user',
+  'file.delete.user',
+  'file.list.user',
+  'file.read.app',
+  'file.write.app',
+  'file.list.app',
+
+  // 主控台
+  Permissions.CONSOLE_WRITE,
+  Permissions.CONSOLE_READ,
+
+  // 事件匯流排
+  'event.subscribe.*',
+  'event.emit.*',
+
+  // Shell 指令
+  Permissions.SHELL_LIST_APPS,
+  Permissions.SHELL_LAUNCH,
+  Permissions.SHELL_WINDOWS,
+  Permissions.SHELL_SYSINFO,
+
+  // 通知
+  Permissions.NOTIFICATION_SEND,
+
+  // 環境
+  Permissions.ENV_READ,
+  Permissions.ENV_LOAD_LIBRARY,
+
+  // 儲存空間查詢
+  Permissions.STORAGE_USAGE,
+
+  // 設定
+  Permissions.SETTINGS_READ,
+  Permissions.SETTINGS_WRITE,
+
+  // 監控（唯讀）
+  Permissions.MONITOR_READ,
+
+  // 權限：建立子應用權限槽（供 DesktopShell 啟動使用）
+  Permissions.NEW_APP,
+];

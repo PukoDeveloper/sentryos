@@ -28,6 +28,11 @@ class ApplicationManager {
         return appId;
     }
 
+    /** 以指定 appId 登錄內建應用程式 */
+    registerBuiltin(appId: string, app: Omit<Application, 'appId'>): void {
+        this.applications.set(appId, { ...app, appId });
+    }
+
     unregister(appId: string): boolean {
         return this.applications.delete(appId);
     }

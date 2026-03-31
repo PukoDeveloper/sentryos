@@ -1,5 +1,5 @@
 import type { PermissionResult } from "../kernel/types";
-import { ID_PREFIX_SYSTEM, ID_PREFIX_APP_INSTANCE, Permissions } from '../kernel/constants';
+import { ID_PREFIX_SYSTEM, ID_PREFIX_USER, ID_PREFIX_APP_INSTANCE, Permissions } from '../kernel/constants';
 import type { Kernel } from '../kernel/Kernel';
 
 type Permission = string;
@@ -34,6 +34,21 @@ class PermissionsManager {
         const systemAppId = `${ID_PREFIX_SYSTEM}${Date.now()}`;
         this.appPermissions[systemAppId] = new Set([Permissions.WILDCARD]);
         return { success: true, data: systemAppId };
+    }
+    /**
+     * 建立使用者權限實體，權限範圍由呼叫者指定。
+     * 需要 MANAGE_PERMISSIONS 權限（通常由 systemAppId 呼叫）。
+     */
+    createUser(fromAppId: string, permissions: string[]): PermissionResult {
+        if (!this.inited) {
+            return { success: false, error: 'NotInitialized' };
+        }
+        if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
+            return { success: false, error: 'PermissionDenied' };
+        }
+        const userAppId = `${ID_PREFIX_USER}${Date.now()}`;
+        this.appPermissions[userAppId] = new Set(permissions);
+        return { success: true, data: userAppId };
     }
     new(fromAppId: string, permissions: string[]): PermissionResult {
         if (!this.inited) {
