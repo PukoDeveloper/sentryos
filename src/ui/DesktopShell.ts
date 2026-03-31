@@ -11,7 +11,7 @@ type DesktopOverlayRegistration = {
   order?: number;
 };
 
-export type ThemeSettings = {
+type ThemeSettings = {
   wallpaper?: string;
   tint?: string;
   accentPrimary?: string;
