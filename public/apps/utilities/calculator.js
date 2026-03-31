@@ -1,4 +1,4 @@
-var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }

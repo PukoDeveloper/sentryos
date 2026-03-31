@@ -1,4 +1,4 @@
-var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -17,12 +17,12 @@ var state = {
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadUsage() {
-  var result = storageApi.usage();
+  var result = OS.storageUsage();
   state.usage = result.success ? result.data : null;
 }
 
 function loadEntries() {
-  var result = storageApi.listAll(state.currentTier);
+  var result = OS.listAllFiles(state.currentTier);
   if (!result.success) { state.entries = []; state.namespaces = []; return; }
 
   var all = result.data || [];
@@ -77,7 +77,7 @@ function formatData(data) {
 
 function deleteEntry(entry) {
   if (state.currentTier === 'sys') {
-    notificationApi.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
+    OS.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
     return;
   }
   // 使用跨應用路徑刪除
@@ -89,11 +89,11 @@ function deleteEntry(entry) {
   var filename = slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
   var tier = state.currentTier;
   var path = tier + ':@' + ns + '/' + filename;
-  var result = storageApi.delete(path);
+  var result = OS.deleteFile(path);
   if (result.success) {
-    notificationApi.notify('已刪除', entry.key, 'info');
+    OS.notify('已刪除', entry.key, 'info');
   } else {
-    notificationApi.notify('刪除失敗', result.error || '未知錯誤', 'error');
+    OS.notify('刪除失敗', result.error || '未知錯誤', 'error');
   }
 }
 

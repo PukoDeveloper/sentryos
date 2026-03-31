@@ -16,10 +16,10 @@ StartMenu click
       → fetch(app.mainPath) → code
       → ScriptRuntime.execute(pid, code)
         → ensureRuntimeProcess() → QuickJS Runtime/Context
-        → injectApis() → 注入 Sentry.{process, event, ipc, ui, ...}
+        → injectApis() → 注入 OS.{pid, subscribe, emit, createWindow, ...}
         → evalCode(code) → app 主程式執行
-          → ui.createWindow() → WindowManager.createWindow() → DOM 建立
-          → ui.initialize(wid, tree) → WindowManager.initializeUi() → DOM 渲染
+          → OS.createWindow() → WindowManager.createWindow() → DOM 建立
+          → OS.initialize(wid, tree) → WindowManager.initializeUi() → DOM 渲染
 ```
 
 ---
@@ -48,7 +48,7 @@ launchApplication(deps, { app, type: 'Console' })
     → ScriptRuntime.dispatchConsoleInput(processAppId, line)
       → evalCode: 'onConsoleInput("...")'
         → app 內 globalThis.onConsoleInput(line)
-          → consoleApi.writeLine(response)
+          → OS.writeLine(response)
             → controller.appendLine(text)   → DOM 更新 .console-output
 ```
 
@@ -66,7 +66,7 @@ bootstrapSystem
        → fetch(lib.mainPath) → code
        → EnvironmentManager.registerLibrary(libraryId, code)   快取原始碼
        → ScriptRuntime.execute(pid, code)                      執行 init
-         → envApi.registerCommand(...)                         註冊 CLI 命令
+         → OS.registerCommand(...)                             註冊 CLI 命令
          → globalThis.__commands['cmd'] = handler              設定命令處理函式
        → ScriptRuntime.destroyProcessRuntime(pid)              銷毀 Runtime
        → ProcessManager.terminate(systemAppId, pid)            終止程序
@@ -75,7 +75,7 @@ bootstrapSystem
 ### 執行期載入（由其他程序呼叫）
 
 ```
-consoleApp → envApi.loadLibrary('stdlib/Math Utils')
+consoleApp → OS.loadLibrary('stdlib/Math Utils')
   → EnvironmentManager.getLibraryCode(libraryId)
   → ScriptRuntime.evaluateInContext(pid, code)     在呼叫者的 Context 中執行
     → 程式庫的全域物件（MathUtils 等）與 __commands 載入到呼叫者 Context
@@ -87,15 +87,15 @@ consoleApp → envApi.loadLibrary('stdlib/Math Utils')
 
 ```
 Console 使用者輸入 "factorial 5"（未識別的命令）
-  → shellApi.resolveCommand('factorial')
+  → OS.resolveCommand('factorial')
     → EnvironmentManager.getCommand('factorial')
     → 回傳 { name, libraryId: 'stdlib/Math Utils', description, usage }
-  → envApi.loadLibrary('stdlib/Math Utils')
+  → OS.loadLibrary('stdlib/Math Utils')
     → ScriptRuntime.evaluateInContext(pid, code)
     → MathUtils、__commands 載入成功
   → globalThis.__commands['factorial'](['5'])
     → 回傳 '120'
-  → consoleApi.writeLine('120')
+  → OS.writeLine('120')
 ```
 
 ---
@@ -112,7 +112,7 @@ Console 使用者輸入 "factorial 5"（未識別的命令）
             → evalCode: 'onWindowEvent(${JSON.stringify(event)})'
               → app 內 globalThis.onWindowEvent(event)
                 → 更新應用狀態
-                → ui.initialize(wid, newTree)  // 重新渲染
+                → OS.initialize(wid, newTree)  // 重新渲染
                   → WindowManager.initializeUi()
                     → DOM replaceChildren()
 ```
@@ -198,23 +198,4 @@ Console 使用者輸入 "factorial 5"（未識別的命令）
       → state = stateBeforeMinimize ?? 'normal'
       → stateBeforeMinimize = undefined
       → root.style.display = 'block'
-      → applyWindowLayout()    // 若 stateBeforeMinimize 是 'maximized'，套用最大化佈局
-      → emitWindowChange('focused')
-```
-
----
-
-## IPC 資料流
-
-```
-程序 A (parent) → ipcApi.sendToChild(childPid, payload)
-  → ScriptRuntime.sendToChild()
-    → 權限檢查: process.ipc.send-child
-    → pushMessage(fromPid, toPid, 'child', payload)
-      → 目標程序 inbox.push(Message)
-
-程序 B (child) → ipcApi.receive()
-  → ScriptRuntime.readInbox(pid)
-    → 回傳 inbox 快照並清空
-    → [Message, Message, ...]
 ```

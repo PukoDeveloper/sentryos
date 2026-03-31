@@ -19,6 +19,7 @@ type ThemeSettings = {
   taskbarOpacity?: number;
   startMenuWidth?: number;
   startMenuHeight?: number;
+  startMenuGroupByPackage?: boolean;
 };
 
 class DesktopShell {
@@ -54,6 +55,7 @@ class DesktopShell {
   private contextMenu: HTMLDivElement | null = null;
   private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
   private pinnedAppIds: string[] = [];
+  private expandedPackage: string | null = null;
 
   mount(_applications: Application[]): boolean {
     const appRoot = getAppDiv();
@@ -312,7 +314,13 @@ class DesktopShell {
       const h = Math.max(300, Math.min(800, theme.startMenuHeight));
       this.startPanel.style.setProperty('--start-menu-height', `${h}px`);
     }
+    if (theme.startMenuGroupByPackage !== undefined) {
+      this.expandedPackage = null;
+    }
     Object.assign(this.currentTheme, theme);
+    if (theme.startMenuGroupByPackage !== undefined) {
+      this.renderStartMenu();
+    }
   }
 
   getTheme(): ThemeSettings {
@@ -1011,31 +1019,139 @@ class DesktopShell {
         return true;
       }
 
-      const text = `${app.name} ${app.description ?? ''}`.toLowerCase();
+      const text = `${app.name} ${app.description ?? ''} ${app.packageName ?? ''}`.toLowerCase();
       return text.includes(keyword);
     });
 
     this.startSearchList.replaceChildren();
 
-    for (const app of matches) {
-      const button = this.createAppItem(app);
+    const groupByPackage = this.currentTheme.startMenuGroupByPackage === true;
 
-      // Right-click context menu
-      button.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        this.showSearchContextMenu(e, app);
-      });
-
-      // Draggable
-      if (app.appId) {
-        button.draggable = true;
-        button.addEventListener('dragstart', (e) => {
-          e.dataTransfer?.setData('text/plain', app.appId!);
-          e.dataTransfer?.setData('application/x-sentryos-source', 'search');
-        });
+    if (groupByPackage && !keyword) {
+      // ── Package grouped mode ──
+      const packageMap = new Map<string, RegisteredApplication[]>();
+      for (const app of matches) {
+        const pkg = app.packageName || app.name;
+        if (!packageMap.has(pkg)) {
+          packageMap.set(pkg, []);
+        }
+        packageMap.get(pkg)!.push(app);
       }
 
-      this.startSearchList.appendChild(button);
+      for (const [pkgName, apps] of packageMap) {
+        if (apps.length === 1) {
+          // Single app in package — render directly
+          const button = this.createAppItem(apps[0]);
+          button.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showSearchContextMenu(e, apps[0]);
+          });
+          if (apps[0].appId) {
+            button.draggable = true;
+            button.addEventListener('dragstart', (e) => {
+              e.dataTransfer?.setData('text/plain', apps[0].appId!);
+              e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+            });
+          }
+          this.startSearchList.appendChild(button);
+        } else {
+          // Multiple apps — render as collapsible group
+          const isExpanded = this.expandedPackage === pkgName;
+          const group = document.createElement('div');
+          group.className = 'desktop-start-package-group';
+          if (isExpanded) group.classList.add('is-expanded');
+
+          const header = document.createElement('button');
+          header.type = 'button';
+          header.className = 'desktop-start-package-header';
+
+          const iconEl = document.createElement('span');
+          iconEl.className = 'desktop-start-item-icon';
+          // Use first app's icon or package initial
+          const firstApp = apps[0];
+          if (firstApp.icon) {
+            const img = document.createElement('img');
+            img.src = firstApp.icon;
+            img.alt = '';
+            img.draggable = false;
+            img.addEventListener('error', () => {
+              img.remove();
+              iconEl.textContent = pkgName.charAt(0).toUpperCase();
+            });
+            iconEl.appendChild(img);
+          } else {
+            iconEl.textContent = pkgName.charAt(0).toUpperCase();
+          }
+
+          const label = document.createElement('span');
+          label.className = 'desktop-start-item-label';
+          label.textContent = pkgName;
+
+          const badge = document.createElement('span');
+          badge.className = 'desktop-start-package-badge';
+          badge.textContent = String(apps.length);
+
+          const chevron = document.createElement('span');
+          chevron.className = 'desktop-start-package-chevron';
+          chevron.textContent = isExpanded ? '▼' : '▶';
+
+          header.appendChild(iconEl);
+          header.appendChild(label);
+          header.appendChild(badge);
+          header.appendChild(chevron);
+
+          header.addEventListener('click', () => {
+            this.expandedPackage = this.expandedPackage === pkgName ? null : pkgName;
+            this.renderStartMenu();
+          });
+
+          group.appendChild(header);
+
+          if (isExpanded) {
+            const body = document.createElement('div');
+            body.className = 'desktop-start-package-body';
+
+            for (const app of apps) {
+              const button = this.createAppItem(app);
+              button.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showSearchContextMenu(e, app);
+              });
+              if (app.appId) {
+                button.draggable = true;
+                button.addEventListener('dragstart', (e) => {
+                  e.dataTransfer?.setData('text/plain', app.appId!);
+                  e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+                });
+              }
+              body.appendChild(button);
+            }
+            group.appendChild(body);
+          }
+
+          this.startSearchList.appendChild(group);
+        }
+      }
+    } else {
+      // ── Flat mode (default / search active) ──
+      for (const app of matches) {
+        const button = this.createAppItem(app);
+
+        button.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.showSearchContextMenu(e, app);
+        });
+
+        if (app.appId) {
+          button.draggable = true;
+          button.addEventListener('dragstart', (e) => {
+            e.dataTransfer?.setData('text/plain', app.appId!);
+            e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+          });
+        }
+
+        this.startSearchList.appendChild(button);
+      }
     }
   }
 

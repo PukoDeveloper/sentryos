@@ -55,11 +55,11 @@ export function registerEnvApi(kernel: Kernel): void {
       if (!code) return { success: false, error: 'LibraryNotFound' };
       // Suppress command re-registration — commands are only registered at boot time
       runtime.evaluateInContext(pid,
-        `globalThis.__savedRegCmd = envApi.registerCommand; envApi.registerCommand = function(){};`
+        `globalThis.__savedRegCmd = OS.registerCommand; OS.registerCommand = function(){};`
       );
       const result = runtime.evaluateInContext(pid, code);
       runtime.evaluateInContext(pid,
-        `envApi.registerCommand = globalThis.__savedRegCmd; delete globalThis.__savedRegCmd;`
+        `OS.registerCommand = globalThis.__savedRegCmd; delete globalThis.__savedRegCmd;`
       );
       return result;
     },

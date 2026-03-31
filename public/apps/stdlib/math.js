@@ -51,11 +51,11 @@ globalThis.MathUtils = {
 
 // ── Register CLI commands ─────────────────────────────────────
 
-envApi.registerCommand('factorial', 'Calculate factorial of a number', 'factorial <n>');
-envApi.registerCommand('fib', 'Calculate Fibonacci number', 'fib <n>');
-envApi.registerCommand('prime', 'Check if a number is prime', 'prime <n>');
-envApi.registerCommand('gcd', 'Calculate GCD of two numbers', 'gcd <a> <b>');
-envApi.registerCommand('lcm', 'Calculate LCM of two numbers', 'lcm <a> <b>');
+OS.registerCommand('factorial', 'Calculate factorial of a number', 'factorial <n>');
+OS.registerCommand('fib', 'Calculate Fibonacci number', 'fib <n>');
+OS.registerCommand('prime', 'Check if a number is prime', 'prime <n>');
+OS.registerCommand('gcd', 'Calculate GCD of two numbers', 'gcd <a> <b>');
+OS.registerCommand('lcm', 'Calculate LCM of two numbers', 'lcm <a> <b>');
 
 globalThis.__commands = globalThis.__commands || {};
 

@@ -37,31 +37,33 @@
 
 ## 內建 Host API
 
-ScriptRuntime 自身註冊的 API：
+ScriptRuntime 自身註冊的 API（扁平化注入至 `OS` 全域物件）：
 
-| API 名稱 | Scope | 全域變數 | 提供方法 |
-|-----------|-------|---------|---------|
-| `process` | all | `processApi` | `pid`, `appDefId`, `appId`, `type`, `parentPid`, `status()`, `spawnChild()`, `terminateSelf()`, `listProcesses()`, `terminateProcess()` |
-| `event` | all | `eventApi` | `subscribe(name)`, `unsubscribe(name)`, `emit(name, payload?)` |
-| `ipc` | all | `ipcApi` | `sendToParent(payload)`, `sendToChild(childPid, payload)`, `broadcastChildren(payload)`, `receive()` |
-| `serviceApi` | service | `serviceApi` | `publishHealth(health)` |
-| `windowApi` | window | `windowApi` | `postUiEvent(name, payload?)` |
-| `consoleApi` | console | `consoleApi` | `writeLine(text)` |
+| API 名稱 | Scope | 提供方法 |
+|-----------|-------|---------|
+| `process` | all | `pid`, `appDefId`, `appId`, `type`, `parentPid`, `status()`, `spawnChild()`, `terminateSelf()`, `listProcesses()`, `terminateProcess()` |
+| `event` | all | `subscribe(name)`, `unsubscribe(name)`, `emit(name, payload?)` |
+| `ipc` | all | `sendToParent(payload)`, `sendToChild(childPid, payload)`, `broadcastChildren(payload)`, `receive()` |
+| `serviceApi` | service | `publishHealth(health)` |
+| `windowApi` | window | `postUiEvent(name, payload?)` |
+| `consoleApi` | console | `writeLine(text)` |
 
 ## Bootstrap 註冊 Host API
 
-以下 API 由 `systemBootstrap.ts` 於啟動時註冊：
+以下 API 由 `systemBootstrap.ts` 於啟動時註冊（同樣扁平化注入至 `OS`）：
 
-| API 名稱 | Scope | 全域變數 | 提供方法 |
-|-----------|-------|---------|---------|
-| `ui` | window | `ui` | `createWindow(opts)`, `initialize(wid, tree)`, `label()`, `button()`, `stack()`, `panel()` |
-| `systemApi` | all | `systemApi` | `terminateProcess(targetPid)` |
-| `storageApi` | all | `storageApi` | `usage()` |
-| `envApi` | all | `envApi` | `getVariable()`, `getAllVariables()`, `setVariable()`, `removeVariable()`, `registerAutoStart()`, `unregisterAutoStart()`, `loadLibrary()`, `listLibraries()`, `registerCommand()` |
-| `consoleApi` | console | `consoleApi` | `writeLine()`, `write()`, `clear()`（覆寫內建版本，直接操作 Console 視窗 DOM） |
-| `shellApi` | console | `shellApi` | `listProcesses()`, `killProcess()`, `listApps()`, `launch()`, `listWindows()`, `sysinfo()`, `listCommands()`, `resolveCommand()` |
-| `notificationApi` | all | `notificationApi` | `notify()`, `dismiss()`（覆寫內建版本，發送通知到通知系統） |
-| `monitorApi` | all | `monitorApi` | `snapshot()`, `eventStats()`, `apiStats()`, `permissionStats()`, `recentEvents()`, `recentApiCalls()`, `processHistory()` |
+| API 名稱 | Scope | 提供方法 |
+|-----------|-------|---------|
+| `ui` | window | `createWindow(opts)`, `initialize(wid, tree)`, `update()`, `remove()`, `append()`, `label()`, `button()`, `stack()`, `panel()`, `input()`, `textarea()`, `checkbox()`, `select()`, `image()`, `separator()`, `progress()`, `list()` |
+| `systemApi` | all | `terminateProcess(targetPid)` |
+| `storageApi` | all | `readFile()`, `writeFile()`, `deleteFile()`, `listFiles()`, `fileExists()`, `storageUsage()`, `listAllFiles()` |
+| `envApi` | all | `getVariable()`, `getAllVariables()`, `setVariable()`, `removeVariable()`, `registerAutoStart()`, `unregisterAutoStart()`, `loadLibrary()`, `listLibraries()`, `registerCommand()` |
+| `consoleApi` | console | `writeLine()`, `write()`, `clear()`（覆寫內建版本，直接操作 Console 視窗 DOM） |
+| `shellApi` | console | `listProcesses()`, `killProcess()`, `listApps()`, `launch()`, `listWindows()`, `sysinfo()`, `listCommands()`, `resolveCommand()` |
+| `notificationApi` | all | `notify()`, `dismiss()` |
+| `monitorApi` | all | `snapshot()`, `eventStats()`, `apiStats()`, `permissionStats()`, `recentEvents()`, `recentApiCalls()`, `processHistory()` |
+| `settingsApi` | all | `getTheme()`, `applyTheme()`, `saveTheme()`, `loadSavedTheme()`, `sysinfo()`, `getNotificationSettings()`, `setNotificationSettings()`, `getApps()`, `getAppProcesses()` |
+| `networkApi` | all | `request()`, `isAllowed()`, `getStatus()`, `getAllowlist()`, `addAllowlistEntry()`, `removeAllowlistEntry()`, `setEnabled()` |
 
 > Bootstrap 的 `consoleApi` 會覆寫 ScriptRuntime 內建版本，提供實際操作 Console 視窗 DOM 的功能。
 
@@ -78,7 +80,7 @@ type ApiFactoryContext = {
 type ApiFactory = (ctx: ApiFactoryContext) => Record<string, HostApiValue>;
 ```
 
-每次 `execute()` 時，會呼叫所有適用 scope 的 factory 產生 API 物件，再注入沙箱。
+每次 `execute()` 時，會呼叫所有適用 scope 的 factory 產生 API 物件，再扁平化注入沙箱 `OS` 物件。
 
 ---
 
@@ -104,25 +106,12 @@ IPC 權限要求：
 ## 沙箱注入機制
 
 1. **`ensureRuntimeProcess()`**：延遲建立 QuickJS Runtime + Context（首次 execute 時才建立）
-2. **`injectApis()`**：呼叫 `buildApiSurface()` 產生 API 物件，以 `Sentry` 名稱設定到全域
-3. **Prelude 代碼**：自動將 `Sentry` 展開為快捷變數
-   ```javascript
-   globalThis.processApi  = Sentry.process;
-   globalThis.eventApi    = Sentry.event;
-   globalThis.ipcApi      = Sentry.ipc;
-   globalThis.ui          = Sentry.ui ?? {};
-   globalThis.serviceApi  = Sentry.serviceApi ?? {};
-   globalThis.windowApi   = Sentry.windowApi ?? {};
-   globalThis.consoleApi  = Sentry.consoleApi ?? {};
-   globalThis.systemApi   = Sentry.systemApi ?? {};
-   globalThis.storageApi  = Sentry.storageApi ?? {};
-   globalThis.envApi      = Sentry.envApi ?? {};
-   globalThis.shellApi    = Sentry.shellApi ?? {};
-   globalThis.notificationApi = Sentry.notificationApi ?? {};
-   globalThis.monitorApi  = Sentry.monitorApi ?? {};
-   ```
+2. **`buildApiSurface()`**：收集所有適用 scope 的 API factory，執行產生方法，使用 `Object.assign` 扁平合併為單一物件
+3. **`injectApis()`**：將合併後的 API 物件以 `OS` 名稱設定到沙箱全域
 4. **`toHandle()`**：遞迴將 JS 值轉換為 QuickJS Handle（支援 function、object、array、primitives）
 5. **`normalizeReturnValue()`**：將 Host function 回傳值正規化為可序列化格式
+
+> **注意**：由於所有 API 方法被扁平化到單一 `OS` 物件，若不同 API 有同名方法，後註冊的會覆蓋先註冊的。例如 `systemApi.terminateProcess` 會覆蓋內建 `process.terminateProcess`。
 
 ---
 
@@ -150,7 +139,7 @@ if(typeof onConsoleInput === 'function') {
 
 ### evaluateInContext（Library 載入）
 
-`evaluateInContext()` 在已存在的程序 Context 中直接執行程式碼，不重新注入 API。用於 `envApi.loadLibrary()` 將程式庫原始碼載入呼叫者的 Context。
+`evaluateInContext()` 在已存在的程序 Context 中直接執行程式碼，不重新注入 API。用於 `OS.loadLibrary()` 將程式庫原始碼載入呼叫者的 Context。
 
 ---
 

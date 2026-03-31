@@ -270,40 +270,17 @@ class ScriptRuntime {
     private injectApis(context: any, process: ProcessView): void {
         const runtimeProcess = this.processRuntimes.get(process.pid);
         const global = context.global;
-        const sentryApi = context.newObject();
+        const osApi = context.newObject();
         const surface = this.buildApiSurface(process);
 
         for (const [name, value] of Object.entries(surface)) {
             const handle = this.toHandle(context, value);
-            context.setProp(sentryApi, name, handle);
+            context.setProp(osApi, name, handle);
             handle.dispose();
         }
 
-        context.setProp(global, 'Sentry', sentryApi);
-        sentryApi.dispose();
-
-        const prelude = context.evalCode(`
-            globalThis.processApi = Sentry.process;
-            globalThis.eventApi = Sentry.event;
-            globalThis.ipcApi = Sentry.ipc;
-            globalThis.ui = Sentry.ui ?? {};
-            globalThis.serviceApi = Sentry.serviceApi ?? {};
-            globalThis.windowApi = Sentry.windowApi ?? {};
-            globalThis.consoleApi = Sentry.consoleApi ?? {};
-            globalThis.systemApi = Sentry.systemApi ?? {};
-            globalThis.storageApi = Sentry.storageApi ?? {};
-            globalThis.envApi = Sentry.envApi ?? {};
-            globalThis.shellApi = Sentry.shellApi ?? {};
-            globalThis.notificationApi = Sentry.notificationApi ?? {};
-            globalThis.monitorApi = Sentry.monitorApi ?? {};
-            globalThis.settingsApi = Sentry.settingsApi ?? {};
-            globalThis.networkApi = Sentry.networkApi ?? {};
-        `);
-        if (!prelude.error) {
-            prelude.value.dispose();
-        } else {
-            prelude.error.dispose();
-        }
+        context.setProp(global, 'OS', osApi);
+        osApi.dispose();
 
         // 注入 imports() 函式（僅限有 entryPath 的程序）
         if (runtimeProcess?.entryPath) {
@@ -328,12 +305,14 @@ class ScriptRuntime {
 
         const allFactories = this.apiFactories.get('all')!;
         for (const [name, factory] of allFactories) {
-            merged[name] = this.wrapApiObject(name, factory(ctx), process);
+            const wrapped = this.wrapApiObject(name, factory(ctx), process);
+            Object.assign(merged, wrapped);
         }
 
         const scopedFactories = this.apiFactories.get(scope)!;
         for (const [name, factory] of scopedFactories) {
-            merged[name] = this.wrapApiObject(name, factory(ctx), process);
+            const wrapped = this.wrapApiObject(name, factory(ctx), process);
+            Object.assign(merged, wrapped);
         }
 
         return merged;

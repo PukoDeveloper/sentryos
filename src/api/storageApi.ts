@@ -78,7 +78,7 @@ export function registerStorageApi(kernel: Kernel): void {
     }
 
     return {
-      read: (path: string) => {
+      readFile: (path: string) => {
         const resolved = resolvePath(path, appId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
@@ -93,7 +93,7 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      write: (path: string, data: unknown, options?: Record<string, unknown>) => {
+      writeFile: (path: string, data: unknown, options?: Record<string, unknown>) => {
         const resolved = resolvePath(path, appId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
@@ -108,7 +108,7 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      delete: (path: string) => {
+      deleteFile: (path: string) => {
         const resolved = resolvePath(path, appId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
@@ -116,7 +116,7 @@ export function registerStorageApi(kernel: Kernel): void {
         return fileSystem.delete(appId, resolved.tier, resolved.key);
       },
 
-      list: (path?: string) => {
+      listFiles: (path?: string) => {
         const resolved = resolvePath(path || '', appId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
@@ -131,7 +131,7 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      exists: (path: string) => {
+      fileExists: (path: string) => {
         const resolved = resolvePath(path, appId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
@@ -139,14 +139,14 @@ export function registerStorageApi(kernel: Kernel): void {
         return fileSystem.exists(appId, resolved.tier, resolved.key);
       },
 
-      usage: () => {
+      storageUsage: () => {
         if (!permissions.has(appId, Permissions.STORAGE_USAGE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         return fileSystem.usage(appId);
       },
 
-      listAll: (tier?: string) => {
+      listAllFiles: (tier?: string) => {
         if (!permissions.has(appId, Permissions.FILE_LIST_ALL)) {
           return { success: false, error: 'PermissionDenied' };
         }
