@@ -13,6 +13,7 @@ import { NotificationManager } from '../notification/NotificationManager';
 import { SystemMonitor } from '../monitor/SystemMonitor';
 import { SystemAlert } from '../notification/SystemAlert';
 import { KernelConsole } from '../console/KernelConsole';
+import { AllowlistNetworkManager } from '../network/AllowlistNetworkManager';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
@@ -267,6 +268,15 @@ async function initializeCore(): Promise<Kernel> {
 
   const sysAlert = new SystemAlert(kernel);
   kernel.register('systemAlert', sysAlert);
+
+  const networkManager = new AllowlistNetworkManager();
+  kernel.register('networkManager', networkManager);
+
+  // Restore persisted network settings
+  const netState = fileSystem.read(systemAppId, 'sys', 'network-settings');
+  if (netState.success && netState.data) {
+    networkManager.importState(netState.data.data as any);
+  }
 
   const desktopShell = new DesktopShell();
   kernel.register('desktopShell', desktopShell);

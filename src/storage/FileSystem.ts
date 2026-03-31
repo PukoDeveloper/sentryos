@@ -65,6 +65,7 @@ interface FileSystemAdapter {
 	): StorageResult<StorageEntry<TData>>;
 	delete(appId: string, tier: StorageTier, key: string): StorageResult<string>;
 	list(appId: string, tier?: StorageTier): StorageResult<StorageEntry[]>;
+	listByPrefix(appId: string, tier: StorageTier, prefix: string): StorageResult<StorageEntry[]>;
 	exists(appId: string, tier: StorageTier, key: string): StorageResult<boolean>;
 	usage(appId: string): StorageResult<StorageUsage>;
 	configureCapacity(appId: string, tier: StorageTier, capacity: number): StorageResult<number>;
@@ -234,6 +235,27 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 				continue;
 			}
 			entries.push(...Array.from(this.storage.get(currentTier)!.values()));
+		}
+
+		return { success: true, data: this.cloneEntries(entries) };
+	}
+
+	listByPrefix(appId: string, tier: StorageTier, prefix: string): StorageResult<StorageEntry[]> {
+		const tierCheck = this.validateTier(tier);
+		if (!tierCheck.success) {
+			return { success: false, error: tierCheck.error };
+		}
+
+		if (!this.permissions.has(appId, makeStoragePermission('list', tier))) {
+			return { success: false, error: 'PermissionDenied' };
+		}
+
+		const tierStorage = this.storage.get(tier)!;
+		const entries: StorageEntry[] = [];
+		for (const [key, entry] of tierStorage) {
+			if (key.startsWith(prefix)) {
+				entries.push(entry);
+			}
 		}
 
 		return { success: true, data: this.cloneEntries(entries) };

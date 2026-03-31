@@ -4,7 +4,6 @@ if (!_loadResult.success) {
 }
 
 // ── State ────────────────────────────────────────────────────
-var TIER = 'user';
 var PREFIX = 'doc:';
 
 var state = {
@@ -18,10 +17,9 @@ var state = {
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadDocumentList() {
-  var result = storageApi.list(TIER);
+  var result = storageApi.list('user:' + PREFIX);
   if (!result.success) { state.documents = []; return; }
   state.documents = (result.data || [])
-    .filter(function (e) { return e.key.indexOf(PREFIX) === 0; })
     .map(function (e) {
       return { key: e.key, title: e.data.title || e.key.slice(PREFIX.length), updatedAt: e.updatedAt };
     })
@@ -30,7 +28,7 @@ function loadDocumentList() {
 
 function saveDocument() {
   if (!state.currentKey) return;
-  var result = storageApi.write(TIER, state.currentKey, {
+  var result = storageApi.write('user:' + state.currentKey, {
     title: state.currentTitle,
     content: state.currentContent,
   }, { overwrite: true });
@@ -43,7 +41,7 @@ function saveDocument() {
 }
 
 function deleteDocument(key) {
-  var result = storageApi.delete(TIER, key);
+  var result = storageApi.delete('user:' + key);
   if (result.success) {
     notificationApi.notify('已刪除', '文件已刪除', 'info');
   }
@@ -59,7 +57,7 @@ function newDocument() {
 }
 
 function openDocument(key) {
-  var result = storageApi.read(TIER, key);
+  var result = storageApi.read('user:' + key);
   if (!result.success) {
     notificationApi.notify('開啟失敗', result.error || '未知錯誤', 'error');
     return;

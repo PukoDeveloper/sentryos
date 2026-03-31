@@ -14,6 +14,7 @@ import type { DesktopShell } from '../ui/DesktopShell';
 import type { SystemAlert } from '../notification/SystemAlert';
 import type { KernelConsole } from '../console/KernelConsole';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
+import type { NetworkAdapter } from '../network/NetworkAdapter';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -30,6 +31,7 @@ export interface ServiceMap {
   applicationLauncher: ApplicationLauncher;
   systemAlert: SystemAlert;
   kernelConsole: KernelConsole;
+  networkManager: NetworkAdapter;
 }
 
 export interface ValueMap {

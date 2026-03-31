@@ -29,6 +29,18 @@ class NotificationManager {
     private container: HTMLDivElement | null = null;
     private notifications = new Map<string, NotificationEntry>();
     private nextId = 1;
+    private _doNotDisturb = false;
+    private _defaultDuration = NOTIFICATION_DEFAULT_DURATION_MS;
+    private _maxVisible = NOTIFICATION_MAX_VISIBLE;
+
+    get doNotDisturb(): boolean { return this._doNotDisturb; }
+    set doNotDisturb(v: boolean) { this._doNotDisturb = v; }
+
+    get defaultDuration(): number { return this._defaultDuration; }
+    set defaultDuration(v: number) { this._defaultDuration = Math.max(0, v); }
+
+    get maxVisible(): number { return this._maxVisible; }
+    set maxVisible(v: number) { this._maxVisible = Math.max(1, v); }
 
     /** 建立通知容器，回傳 HTMLElement 供 DesktopShell.registerOverlay 使用 */
     createContainer(): HTMLDivElement {
@@ -49,10 +61,11 @@ class NotificationManager {
 
     notify(options: NotificationOptions): string {
         if (!this.container) return '';
+        if (this._doNotDisturb) return '';
 
         const id = `notif_${this.nextId++}`;
         const type = options.type ?? 'info';
-        const duration = options.duration ?? NOTIFICATION_DEFAULT_DURATION_MS;
+        const duration = options.duration ?? this._defaultDuration;
 
         const el = this.createNotificationElement(id, options.title, options.body, type, options.source);
         this.container.appendChild(el);
@@ -102,7 +115,7 @@ class NotificationManager {
 
     private enforceMaxVisible(): void {
         const ids = Array.from(this.notifications.keys());
-        while (ids.length > NOTIFICATION_MAX_VISIBLE) {
+        while (ids.length > this._maxVisible) {
             this.dismiss(ids.shift()!);
         }
     }

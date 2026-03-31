@@ -8,6 +8,7 @@ import { registerShellApi } from './shellApi';
 import { registerNotificationApi } from './notificationApi';
 import { registerMonitorApi } from './monitorApi';
 import { registerSettingsApi } from './settingsApi';
+import { registerNetworkApi } from './networkApi';
 
 export function registerAllHostApis(kernel: Kernel): void {
   registerUiApi(kernel);
@@ -19,4 +20,5 @@ export function registerAllHostApis(kernel: Kernel): void {
   registerNotificationApi(kernel);
   registerMonitorApi(kernel);
   registerSettingsApi(kernel);
+  registerNetworkApi(kernel);
 }

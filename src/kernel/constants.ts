@@ -74,6 +74,8 @@ export const Permissions = {
   // File system
   fileAction: (action: 'read' | 'write' | 'delete' | 'list', tier: string) => `file.${action}.${tier}`,
   FILE_ADMIN_CONFIGURE: 'file.admin.configure-capacity',
+  FILE_CROSS_APP: 'file.cross-app',
+  FILE_LIST_ALL: 'file.list-all',
 
   // Window
   WINDOW_CREATE: 'window.create',
@@ -112,6 +114,11 @@ export const Permissions = {
   // Settings
   SETTINGS_READ: 'settings.read',
   SETTINGS_WRITE: 'settings.write',
+
+  // Network
+  NETWORK_REQUEST: 'network.request',
+  NETWORK_STATUS: 'network.status',
+  NETWORK_MANAGE: 'network.manage',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
