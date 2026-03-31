@@ -191,6 +191,7 @@ body {
 	padding: 12px 14px;
 	background: rgba(255, 255, 255, 0.05);
 	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	user-select: none;
 }
 
 .window-shell.is-dragging {
