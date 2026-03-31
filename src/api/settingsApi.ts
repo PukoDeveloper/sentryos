@@ -3,6 +3,7 @@ import type { ThemeSettings } from '../ui/DesktopShell';
 import { Permissions } from '../kernel/constants';
 
 const SETTINGS_KEY = 'system-theme';
+const NOTIFICATION_SETTINGS_KEY = 'notification-settings';
 const SETTINGS_TIER = 'sys' as const;
 
 export function registerSettingsApi(kernel: Kernel): void {
@@ -13,6 +14,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   const processManager = kernel.resolve('processManager');
   const windowManager = kernel.resolve('windowManager');
   const environmentManager = kernel.resolve('environmentManager');
+  const notificationManager = kernel.resolve('notificationManager');
   const systemAppId = kernel.get('systemAppId');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
@@ -93,11 +95,94 @@ export function registerSettingsApi(kernel: Kernel): void {
         },
       };
     },
+
+    // ── Notification Settings ────────────────────────────────
+    getNotificationSettings: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return {
+        success: true,
+        data: {
+          doNotDisturb: notificationManager.doNotDisturb,
+          defaultDuration: notificationManager.defaultDuration,
+          maxVisible: notificationManager.maxVisible,
+        },
+      };
+    },
+    setNotificationSettings: (settings: Record<string, unknown>) => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof settings.doNotDisturb === 'boolean') {
+        notificationManager.doNotDisturb = settings.doNotDisturb;
+      }
+      if (typeof settings.defaultDuration === 'number') {
+        notificationManager.defaultDuration = settings.defaultDuration;
+      }
+      if (typeof settings.maxVisible === 'number') {
+        notificationManager.maxVisible = settings.maxVisible;
+      }
+      // persist
+      const current = {
+        doNotDisturb: notificationManager.doNotDisturb,
+        defaultDuration: notificationManager.defaultDuration,
+        maxVisible: notificationManager.maxVisible,
+      };
+      fileSystem.write(systemAppId, SETTINGS_TIER, NOTIFICATION_SETTINGS_KEY, current, { overwrite: true });
+      return { success: true, data: current };
+    },
+
+    // ── Application Catalog ──────────────────────────────────
+    getApps: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return {
+        success: true,
+        data: catalogApps.map(app => ({
+          appId: app.appId,
+          name: app.name,
+          packageName: app.packageName,
+          version: app.version,
+          description: app.description || '',
+          author: app.author || '',
+          runtimeType: app.runtimeType,
+          permissions: app.permissions,
+          maxInstances: app.maxInstances ?? 0,
+          autoStart: app.autoStart,
+        })),
+      };
+    },
+    getAppProcesses: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      const allProcs = processManager.getAllProcesses();
+      return {
+        success: true,
+        data: allProcs.map(p => ({
+          pid: p.pid,
+          appDefId: p.appDefId,
+          type: p.type,
+          status: p.status,
+        })),
+      };
+    },
   }));
 
   // Load saved theme on boot
   const saved = fileSystem.read(systemAppId, SETTINGS_TIER, SETTINGS_KEY);
   if (saved.success && saved.data && typeof saved.data.data === 'object') {
     desktopShell.applyTheme(saved.data.data as ThemeSettings);
+  }
+
+  // Load saved notification settings on boot
+  const notifSaved = fileSystem.read(systemAppId, SETTINGS_TIER, NOTIFICATION_SETTINGS_KEY);
+  if (notifSaved.success && notifSaved.data && typeof notifSaved.data.data === 'object') {
+    const ns = notifSaved.data.data as Record<string, unknown>;
+    if (typeof ns.doNotDisturb === 'boolean') notificationManager.doNotDisturb = ns.doNotDisturb;
+    if (typeof ns.defaultDuration === 'number') notificationManager.defaultDuration = ns.defaultDuration;
+    if (typeof ns.maxVisible === 'number') notificationManager.maxVisible = ns.maxVisible;
   }
 }

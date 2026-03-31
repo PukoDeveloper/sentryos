@@ -479,28 +479,364 @@ function renderSaveRow(self) {
   ]);
 }
 
-// ── 通知頁面（預留）─────────────────────────────────────────
+// ── 通知頁面 ─────────────────────────────────────────────────
+var notifSettings = { doNotDisturb: false, defaultDuration: 4000, maxVisible: 5 };
+
+function loadNotifSettings() {
+  var result = settingsApi.getNotificationSettings();
+  if (result.success && result.data) {
+    notifSettings = result.data;
+  }
+}
+
+loadNotifSettings();
+
+var durationOptions = [
+  { label: '2 秒', value: 2000 },
+  { label: '4 秒（預設）', value: 4000 },
+  { label: '6 秒', value: 6000 },
+  { label: '8 秒', value: 8000 },
+  { label: '不自動消失', value: 0 },
+];
+
+var maxVisibleOptions = [
+  { label: '3', value: 3 },
+  { label: '5（預設）', value: 5 },
+  { label: '8', value: 8 },
+  { label: '10', value: 10 },
+];
+
 function renderNotificationsPage(self) {
+  loadNotifSettings();
+
   return UI.column([
     UI.heading('通知', { color: '#ecf4ff' }),
     UI.text('管理應用程式通知的顯示方式與行為', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+
     UI.box([], { height: '8px' }),
-    stubSection('通知偏好', '設定通知顯示時長、最大數量、音效等。'),
-    stubSection('勿擾模式', '啟用後暫時停止所有非系統性通知。'),
-    stubSection('應用程式通知權限', '個別管理每個應用程式的通知權限。'),
+
+    // ── 勿擾模式 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('勿擾模式', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('啟用後暫時停止所有通知彈窗', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.button(notifSettings.doNotDisturb ? '🔕 已開啟' : '🔔 已關閉', {
+          onClick: function () {
+            notifSettings.doNotDisturb = !notifSettings.doNotDisturb;
+            settingsApi.setNotificationSettings(notifSettings);
+            self.rerender();
+          },
+          style: {
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            flexShrink: '0',
+            background: notifSettings.doNotDisturb ? 'rgba(255,85,85,0.15)' : 'rgba(80,250,123,0.15)',
+            color: notifSettings.doNotDisturb ? '#ff5555' : '#50fa7b',
+            border: notifSettings.doNotDisturb ? '1px solid rgba(255,85,85,0.25)' : '1px solid rgba(80,250,123,0.25)',
+          },
+        }),
+      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+    ]),
+
+    // ── 顯示時長 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('通知顯示時長', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('設定通知自動消失前的顯示時間', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.row(
+          durationOptions.map(function (opt) {
+            var active = notifSettings.defaultDuration === opt.value;
+            return UI.button(opt.label, {
+              onClick: function () {
+                notifSettings.defaultDuration = opt.value;
+                settingsApi.setNotificationSettings(notifSettings);
+                self.rerender();
+              },
+              style: {
+                padding: '6px 10px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: active ? 'bold' : 'normal',
+                background: active ? 'rgba(103,184,255,0.18)' : 'rgba(255,255,255,0.04)',
+                color: active ? '#67b8ff' : 'rgba(216,232,255,0.6)',
+                border: active ? '1px solid rgba(103,184,255,0.3)' : '1px solid transparent',
+              },
+            });
+          }),
+          { gap: '4px', flexShrink: '0' }
+        ),
+      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+    ]),
+
+    // ── 最大顯示數量 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('最大顯示數量', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('同時顯示的通知上限', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.row(
+          maxVisibleOptions.map(function (opt) {
+            var active = notifSettings.maxVisible === opt.value;
+            return UI.button(opt.label, {
+              onClick: function () {
+                notifSettings.maxVisible = opt.value;
+                settingsApi.setNotificationSettings(notifSettings);
+                self.rerender();
+              },
+              style: {
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: active ? 'bold' : 'normal',
+                background: active ? 'rgba(103,184,255,0.18)' : 'rgba(255,255,255,0.04)',
+                color: active ? '#67b8ff' : 'rgba(216,232,255,0.6)',
+                border: active ? '1px solid rgba(103,184,255,0.3)' : '1px solid transparent',
+              },
+            });
+          }),
+          { gap: '4px', flexShrink: '0' }
+        ),
+      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+    ]),
+
+    // ── 測試通知 ──
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('測試通知', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('發送一則測試通知以預覽效果', { fontSize: '12px', color: 'rgba(216,232,255,0.4)' }),
+        ], { flex: '1', gap: '2px' }),
+        UI.button('發送測試', {
+          onClick: function () {
+            notificationApi.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
+          },
+          style: {
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            flexShrink: '0',
+            background: 'linear-gradient(135deg, #4a7fff, #67b8ff)',
+            color: '#05101c',
+          },
+        }),
+      ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between' }),
+    ]),
+
   ], { gap: '8px', flex: '1' });
 }
 
-// ── 應用程式頁面（預留）──────────────────────────────────────
+// ── 應用程式頁面 ─────────────────────────────────────────────
+var appsSelectedApp = null;
+
 function renderAppsPage(self) {
+  var appsResult = settingsApi.getApps();
+  var apps = (appsResult.success && appsResult.data) ? appsResult.data : [];
+  var procsResult = settingsApi.getAppProcesses();
+  var procs = (procsResult.success && procsResult.data) ? procsResult.data : [];
+
+  // 每個 app 的執行中程序數
+  var procCountMap = {};
+  for (var i = 0; i < procs.length; i++) {
+    var p = procs[i];
+    if (p.status === 'running') {
+      procCountMap[p.appDefId] = (procCountMap[p.appDefId] || 0) + 1;
+    }
+  }
+
+  if (appsSelectedApp) {
+    var detail = null;
+    for (var i = 0; i < apps.length; i++) {
+      if (apps[i].appId === appsSelectedApp) { detail = apps[i]; break; }
+    }
+    if (detail) return renderAppDetail(detail, procCountMap[detail.appId] || 0, self);
+    appsSelectedApp = null;
+  }
+
+  return renderAppList(apps, procCountMap, self);
+}
+
+function renderAppItem(app, procCountMap, typeColors, self) {
+  var running = procCountMap[app.appId] || 0;
+  var typeColor = typeColors[app.runtimeType] || '#d8e8ff';
+
+  return UI.row([
+    UI.column([
+      UI.row([
+        UI.text(app.name, { fontSize: '13px', fontWeight: 'bold', color: '#d8e8ff' }),
+        running > 0 ? UI.badge('執行中 ×' + running, {
+          fontSize: '10px',
+          padding: '1px 7px',
+          borderRadius: '4px',
+          background: 'rgba(80,250,123,0.12)',
+          color: '#50fa7b',
+        }) : UI.text(''),
+      ], { gap: '6px', alignItems: 'center' }),
+      UI.text(app.packageName + (app.version ? ' v' + app.version : ''), {
+        fontSize: '11px', color: 'rgba(216,232,255,0.35)',
+      }),
+    ], { flex: '1', gap: '2px' }),
+    UI.button('詳情', {
+      onClick: function () {
+        appsSelectedApp = app.appId;
+        self.rerender();
+      },
+      style: {
+        padding: '6px 14px',
+        borderRadius: '6px',
+        fontSize: '11px',
+      },
+    }),
+  ], {
+    alignItems: 'center',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+  });
+}
+
+function renderAppList(apps, procCountMap, self) {
+  var typeColors = {
+    Window: '#67b8ff',
+    Console: '#50fa7b',
+    Service: '#fbbf24',
+    Library: '#c084fc',
+  };
+
+  var typeLabels = {
+    Window: '🪟  視窗應用',
+    Console: '💻  主控台應用',
+    Service: '⚙️  服務',
+    Library: '📚  函式庫',
+  };
+  var typeOrder = ['Window', 'Console', 'Service', 'Library'];
+
+  // group apps by runtimeType
+  var groups = {};
+  for (var i = 0; i < apps.length; i++) {
+    var t = apps[i].runtimeType || 'Window';
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(apps[i]);
+  }
+
+  var sections = [];
+  for (var j = 0; j < typeOrder.length; j++) {
+    var type = typeOrder[j];
+    if (!groups[type] || groups[type].length === 0) continue;
+    (function (type, list) {
+      var key = 'apps_' + type;
+      sections.push(collapsible(key, typeLabels[type] + '（' + list.length + '）', function () {
+        var items = [];
+        for (var k = 0; k < list.length; k++) {
+          items.push(renderAppItem(list[k], procCountMap, typeColors, self));
+        }
+        return UI.column(items, { gap: '4px' });
+      }, self));
+    })(type, groups[type]);
+  }
+
   return UI.column([
     UI.heading('應用程式', { color: '#ecf4ff' }),
-    UI.text('瀏覽與管理已安裝的應用程式', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
-    UI.box([], { height: '8px' }),
-    stubSection('已安裝應用程式', '檢視所有已安裝的應用程式，查看版本、權限與使用狀態。'),
-    stubSection('預設應用程式', '設定特定檔案類型或操作的預設處理程式。'),
-    stubSection('自動啟動', '管理系統啟動時自動執行的應用程式與服務。'),
+    UI.text('已安裝 ' + apps.length + ' 個應用程式', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+    UI.box([], { height: '4px' }),
+    UI.column(sections, { gap: '6px', overflow: 'auto', flex: '1' }),
   ], { gap: '8px', flex: '1' });
+}
+
+function renderAppDetail(app, runningCount, self) {
+  var typeColors = {
+    Window: '#67b8ff',
+    Console: '#50fa7b',
+    Service: '#fbbf24',
+    Library: '#c084fc',
+  };
+  var typeColor = typeColors[app.runtimeType] || '#d8e8ff';
+
+  var permItems = [];
+  var perms = app.permissions || [];
+  for (var i = 0; i < perms.length; i++) {
+    permItems.push(
+      UI.text(perms[i], {
+        fontSize: '11px',
+        fontFamily: 'monospace',
+        padding: '4px 10px',
+        borderRadius: '6px',
+        background: 'rgba(255,255,255,0.04)',
+        color: 'rgba(216,232,255,0.6)',
+      })
+    );
+  }
+
+  return UI.column([
+    UI.row([
+      UI.button('← 返回', {
+        onClick: function () {
+          appsSelectedApp = null;
+          self.rerender();
+        },
+        style: {
+          padding: '6px 14px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          background: 'rgba(255,255,255,0.06)',
+          color: '#d8e8ff',
+        },
+      }),
+    ]),
+
+    UI.box([], { height: '4px' }),
+
+    // 標題
+    UI.row([
+      UI.heading(app.name, { color: '#ecf4ff', flex: '1' }),
+      UI.badge(app.runtimeType, {
+        fontSize: '11px',
+        padding: '3px 10px',
+        borderRadius: '6px',
+        background: 'rgba(255,255,255,0.06)',
+        color: typeColor,
+      }),
+    ], { alignItems: 'center' }),
+
+    // 基本資訊
+    UI.column([
+      infoRow('套件名稱', app.packageName),
+      infoRow('版本', app.version || '—'),
+      infoRow('作者', app.author || '—'),
+      infoRow('描述', app.description || '—'),
+      infoRow('類型', app.runtimeType),
+      infoRow('最大實例數', app.maxInstances > 0 ? String(app.maxInstances) : '無限制'),
+      infoRow('自動啟動', app.autoStart ? '是' : '否'),
+      infoRow('目前執行中', runningCount > 0 ? (runningCount + ' 個實例') : '未執行'),
+    ], { gap: '4px' }),
+
+    UI.box([], { height: '8px' }),
+    UI.text('權限 (' + perms.length + ')', sectionTitle),
+
+    perms.length > 0
+      ? UI.box(permItems, {
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px',
+        })
+      : UI.text('此應用程式無需任何權限', { fontSize: '12px', color: 'rgba(216,232,255,0.35)' }),
+
+  ], { gap: '8px', flex: '1' });
+}
+
+function infoRow(label, value) {
+  return UI.box([
+    UI.text(label, infoLabel),
+    UI.text(value, infoValue),
+  ], infoRowStyle);
 }
 
 // ── 儲存空間頁面（預留）──────────────────────────────────────

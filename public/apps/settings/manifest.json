@@ -16,7 +16,8 @@
                 "event.emit.window.ui",
                 "env.library.load",
                 "settings.read",
-                "settings.write"
+                "settings.write",
+                "notification.send"
             ],
             "maxInstances": 1
         }
