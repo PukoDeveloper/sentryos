@@ -11,6 +11,7 @@ import { EnvironmentManager } from '../environment/EnvironmentManager';
 import { DesktopShell } from '../ui/DesktopShell';
 import { NotificationManager } from '../notification/NotificationManager';
 import { SystemMonitor } from '../monitor/SystemMonitor';
+import { SystemAlert } from '../notification/SystemAlert';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
@@ -94,6 +95,11 @@ async function bootstrapSystem(): Promise<void> {
   // Register notification overlay
   const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });
+
+  // Register system alert overlay
+  const systemAlert = kernel.resolve('systemAlert');
+  const alertContainer = systemAlert.createContainer();
+  desktopShell.registerOverlay({ id: 'system-alert-layer', element: alertContainer, order: 200 });
 
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
@@ -225,6 +231,9 @@ async function initializeCore(): Promise<Kernel> {
 
   const notificationManager = new NotificationManager();
   kernel.register('notificationManager', notificationManager);
+
+  const sysAlert = new SystemAlert(kernel);
+  kernel.register('systemAlert', sysAlert);
 
   const desktopShell = new DesktopShell();
   kernel.register('desktopShell', desktopShell);

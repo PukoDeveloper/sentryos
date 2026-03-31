@@ -28,6 +28,7 @@ export class ApplicationLauncher {
   private get windowManager() { return this.kernel.resolve('windowManager'); }
   private get environmentManager() { return this.kernel.resolve('environmentManager'); }
   private get systemMonitor() { return this.kernel.resolve('systemMonitor'); }
+  private get systemAlert() { return this.kernel.resolve('systemAlert'); }
 
   getConsoleControllers(): Map<string, ConsoleWindowController> {
     return this.consoleControllers;
@@ -88,8 +89,12 @@ export class ApplicationLauncher {
     if (!launch.success || typeof launch.data !== 'number') {
       if (launch.error === 'MaxInstancesReached') {
         this.focusExistingInstance(app.appId);
+      } else if (launch.error === 'PermissionDenied') {
+        bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error}`);
+        this.systemAlert.show({ code: 'PERMISSION_DENIED', detail: `無法啟動「${app.name}」` });
       } else {
         bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error ?? 'UnknownError'}`);
+        this.systemAlert.show({ code: 'APP_LAUNCH_FAILED', detail: `${app.name}: ${launch.error ?? 'UnknownError'}` });
       }
       return;
     }
@@ -108,12 +113,14 @@ export class ApplicationLauncher {
       source = await fetch(app.mainPath);
     } catch (err) {
       bios.log('PROC', 'ERROR', `Failed to fetch main script: ${app.mainPath}`);
+      this.systemAlert.show({ code: 'APP_FETCH_FAILED', detail: app.name });
       this.terminateApplication(proc.processAppId, `Fetch error: ${app.mainPath}`);
       return;
     }
 
     if (!source.ok) {
       bios.log('PROC', 'ERROR', `HTTP ${source.status} fetching ${app.mainPath}`);
+      this.systemAlert.show({ code: 'APP_FETCH_FAILED', detail: `${app.name} (HTTP ${source.status})` });
       this.terminateApplication(proc.processAppId, `HTTP ${source.status}: ${app.mainPath}`);
       return;
     }

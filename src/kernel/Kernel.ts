@@ -11,6 +11,7 @@ import type { NotificationManager } from '../notification/NotificationManager';
 import type { SystemMonitor } from '../monitor/SystemMonitor';
 import type { ApplicationLauncher } from '../application/ApplicationLauncher';
 import type { DesktopShell } from '../ui/DesktopShell';
+import type { SystemAlert } from '../notification/SystemAlert';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
 
 export interface ServiceMap {
@@ -26,6 +27,7 @@ export interface ServiceMap {
   systemMonitor: SystemMonitor;
   desktopShell: DesktopShell;
   applicationLauncher: ApplicationLauncher;
+  systemAlert: SystemAlert;
 }
 
 export interface ValueMap {
