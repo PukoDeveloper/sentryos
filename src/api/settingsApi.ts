@@ -34,6 +34,8 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
+      if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       desktopShell.applyTheme(safe);
       return { success: true, data: null };
     },
@@ -47,6 +49,8 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
+      if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       desktopShell.applyTheme(safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },

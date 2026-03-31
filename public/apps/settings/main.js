@@ -38,6 +38,8 @@ var opacitySteps = [
 var selectedWallpaper = 0;
 var selectedAccent = 0;
 var selectedOpacity = 2;
+var startMenuWidth = 380;
+var startMenuHeight = 480;
 var currentPage = 'home';
 
 // Load saved settings
@@ -53,6 +55,8 @@ if (saved.success && saved.data) {
   for (var i = 0; i < opacitySteps.length; i++) {
     if (opacitySteps[i].value === d.taskbarOpacity) { selectedOpacity = i; break; }
   }
+  if (typeof d.startMenuWidth === 'number') startMenuWidth = d.startMenuWidth;
+  if (typeof d.startMenuHeight === 'number') startMenuHeight = d.startMenuHeight;
 }
 
 // ── Styles ───────────────────────────────────────────────────
@@ -148,6 +152,8 @@ function buildThemeObject() {
     accentPrimary: accents[selectedAccent].primary,
     accentSecondary: accents[selectedAccent].secondary,
     taskbarOpacity: opacitySteps[selectedOpacity].value,
+    startMenuWidth: startMenuWidth,
+    startMenuHeight: startMenuHeight,
   };
 }
 
@@ -161,6 +167,7 @@ var pages = [
   { id: 'wallpaper', label: '桌面背景' },
   { id: 'accent',    label: '主題色' },
   { id: 'taskbar',   label: '工作列' },
+  { id: 'startmenu', label: '開始選單' },
 ];
 
 // ── Page renderers ───────────────────────────────────────────
@@ -356,6 +363,74 @@ function renderSaveRow(self) {
 }
 
 // ── Render ───────────────────────────────────────────────────
+function renderStartMenuPage(self) {
+  var widthSteps = [280, 320, 380, 440, 520, 640];
+  var heightSteps = [300, 400, 480, 560, 640, 800];
+
+  function findIndex(arr, val) {
+    var closest = 0;
+    for (var i = 0; i < arr.length; i++) {
+      if (Math.abs(arr[i] - val) < Math.abs(arr[closest] - val)) closest = i;
+    }
+    return closest;
+  }
+
+  var selW = findIndex(widthSteps, startMenuWidth);
+  var selH = findIndex(heightSteps, startMenuHeight);
+
+  var widthItems = [];
+  for (var i = 0; i < widthSteps.length; i++) {
+    (function (idx) {
+      var s = idx === selW ? swatchSelected() : swatchBase();
+      s.background = 'rgba(255,255,255,0.06)';
+      s.aspectRatio = '2';
+      widthItems.push(UI.button(widthSteps[idx] + 'px', {
+        id: 'smw-' + idx,
+        onClick: function () {
+          startMenuWidth = widthSteps[idx];
+          liveApply();
+          self.rerender();
+        },
+        style: s,
+      }));
+    })(i);
+  }
+
+  var heightItems = [];
+  for (var i = 0; i < heightSteps.length; i++) {
+    (function (idx) {
+      var s = idx === selH ? swatchSelected() : swatchBase();
+      s.background = 'rgba(255,255,255,0.06)';
+      s.aspectRatio = '2';
+      heightItems.push(UI.button(heightSteps[idx] + 'px', {
+        id: 'smh-' + idx,
+        onClick: function () {
+          startMenuHeight = heightSteps[idx];
+          liveApply();
+          self.rerender();
+        },
+        style: s,
+      }));
+    })(i);
+  }
+
+  return UI.column([
+    UI.heading('開始選單', { color: '#ecf4ff' }),
+    UI.text('調整開始選單的大小', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+
+    UI.box([], { height: '4px' }),
+    UI.text('寬度', sectionTitle),
+    UI.box(widthItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }, 'smw-grid'),
+
+    UI.box([], { height: '8px' }),
+    UI.text('高度', sectionTitle),
+    UI.box(heightItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }, 'smh-grid'),
+
+    UI.box([], { height: '8px' }),
+    renderSaveRow(self),
+  ], { gap: '8px' });
+}
+
 var app = UI.createApp({
   title: '系統設定',
   width: 640,
@@ -388,6 +463,7 @@ var app = UI.createApp({
     if (currentPage === 'wallpaper') content = renderWallpaperPage(self);
     else if (currentPage === 'accent') content = renderAccentPage(self);
     else if (currentPage === 'taskbar') content = renderTaskbarPage(self);
+    else if (currentPage === 'startmenu') content = renderStartMenuPage(self);
     else content = renderHomePage(self);
 
     return UI.row([
