@@ -4,6 +4,7 @@
     "app/terminal",
     "app/task-manager",
     "app/text-manager",
+    "app/file-manager",
     "app/utilities",
     "app/settings"
 ]

@@ -74,6 +74,8 @@ export const Permissions = {
   // File system
   fileAction: (action: 'read' | 'write' | 'delete' | 'list', tier: string) => `file.${action}.${tier}`,
   FILE_ADMIN_CONFIGURE: 'file.admin.configure-capacity',
+  FILE_CROSS_APP: 'file.cross-app',
+  FILE_LIST_ALL: 'file.list-all',
 
   // Window
   WINDOW_CREATE: 'window.create',

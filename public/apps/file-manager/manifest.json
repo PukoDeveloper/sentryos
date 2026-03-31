@@ -1,0 +1,37 @@
+{
+    "name": "File Manager",
+    "version": "1.0.0",
+    "description": "Browse, inspect and manage files across all storage tiers.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "file-manager-app",
+            "name": "檔案管理器",
+            "main": "main.js",
+            "type": "Window",
+            "icon": "icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.sys",
+                "file.read.app",
+                "file.read.user",
+                "file.read.cache",
+                "file.delete.app",
+                "file.delete.user",
+                "file.delete.cache",
+                "file.list.sys",
+                "file.list.app",
+                "file.list.user",
+                "file.list.cache",
+                "file.list-all",
+                "file.cross-app",
+                "storage.usage",
+                "notification.send"
+            ],
+            "maxInstances": 1
+        }
+    ]
+}
