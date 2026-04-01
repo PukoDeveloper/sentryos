@@ -939,7 +939,7 @@ body {
 .desktop-context-menu {
 	position: absolute;
 	min-width: 180px;
-	padding: 6px 0;
+	padding: 6px;
 	border-radius: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.15);
 	background: rgba(12, 18, 28, 0.94);
@@ -954,6 +954,7 @@ body {
 	display: block;
 	width: 100%;
 	border: 0;
+	border-radius: 10px;
 	background: transparent;
 	color: #f4f7fb;
 	padding: 9px 16px;

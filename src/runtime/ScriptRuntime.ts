@@ -52,6 +52,13 @@ class ScriptRuntime {
         const runtimeProcess = this.ensureRuntimeProcess(proc);
         if (entryPath !== undefined) {
             runtimeProcess.entryPath = entryPath;
+            // Inject imports() lazily on first entryPath assignment
+            if (!runtimeProcess.importsInjected) {
+                runtimeProcess.importsInjected = true;
+                const global = runtimeProcess.context.global;
+                this.injectImportsFunction(runtimeProcess.context, global, runtimeProcess);
+                global.dispose();
+            }
         }
 
         runtimeProcess.runtime.setInterruptHandler(
@@ -174,16 +181,21 @@ class ScriptRuntime {
                 if (!this.permissions.has(process.processAppId, Permissions.PROCESS_LIST)) {
                     return { success: false, error: 'PermissionDenied' };
                 }
+                const appManager = this.kernel.resolve('appManager');
                 const all = this.processManager.getAllProcesses();
                 return {
                     success: true,
-                    data: all.map(p => ({
-                        pid: p.pid,
-                        appDefId: p.appDefId,
-                        type: p.type,
-                        status: p.status,
-                        parentPid: p.parentPid,
-                    }))
+                    data: all.map(p => {
+                        const appDef = appManager.get(p.appDefId);
+                        return {
+                            pid: p.pid,
+                            appDefId: p.appDefId,
+                            appName: appDef?.name ?? p.appDefId,
+                            type: p.type,
+                            status: p.status,
+                            parentPid: p.parentPid,
+                        };
+                    })
                 };
             },
             terminateProcess: (targetPid: number) =>
@@ -281,11 +293,6 @@ class ScriptRuntime {
 
         context.setProp(global, 'OS', osApi);
         osApi.dispose();
-
-        // 注入 imports() 函式（僅限有 entryPath 的程序）
-        if (runtimeProcess?.entryPath) {
-            this.injectImportsFunction(context, global, runtimeProcess);
-        }
 
         // 注入 timer 函式
         if (runtimeProcess) {

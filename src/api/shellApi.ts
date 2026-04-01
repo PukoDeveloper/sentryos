@@ -7,6 +7,7 @@ export function registerShellApi(kernel: Kernel): void {
   const processManager = kernel.resolve('processManager');
   const windowManager = kernel.resolve('windowManager');
   const environmentManager = kernel.resolve('environmentManager');
+  const appManager = kernel.resolve('appManager');
   const launcher = kernel.resolve('applicationLauncher');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
@@ -19,14 +20,18 @@ export function registerShellApi(kernel: Kernel): void {
       const all = processManager.getAllProcesses();
       return {
         success: true,
-        data: all.map(p => ({
-          pid: p.pid,
-          appDefId: p.appDefId,
-          processAppId: p.processAppId,
-          type: p.type,
-          status: p.status,
-          parentPid: p.parentPid,
-        })),
+        data: all.map(p => {
+          const appDef = appManager.get(p.appDefId);
+          return {
+            pid: p.pid,
+            appDefId: p.appDefId,
+            appName: appDef?.name ?? p.appDefId,
+            processAppId: p.processAppId,
+            type: p.type,
+            status: p.status,
+            parentPid: p.parentPid,
+          };
+        }),
       };
     },
     killProcess: (targetPid: unknown) => {

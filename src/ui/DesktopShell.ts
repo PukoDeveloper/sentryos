@@ -57,6 +57,16 @@ class DesktopShell {
   private pinnedAppIds: string[] = [];
   private expandedPackage: string | null = null;
 
+  /** Return a stable identifier for an app that survives page refreshes */
+  private stableId(app: RegisteredApplication): string {
+    return app.manifestId ?? app.mainPath;
+  }
+
+  /** Find an app by its stable identifier */
+  private findAppByStableId(stableId: string): RegisteredApplication | undefined {
+    return this.allApps.find(a => (a.manifestId ?? a.mainPath) === stableId);
+  }
+
   mount(_applications: Application[]): boolean {
     const appRoot = getAppDiv();
     if (!appRoot) {
@@ -225,6 +235,7 @@ class DesktopShell {
   setApplications(applications: RegisteredApplication[]): void {
     this.allApps = applications;
     this.renderStartMenu();
+    this.renderFoldersTab();
   }
 
   onLaunchRequest(handler: (app: RegisteredApplication) => void): void {
@@ -715,7 +726,7 @@ class DesktopShell {
 
   private showSearchContextMenu(e: MouseEvent, app: RegisteredApplication): void {
     if (!app.appId) return;
-    const appId = app.appId;
+    const sid = this.stableId(app);
 
     const rootRect = this.root?.getBoundingClientRect();
     const x = e.clientX - (rootRect?.left ?? 0);
@@ -723,23 +734,23 @@ class DesktopShell {
 
     const items: { label: string; action: () => void }[] = [];
 
-    if (!this.pinnedAppIds.includes(appId)) {
+    if (!this.pinnedAppIds.includes(sid)) {
       items.push({
         label: '📌 釘選到選單',
-        action: () => this.pinApp(appId),
+        action: () => this.pinApp(sid),
       });
     } else {
       items.push({
         label: '📌 從選單取消釘選',
-        action: () => this.unpinApp(appId),
+        action: () => this.unpinApp(sid),
       });
     }
 
     for (const folder of this.folders) {
-      if (!folder.appIds.includes(appId)) {
+      if (!folder.appIds.includes(sid)) {
         items.push({
           label: `📁 新增到「${folder.name}」`,
-          action: () => this.addAppToFolder(folder.name, appId),
+          action: () => this.addAppToFolder(folder.name, sid),
         });
       }
     }
@@ -747,22 +758,22 @@ class DesktopShell {
     this.showContextMenu(x, y, items);
   }
 
-  private showPinnedContextMenu(e: MouseEvent, appId: string): void {
+  private showPinnedContextMenu(e: MouseEvent, sid: string): void {
     const rootRect = this.root?.getBoundingClientRect();
     const x = e.clientX - (rootRect?.left ?? 0);
     const y = e.clientY - (rootRect?.top ?? 0);
 
     const items: { label: string; action: () => void }[] = [
-      { label: '📌 從選單取消釘選', action: () => this.unpinApp(appId) },
+      { label: '📌 從選單取消釘選', action: () => this.unpinApp(sid) },
     ];
 
     for (const folder of this.folders) {
-      if (!folder.appIds.includes(appId)) {
+      if (!folder.appIds.includes(sid)) {
         items.push({
           label: `📁 移動到「${folder.name}」`,
           action: () => {
-            this.pinnedAppIds = this.pinnedAppIds.filter(id => id !== appId);
-            this.addAppToFolder(folder.name, appId);
+            this.pinnedAppIds = this.pinnedAppIds.filter(id => id !== sid);
+            this.addAppToFolder(folder.name, sid);
           },
         });
       }
@@ -804,19 +815,19 @@ class DesktopShell {
     }
 
     // ── Root view: pinned apps + folder tiles ──
-    for (const appId of this.pinnedAppIds) {
-      const app = this.allApps.find(a => a.appId === appId);
+    for (const sid of this.pinnedAppIds) {
+      const app = this.findAppByStableId(sid);
       if (!app) continue;
 
       const item = this.createAppItem(app);
       item.draggable = true;
       item.addEventListener('dragstart', (e) => {
-        e.dataTransfer?.setData('text/plain', appId);
+        e.dataTransfer?.setData('text/plain', sid);
         e.dataTransfer?.setData('application/x-sentryos-source', 'pinned');
       });
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        this.showPinnedContextMenu(e, appId);
+        this.showPinnedContextMenu(e, sid);
       });
       this.startFolderList.appendChild(item);
     }
@@ -982,8 +993,8 @@ class DesktopShell {
       hint.textContent = '從搜尋拖曳應用程式到此資料夾';
       this.startFolderList.appendChild(hint);
     } else {
-      for (const appId of folder.appIds) {
-        const app = this.allApps.find(a => a.appId === appId);
+      for (const sid of folder.appIds) {
+        const app = this.findAppByStableId(sid);
         if (!app) continue;
 
         const row = document.createElement('div');
@@ -998,7 +1009,7 @@ class DesktopShell {
         removeBtn.title = '從資料夾移除';
         removeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.removeAppFromFolder(folder.name, appId);
+          this.removeAppFromFolder(folder.name, sid);
         });
 
         row.appendChild(appBtn);
@@ -1046,13 +1057,11 @@ class DesktopShell {
             e.preventDefault();
             this.showSearchContextMenu(e, apps[0]);
           });
-          if (apps[0].appId) {
-            button.draggable = true;
-            button.addEventListener('dragstart', (e) => {
-              e.dataTransfer?.setData('text/plain', apps[0].appId!);
-              e.dataTransfer?.setData('application/x-sentryos-source', 'search');
-            });
-          }
+          button.draggable = true;
+          button.addEventListener('dragstart', (e) => {
+            e.dataTransfer?.setData('text/plain', this.stableId(apps[0]));
+            e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+          });
           this.startSearchList.appendChild(button);
         } else {
           // Multiple apps — render as collapsible group
@@ -1117,13 +1126,11 @@ class DesktopShell {
                 e.preventDefault();
                 this.showSearchContextMenu(e, app);
               });
-              if (app.appId) {
-                button.draggable = true;
-                button.addEventListener('dragstart', (e) => {
-                  e.dataTransfer?.setData('text/plain', app.appId!);
-                  e.dataTransfer?.setData('application/x-sentryos-source', 'search');
-                });
-              }
+              button.draggable = true;
+              button.addEventListener('dragstart', (e) => {
+                e.dataTransfer?.setData('text/plain', this.stableId(app));
+                e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+              });
               body.appendChild(button);
             }
             group.appendChild(body);
@@ -1142,13 +1149,11 @@ class DesktopShell {
           this.showSearchContextMenu(e, app);
         });
 
-        if (app.appId) {
-          button.draggable = true;
-          button.addEventListener('dragstart', (e) => {
-            e.dataTransfer?.setData('text/plain', app.appId!);
-            e.dataTransfer?.setData('application/x-sentryos-source', 'search');
-          });
-        }
+        button.draggable = true;
+        button.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('text/plain', this.stableId(app));
+          e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+        });
 
         this.startSearchList.appendChild(button);
       }

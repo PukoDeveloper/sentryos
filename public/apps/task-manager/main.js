@@ -166,7 +166,7 @@ function renderProcessesTab() {
     rows.push(OS.panel([
       OS.stack([
         OS.stack([
-          OS.label(p.appDefId, { fontSize: '13px', color: '#d8e8ff', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
+          OS.label(p.appName + ' (' + p.appDefId + ')', { fontSize: '13px', color: '#d8e8ff', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
           OS.stack([
             OS.label(p.type, S.tag(typeColor(p.type))),
             OS.label(statusLabel(p.status), { fontSize: '11px', color: statusColor(p.status) }),
