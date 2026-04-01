@@ -13,7 +13,13 @@ var state = {
   namespaces: [],            // 命名空間清單
   selectedEntry: null,       // 選中的檔案（查看詳情）
   usage: null,               // 儲存空間使用量
+  createMode: null,          // 'folder' | 'file' | null
+  createName: '',            // 新增項目的名稱
+  createContent: '',         // 新增檔案的內容
 };
+
+// 右鍵選單暫存（不在 render state 中，由系統層管理）
+var pendingContextTarget = null;  // { type: 'file'|'folder', entry?, namespace? }
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadUsage() {
@@ -97,6 +103,100 @@ function deleteEntry(entry) {
   }
 }
 
+function getFileExtension(key) {
+  var dotIdx = key.lastIndexOf('.');
+  if (dotIdx < 0) return '';
+  return key.slice(dotIdx).toLowerCase();
+}
+
+function openWithDefaultApp(entry) {
+  var ext = getFileExtension(entry.key);
+  if (!ext) {
+    OS.notify('無法開啟', '無法判斷檔案類型', 'warning');
+    return;
+  }
+  var handler = OS.getFileTypeHandler(ext);
+  if (!handler.success || !handler.data) {
+    OS.notify('無法開啟', '沒有設定 ' + ext + ' 的預設應用程式', 'warning');
+    return;
+  }
+  var result = OS.launch(handler.data.appDefId);
+  if (!result.success) {
+    OS.notify('啟動失敗', result.error || '未知錯誤', 'error');
+  }
+}
+
+function deleteFolder(nsName) {
+  if (state.currentTier === 'sys') {
+    OS.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
+    return;
+  }
+  var prefix = nsName + '/';
+  var toDelete = state.entries.filter(function (e) { return e.key.indexOf(prefix) === 0; });
+  var count = 0;
+  for (var i = 0; i < toDelete.length; i++) {
+    deleteEntry(toDelete[i]);
+    count++;
+  }
+  if (count > 0) {
+    OS.notify('已刪除資料夾', nsName + ' (' + count + ' 個檔案)', 'info');
+  } else {
+    OS.notify('刪除失敗', '資料夾為空或不存在', 'warning');
+  }
+}
+
+
+
+function createFolder(name) {
+  name = (name || '').trim();
+  if (!name) {
+    OS.notify('建立失敗', '請輸入資料夾名稱', 'warning');
+    return false;
+  }
+  // 使用跨應用路徑建立獨立命名空間
+  var path = 'user:@' + name + '/.folder';
+  var result = OS.writeFile(path, null, { overwrite: false });
+  if (!result.success) {
+    if (result.error === 'AlreadyExists') {
+      OS.notify('建立失敗', '資料夾「' + name + '」已存在', 'warning');
+    } else {
+      OS.notify('建立失敗', result.error || '未知錯誤', 'error');
+    }
+    return false;
+  }
+  OS.notify('已建立', '資料夾「' + name + '」', 'info');
+  return true;
+}
+
+function createFile(name, content) {
+  name = (name || '').trim();
+  if (!name) {
+    OS.notify('建立失敗', '請輸入檔案名稱', 'warning');
+    return false;
+  }
+  var ns = state.currentNamespace;
+  var path;
+  if (ns) {
+    // 在目前命名空間下建立
+    path = 'user:@' + ns + '/' + name;
+  } else {
+    // 沒有選擇命名空間，建立在自己的命名空間
+    path = 'user:' + name;
+  }
+  var data = content || '';
+  var result = OS.writeFile(path, data, { overwrite: false });
+  if (!result.success) {
+    if (result.error === 'AlreadyExists') {
+      OS.notify('建立失敗', '檔案「' + name + '」已存在', 'warning');
+    } else {
+      OS.notify('建立失敗', result.error || '未知錯誤', 'error');
+    }
+    return false;
+  }
+  OS.notify('已建立', '檔案「' + name + '」', 'info');
+  return true;
+}
+
 // ── Styles ───────────────────────────────────────────────────
 var accent = '#67b8ff';
 var bg = 'linear-gradient(180deg, rgba(10,14,20,0.96), rgba(6,10,14,0.92))';
@@ -144,6 +244,24 @@ var breadcrumbBtn = {
   color: '#d8e8ff',
 };
 
+var createBtn = {
+  padding: '4px 10px',
+  borderRadius: '5px',
+  fontSize: '11px',
+  background: 'rgba(80,250,123,0.15)',
+  color: '#50fa7b',
+};
+
+var inputStyle = {
+  padding: '6px 10px',
+  borderRadius: '5px',
+  fontSize: '12px',
+  background: 'rgba(255,255,255,0.06)',
+  color: '#d8e8ff',
+  border: '1px solid rgba(255,255,255,0.1)',
+  flex: '1',
+};
+
 // ── Render ───────────────────────────────────────────────────
 var app = UI.createApp({
   title: '檔案管理器',
@@ -165,14 +283,21 @@ var app = UI.createApp({
 });
 
 function renderMain(s, self) {
-  return UI.column([
+  var children = [
     renderHeader(s, self),
     UI.separator(),
     renderUsageBar(s),
     UI.separator(),
     renderBreadcrumb(s, self),
-    s.selectedEntry ? renderDetail(s, self) : renderContent(s, self),
-  ], { padding: '16px', flex: '1' });
+  ];
+
+  if (s.createMode) {
+    children.push(renderCreateForm(s, self));
+  }
+
+  children.push(s.selectedEntry ? renderDetail(s, self) : renderContent(s, self));
+
+  return UI.column(children, { padding: '16px', flex: '1' });
 }
 
 // ── Header (Tier Tabs) ──────────────────────────────────────
@@ -185,6 +310,9 @@ function renderHeader(s, self) {
           state.currentTier = tier;
           state.currentNamespace = null;
           state.selectedEntry = null;
+          state.createMode = null;
+          state.createName = '';
+          state.createContent = '';
           self.rerender();
         },
         style: tabStyle(s.currentTier === tier),
@@ -223,6 +351,7 @@ function renderBreadcrumb(s, self) {
     onClick: function () {
       state.currentNamespace = null;
       state.selectedEntry = null;
+      app.closeContextMenu();
       self.rerender();
     },
     style: breadcrumbBtn,
@@ -233,6 +362,7 @@ function renderBreadcrumb(s, self) {
     parts.push(UI.button(s.currentNamespace, {
       onClick: function () {
         state.selectedEntry = null;
+        app.closeContextMenu();
         self.rerender();
       },
       style: breadcrumbBtn,
@@ -244,6 +374,32 @@ function renderBreadcrumb(s, self) {
     parts.push(UI.text(getDisplayKey(s.selectedEntry), {
       fontSize: '12px', color: accent, fontWeight: 'bold',
     }));
+  }
+
+  // user 層且不在詳情頁顯示新增按鈕
+  if (s.currentTier === 'user' && !s.selectedEntry) {
+    parts.push(UI.row([
+      UI.button('+ 資料夾', {
+        onClick: function () {
+          state.createMode = state.createMode === 'folder' ? null : 'folder';
+          state.createName = '';
+          state.createContent = '';
+          app.closeContextMenu();
+          self.rerender();
+        },
+        style: createBtn,
+      }),
+      UI.button('+ 檔案', {
+        onClick: function () {
+          state.createMode = state.createMode === 'file' ? null : 'file';
+          state.createName = '';
+          state.createContent = '';
+          app.closeContextMenu();
+          self.rerender();
+        },
+        style: createBtn,
+      }),
+    ], { gap: '4px', marginLeft: 'auto' }));
   }
 
   return UI.row(parts, { alignItems: 'center', gap: '6px' });
@@ -265,6 +421,93 @@ function renderContent(s, self) {
   return renderFileList(getFilteredEntries(), s, self);
 }
 
+// ── Create Form ─────────────────────────────────────────────
+function renderCreateForm(s, self) {
+  var isFolder = s.createMode === 'folder';
+  var title = isFolder ? '新增資料夾' : '新增檔案';
+
+  var rows = [
+    UI.row([
+      UI.text(title, { fontSize: '13px', fontWeight: 'bold', color: '#50fa7b' }),
+      UI.button('✕', {
+        onClick: function () {
+          state.createMode = null;
+          self.rerender();
+        },
+        style: { padding: '2px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(255,255,255,0.06)', color: 'rgba(216,232,255,0.5)' },
+      }),
+    ], { alignItems: 'center', justifyContent: 'space-between' }),
+    UI.row([
+      UI.text(isFolder ? '名稱：' : '檔名：', { fontSize: '12px', color: 'rgba(216,232,255,0.6)', minWidth: '45px' }),
+      UI.input({
+        value: s.createName,
+        placeholder: isFolder ? '例如：my-documents' : '例如：note.txt',
+        style: inputStyle,
+        onChange: function (val) { state.createName = val; },
+      }),
+    ], { alignItems: 'center', gap: '6px' }),
+  ];
+
+  if (!isFolder) {
+    rows.push(UI.text('內容：', { fontSize: '12px', color: 'rgba(216,232,255,0.6)' }));
+    rows.push(UI.textarea({
+      value: s.createContent,
+      placeholder: '輸入檔案內容（可留空）',
+      rows: 4,
+      style: {
+        padding: '6px 10px',
+        borderRadius: '5px',
+        fontSize: '12px',
+        background: 'rgba(255,255,255,0.06)',
+        color: '#d8e8ff',
+        border: '1px solid rgba(255,255,255,0.1)',
+        fontFamily: 'monospace',
+        resize: 'vertical',
+      },
+      onChange: function (val) { state.createContent = val; },
+    }));
+  }
+
+  rows.push(UI.row([
+    UI.button(isFolder ? '建立資料夾' : '建立檔案', {
+      onClick: function () {
+        var ok;
+        if (isFolder) {
+          ok = createFolder(state.createName);
+        } else {
+          ok = createFile(state.createName, state.createContent);
+        }
+        if (ok) {
+          state.createMode = null;
+          state.createName = '';
+          state.createContent = '';
+          loadEntries();
+          loadUsage();
+        }
+        self.rerender();
+      },
+      style: createBtn,
+    }),
+    UI.button('取消', {
+      onClick: function () {
+        state.createMode = null;
+        state.createName = '';
+        state.createContent = '';
+        self.rerender();
+      },
+      style: btnSmall,
+    }),
+  ], { gap: '8px' }));
+
+  return UI.column(rows, {
+    gap: '6px',
+    padding: '12px',
+    borderRadius: '8px',
+    background: 'rgba(80,250,123,0.04)',
+    border: '1px solid rgba(80,250,123,0.12)',
+  });
+}
+
 function renderNamespaceList(s, self) {
   if (s.namespaces.length === 0) {
     return UI.text('此層級沒有任何檔案。', {
@@ -281,21 +524,32 @@ function renderNamespaceList(s, self) {
           UI.text(ns.name, { fontSize: '13px', fontWeight: 'bold', color: '#d8e8ff' }),
           UI.text(ns.count + ' 個檔案', { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
         ], { flex: '1', gap: '1px' }),
-        UI.button('開啟', {
-          onClick: function () {
-            state.currentNamespace = ns.name;
-            state.selectedEntry = null;
-            self.rerender();
-          },
-          style: btnSmall,
-        }),
       ], {
-        alignItems: 'center',
-        padding: '10px 14px',
-        borderRadius: '8px',
-        background: cardBg,
-        border: cardBorder,
-        gap: '10px',
+        onClick: function () {
+          state.currentNamespace = ns.name;
+          state.selectedEntry = null;
+          self.rerender();
+        },
+        onContextMenu: function (event) {
+          pendingContextTarget = { type: 'folder', namespace: ns };
+          var menuItems = [
+            { id: 'open', label: '📂 開啟' },
+          ];
+          if (state.currentTier !== 'sys') {
+            menuItems.push({ separator: true });
+            menuItems.push({ id: 'delete-folder', label: '🗑 刪除資料夾', danger: true });
+          }
+          OS.showContextMenu(app.windowId, 'ctx-folder-' + ns.name, event.x || 100, event.y || 100, menuItems);
+        },
+        style: {
+          alignItems: 'center',
+          padding: '10px 14px',
+          borderRadius: '8px',
+          background: cardBg,
+          border: cardBorder,
+          gap: '10px',
+          cursor: 'pointer',
+        },
       }));
     })(s.namespaces[i]);
   }
@@ -325,29 +579,51 @@ function renderFileList(entries, s, self) {
             fontSize: '10px', color: 'rgba(216,232,255,0.35)',
           }),
         ], { flex: '1', gap: '1px' }),
-        UI.button('查看', {
-          onClick: function () {
-            state.selectedEntry = entry;
-            self.rerender();
-          },
-          style: btnSmall,
-        }),
-        s.currentTier !== 'sys' ? UI.button('刪除', {
-          onClick: function () {
-            deleteEntry(entry);
-            loadEntries();
-            loadUsage();
-            self.rerender();
-          },
-          style: dangerBtn,
-        }) : UI.text(''),
       ], {
-        alignItems: 'center',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        background: cardBg,
-        border: cardBorder,
-        gap: '8px',
+        onClick: function () {
+          state.selectedEntry = entry;
+          self.rerender();
+        },
+        onDblClick: function () {
+          // 嘗試以預設應用程式開啟，否則顯示詳情
+          var ext = getFileExtension(entry.key);
+          if (ext) {
+            var handler = OS.getFileTypeHandler(ext);
+            if (handler.success && handler.data) {
+              OS.launch(handler.data.appDefId);
+              return;
+            }
+          }
+          state.selectedEntry = entry;
+          self.rerender();
+        },
+        onContextMenu: function (event) {
+          pendingContextTarget = { type: 'file', entry: entry };
+          var menuItems = [
+            { id: 'view', label: '📋 查看詳情' },
+          ];
+          var ext = getFileExtension(entry.key);
+          if (ext) {
+            var handlerResult = OS.getFileTypeHandler(ext);
+            if (handlerResult.success && handlerResult.data) {
+              menuItems.push({ id: 'open-default', label: '📂 以預設應用程式開啟' });
+            }
+          }
+          if (state.currentTier !== 'sys') {
+            menuItems.push({ separator: true });
+            menuItems.push({ id: 'delete', label: '🗑 刪除', danger: true });
+          }
+          OS.showContextMenu(app.windowId, 'ctx-file-' + entry.key, event.x || 100, event.y || 100, menuItems);
+        },
+        style: {
+          alignItems: 'center',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          background: cardBg,
+          border: cardBorder,
+          gap: '8px',
+          cursor: 'pointer',
+        },
       }));
     })(entries[i]);
   }
@@ -392,7 +668,7 @@ function renderDetail(s, self) {
     overflow: 'auto',
   }));
 
-  rows.push(UI.row([
+  var actionButtons = [
     UI.button('← 返回', {
       onClick: function () {
         state.selectedEntry = null;
@@ -400,7 +676,24 @@ function renderDetail(s, self) {
       },
       style: breadcrumbBtn,
     }),
-    s.currentTier !== 'sys' ? UI.button('刪除此檔案', {
+  ];
+
+  // 「以預設應用程式開啟」按鈕（僅當檔案有副檔名且有對應處理程式時顯示）
+  var ext = getFileExtension(entry.key);
+  if (ext) {
+    var handlerResult = OS.getFileTypeHandler(ext);
+    if (handlerResult.success && handlerResult.data) {
+      actionButtons.push(UI.button('📂 以預設應用程式開啟', {
+        onClick: function () {
+          openWithDefaultApp(entry);
+        },
+        style: btnSmall,
+      }));
+    }
+  }
+
+  if (s.currentTier !== 'sys') {
+    actionButtons.push(UI.button('刪除此檔案', {
       onClick: function () {
         deleteEntry(entry);
         state.selectedEntry = null;
@@ -409,8 +702,10 @@ function renderDetail(s, self) {
         self.rerender();
       },
       style: dangerBtn,
-    }) : UI.text(''),
-  ], { gap: '8px' }));
+    }));
+  }
+
+  rows.push(UI.row(actionButtons, { gap: '8px' }));
 
   return UI.column(rows, { gap: '6px', overflow: 'auto', flex: '1' });
 }
@@ -420,4 +715,44 @@ function detailRow(label, value) {
     UI.text(label, { fontSize: '11px', color: 'rgba(216,232,255,0.45)', minWidth: '80px' }),
     UI.text(String(value || '-'), { fontSize: '11px', color: '#d8e8ff', flex: '1' }),
   ], { alignItems: 'baseline', gap: '8px' });
+}
+
+// ── Context Menu Event Handler ─────────────────────────────
+// 系統層右鍵選單的選取事件由 onWindowEvent 派發
+var _origOnWindowEvent = globalThis.onWindowEvent;
+globalThis.onWindowEvent = function (event) {
+  if (event.type === 'contextmenu-select' && pendingContextTarget) {
+    var target = pendingContextTarget;
+    pendingContextTarget = null;
+    handleContextMenuAction(event.value, target);
+    return;
+  }
+  if (_origOnWindowEvent) _origOnWindowEvent(event);
+};
+
+function handleContextMenuAction(actionId, target) {
+  if (target.type === 'folder') {
+    if (actionId === 'open') {
+      state.currentNamespace = target.namespace.name;
+      state.selectedEntry = null;
+      app.rerender();
+    } else if (actionId === 'delete-folder') {
+      deleteFolder(target.namespace.name);
+      loadEntries();
+      loadUsage();
+      app.rerender();
+    }
+  } else if (target.type === 'file') {
+    if (actionId === 'view') {
+      state.selectedEntry = target.entry;
+      app.rerender();
+    } else if (actionId === 'open-default') {
+      openWithDefaultApp(target.entry);
+    } else if (actionId === 'delete') {
+      deleteEntry(target.entry);
+      loadEntries();
+      loadUsage();
+      app.rerender();
+    }
+  }
 }

@@ -9,7 +9,19 @@ type WindowControlType =
     | 'input' | 'textarea' | 'checkbox' | 'select'
     | 'image' | 'separator' | 'progress' | 'list';
 
-type WindowUiEventType = 'click' | 'change' | 'submit';
+type WindowUiEventType = 'click' | 'change' | 'submit' | 'dblclick' | 'contextmenu' | 'contextmenu-select';
+
+interface ContextMenuItem {
+    id: string;
+    label: string;
+    danger?: boolean;
+}
+
+interface ContextMenuSeparator {
+    separator: true;
+}
+
+type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator;
 
 type WindowSystemError =
     | 'PermissionDenied'
@@ -79,6 +91,7 @@ interface WindowUiNodeBase {
     id?: string;
     type: WindowControlType;
     style?: WindowUiStyle;
+    events?: WindowUiEventType[];
 }
 
 interface WindowLabelNode extends WindowUiNodeBase {
@@ -174,6 +187,8 @@ interface WindowUiEvent {
     type: WindowUiEventType;
     controlId?: string;
     value?: unknown;
+    x?: number;
+    y?: number;
 }
 
 interface WindowLifecycleEvent {
@@ -220,6 +235,9 @@ interface ConsoleWindowController {
 }
 
 export type {
+    ContextMenuEntry,
+    ContextMenuItem,
+    ContextMenuSeparator,
     WindowBounds,
     WindowButtonNode,
     WindowCheckboxNode,

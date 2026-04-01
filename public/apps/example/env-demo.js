@@ -123,6 +123,6 @@ var app = UI.createApp({
             : UI.text('尚無載入的函式庫', { fontSize: '12px', color: 'rgba(216,232,255,0.35)' }),
         ], { gap: '6px' }),
       ]),
-    ], { gap: '8px' });
+    ], { gap: '8px', padding: '18px' });
   },
 });

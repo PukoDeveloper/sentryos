@@ -79,8 +79,8 @@
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
                 "env.library.load",
-                "env.variable.read",
-                "env.variable.write",
+                "env.read",
+                "env.write",
                 "env.library.list"
             ],
             "maxInstances": 1

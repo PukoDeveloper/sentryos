@@ -119,6 +119,10 @@ export const Permissions = {
   NETWORK_REQUEST: 'network.request',
   NETWORK_STATUS: 'network.status',
   NETWORK_MANAGE: 'network.manage',
+
+  // Registry
+  REGISTRY_READ: 'registry.read',
+  REGISTRY_WRITE: 'registry.write',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
@@ -183,6 +187,9 @@ export const USER_DEFAULT_PERMISSIONS: string[] = [
 
   // 監控（唯讀）
   Permissions.MONITOR_READ,
+
+  // 註冊表（唯讀）
+  Permissions.REGISTRY_READ,
 
   // 權限：建立子應用權限槽（供 DesktopShell 啟動使用）
   Permissions.NEW_APP,

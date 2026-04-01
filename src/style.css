@@ -947,6 +947,7 @@ body {
 	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 	z-index: 10000;
 	overflow: hidden;
+	pointer-events: auto;
 }
 
 .desktop-context-menu-item {
@@ -964,6 +965,20 @@ body {
 
 .desktop-context-menu-item:hover {
 	background: rgba(109, 213, 255, 0.12);
+}
+
+.desktop-context-menu-item--danger {
+	color: #ff5555;
+}
+
+.desktop-context-menu-item--danger:hover {
+	background: rgba(255, 85, 85, 0.12);
+}
+
+.desktop-context-menu-separator {
+	height: 1px;
+	margin: 4px 8px;
+	background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Drag ghost ── */

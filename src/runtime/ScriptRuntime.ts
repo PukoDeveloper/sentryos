@@ -53,7 +53,6 @@ class ScriptRuntime {
         if (entryPath !== undefined) {
             runtimeProcess.entryPath = entryPath;
         }
-        this.injectApis(runtimeProcess.context, proc);
 
         runtimeProcess.runtime.setInterruptHandler(
             shouldInterruptAfterDeadline(Date.now() + timeoutMs)
@@ -262,6 +261,7 @@ class ScriptRuntime {
             timerNextId: 1,
         };
         this.processRuntimes.set(proc.pid, runtimeProcess);
+        this.injectApis(context, proc);
         return runtimeProcess;
     }
 

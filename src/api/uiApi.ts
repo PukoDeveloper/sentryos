@@ -1,5 +1,6 @@
 import type { Kernel } from '../kernel/Kernel';
 import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../kernel/constants';
+import { uiComponentRegistry } from '../window/UiComponentRegistry';
 
 export function registerUiApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');
@@ -13,6 +14,13 @@ export function registerUiApi(kernel: Kernel): void {
     if (!app) {
       return {};
     }
+
+    // Build node constructors dynamically from the registry
+    const nodeBuilders: Record<string, (...args: any[]) => Record<string, unknown>> = {};
+    for (const [type, builder] of uiComponentRegistry.getApiBuilders()) {
+      nodeBuilders[type] = builder;
+    }
+
     return {
       createWindow: (options: Record<string, unknown>) => {
         if (!permissions.has(process.processAppId, Permissions.WINDOW_CREATE)) {
@@ -50,31 +58,13 @@ export function registerUiApi(kernel: Kernel): void {
       append: (windowId: string, parentId: string, nodes: unknown[]) =>
         windowManager.appendUiNode(process.processAppId, windowId, parentId, (nodes ?? []) as any),
 
-      // ── Node 建構器 ────────────────────────────────────────
-      label: (text: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'label', text, style, id }),
-      button: (text: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'button', text, style, id }),
-      stack: (children: unknown[], style?: Record<string, string>, id?: string) =>
-        ({ type: 'stack', children, style, id }),
-      panel: (children: unknown[], style?: Record<string, string>, id?: string) =>
-        ({ type: 'panel', children, style, id }),
-      input: (value?: string, placeholder?: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'input', value, placeholder, style, id }),
-      textarea: (value?: string, placeholder?: string, rows?: number, style?: Record<string, string>, id?: string) =>
-        ({ type: 'textarea', value, placeholder, rows, style, id }),
-      checkbox: (checked?: boolean, label?: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'checkbox', checked, label, style, id }),
-      select: (options: unknown[], value?: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'select', options, value, style, id }),
-      image: (src: string, alt?: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'image', src, alt, style, id }),
-      separator: (style?: Record<string, string>, id?: string) =>
-        ({ type: 'separator', style, id }),
-      progress: (value: number, color?: string, style?: Record<string, string>, id?: string) =>
-        ({ type: 'progress', value, color, style, id }),
-      list: (children: unknown[], style?: Record<string, string>, id?: string) =>
-        ({ type: 'list', children, style, id }),
+      // ── Context Menu ───────────────────────────────────────
+      showContextMenu: (windowId: string, controlId: string, x: number, y: number, items: unknown[]) =>
+        windowManager.showContextMenu(process.processAppId, windowId, controlId, Number(x), Number(y), (items ?? []) as any),
+      closeContextMenu: () => windowManager.closeContextMenu(),
+
+      // ── Node 建構器（來自 registry）─────────────────────────
+      ...nodeBuilders,
     };
   }, 'window');
 }

@@ -14,6 +14,7 @@ import { SystemMonitor } from '../monitor/SystemMonitor';
 import { SystemAlert } from '../notification/SystemAlert';
 import { KernelConsole } from '../console/KernelConsole';
 import { AllowlistNetworkManager } from '../network/AllowlistNetworkManager';
+import { SystemRegistry } from '../registry/SystemRegistry';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
@@ -109,6 +110,9 @@ async function bootstrapSystem(): Promise<void> {
 
   kernel.set('catalogApps', catalogApps);
   kernel.set('iconMap', iconMap);
+
+  // 3.5  Populate system registry defaults
+  populateDefaultRegistry(kernel, catalogApps);
 
   // 4. Mount desktop shell
   const mounted = desktopShell.mount(applications);
@@ -278,6 +282,9 @@ async function initializeCore(): Promise<Kernel> {
     networkManager.importState(netState.data.data as any);
   }
 
+  const systemRegistry = new SystemRegistry(kernel);
+  kernel.register('systemRegistry', systemRegistry);
+
   const desktopShell = new DesktopShell();
   kernel.register('desktopShell', desktopShell);
 
@@ -313,6 +320,76 @@ function registerApplications(appManager: ApplicationManager, apps: RegisteredAp
     }
   }
   return { applications, iconMap };
+}
+
+// ── Default registry population ────────────────────────────────
+
+/** manifest id → system role 對照表 */
+const ROLE_MAP: Record<string, string> = {
+  'task-manager-app': 'task-manager',
+  'file-manager-app': 'file-manager',
+  'settings-app': 'settings',
+  'text-manager-app': 'text-editor',
+};
+
+/** 預設檔案類型 → manifest id 對照表 */
+const FILE_TYPE_MAP: Record<string, { handler: string; mime?: string }> = {
+  '.txt': { handler: 'text-manager-app', mime: 'text/plain' },
+  '.md': { handler: 'text-manager-app', mime: 'text/markdown' },
+  '.json': { handler: 'text-manager-app', mime: 'application/json' },
+  '.js': { handler: 'text-manager-app', mime: 'application/javascript' },
+  '.ts': { handler: 'text-manager-app', mime: 'application/typescript' },
+  '.css': { handler: 'text-manager-app', mime: 'text/css' },
+  '.html': { handler: 'text-manager-app', mime: 'text/html' },
+  '.xml': { handler: 'text-manager-app', mime: 'application/xml' },
+  '.log': { handler: 'text-manager-app', mime: 'text/plain' },
+  '.cfg': { handler: 'text-manager-app', mime: 'text/plain' },
+  '.ini': { handler: 'text-manager-app', mime: 'text/plain' },
+  '.yaml': { handler: 'text-manager-app', mime: 'text/yaml' },
+  '.yml': { handler: 'text-manager-app', mime: 'text/yaml' },
+  '.csv': { handler: 'text-manager-app', mime: 'text/csv' },
+};
+
+function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplication[]): void {
+  const registry = kernel.resolve('systemRegistry');
+
+  // 嘗試從 sys 層還原先前保存的設定
+  const restored = registry.restore();
+
+  if (restored) {
+    // 已還原使用者自訂設定，不覆蓋
+    return;
+  }
+
+  // Terminal 特殊處理：使用 builtin id
+  registry.setDefaultApp('terminal', BUILTIN_KERNEL_CONSOLE);
+
+  // 建立 manifestId → appDefId 對照表
+  const idToAppDef = new Map<string, string>();
+  for (const app of catalogApps) {
+    if (app.manifestId && app.appId) {
+      idToAppDef.set(app.manifestId, app.appId);
+    }
+  }
+
+  // 設定角色預設值
+  for (const [manifestId, role] of Object.entries(ROLE_MAP)) {
+    const appDefId = idToAppDef.get(manifestId);
+    if (appDefId) {
+      registry.setDefaultApp(role, appDefId);
+    }
+  }
+
+  // 設定檔案類型預設值
+  for (const [ext, { handler, mime }] of Object.entries(FILE_TYPE_MAP)) {
+    const appDefId = idToAppDef.get(handler);
+    if (appDefId) {
+      registry.setFileTypeHandler(ext, appDefId, mime);
+    }
+  }
+
+  // 持久化初始設定
+  registry.persist();
 }
 
 export { bootstrapSystem };

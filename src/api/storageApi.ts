@@ -1,6 +1,7 @@
 import type { Kernel } from '../kernel/Kernel';
 import type { StorageTier } from '../storage/FileSystem';
 import { Permissions } from '../kernel/constants';
+import type { RegisteredApplication } from '../application/ApplicationCatalog';
 
 // ── Path Resolution ────────────────────────────────────────
 // 路徑格式: [tier:][@namespace/]filename
@@ -9,8 +10,8 @@ import { Permissions } from '../kernel/constants';
 //   filename     檔案名稱（支援 / 子目錄）
 //
 // 範例:
-//   "test.json"                → app 層, key = "{appId}/test.json"
-//   "user:doc:readme"          → user 層, key = "{appId}/doc:readme"
+//   "test.json"                → app 層, key = "{storageId}/test.json"
+//   "user:doc:readme"          → user 層, key = "{storageId}/doc:readme"
 //   "sys:boot-config"          → sys 層, key = "boot-config"（全域，無命名空間）
 //   "@terminal/config.json"    → app 層, key = "terminal/config.json"（跨應用）
 //   "user:@terminal/data.json" → user 層, key = "terminal/data.json"（跨應用）
@@ -66,9 +67,17 @@ export function registerStorageApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');
   const permissions = kernel.resolve('permissions');
   const fileSystem = kernel.resolve('fileSystem');
+  const catalogApps = kernel.get('catalogApps');
+
+  /** 用 appDefId 查出穩定的 manifestId，作為儲存命名空間 */
+  function resolveStorageId(appDefId: string): string {
+    const entry = catalogApps.find((a: RegisteredApplication) => a.appId === appDefId);
+    return entry?.manifestId ?? appDefId;
+  }
 
   runtime.registerApi('storageApi', ({ process }) => {
-    const appId = process.processAppId;
+    const appId = process.processAppId;           // 權限檢查用
+    const storageId = resolveStorageId(process.appDefId);  // 儲存命名空間用
 
     function checkCrossApp(resolved: ResolvedPath): string | null {
       if (resolved.crossApp && !permissions.has(appId, Permissions.FILE_CROSS_APP)) {
@@ -79,7 +88,7 @@ export function registerStorageApi(kernel: Kernel): void {
 
     return {
       readFile: (path: string) => {
-        const resolved = resolvePath(path, appId);
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -94,7 +103,7 @@ export function registerStorageApi(kernel: Kernel): void {
       },
 
       writeFile: (path: string, data: unknown, options?: Record<string, unknown>) => {
-        const resolved = resolvePath(path, appId);
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -109,7 +118,7 @@ export function registerStorageApi(kernel: Kernel): void {
       },
 
       deleteFile: (path: string) => {
-        const resolved = resolvePath(path, appId);
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -117,7 +126,7 @@ export function registerStorageApi(kernel: Kernel): void {
       },
 
       listFiles: (path?: string) => {
-        const resolved = resolvePath(path || '', appId);
+        const resolved = resolvePath(path || '', storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -132,7 +141,7 @@ export function registerStorageApi(kernel: Kernel): void {
       },
 
       fileExists: (path: string) => {
-        const resolved = resolvePath(path, appId);
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
