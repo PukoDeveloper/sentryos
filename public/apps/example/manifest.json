@@ -29,10 +29,10 @@
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
                 "env.library.load",
-                "storage.read",
-                "storage.write",
-                "storage.delete",
-                "storage.list",
+                "file.read.app",
+                "file.write.app",
+                "file.delete.app",
+                "file.list.app",
                 "storage.usage"
             ],
             "maxInstances": 1
@@ -47,8 +47,7 @@
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
                 "env.library.load",
-                "notification.send",
-                "notification.dismiss"
+                "notification.send"
             ],
             "maxInstances": 1
         },
@@ -62,10 +61,7 @@
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
                 "env.library.load",
-                "monitor.snapshot",
-                "monitor.events",
-                "monitor.api",
-                "monitor.permissions"
+                "monitor.read"
             ],
             "maxInstances": 1
         },
@@ -80,8 +76,7 @@
                 "event.emit.window.ui",
                 "env.library.load",
                 "env.read",
-                "env.write",
-                "env.library.list"
+                "env.write"
             ],
             "maxInstances": 1
         }
