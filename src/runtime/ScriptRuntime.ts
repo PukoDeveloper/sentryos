@@ -5,7 +5,6 @@ import { DEFAULT_EXECUTION_TIMEOUT_MS, Permissions, Events } from '../kernel/con
 import { getQuickJSInstance } from './QuickJsInit';
 import type {
     ProcessType,
-    ApiScope,
     RuntimeResult,
     ProcessView,
     HostApiValue,
@@ -19,15 +18,10 @@ import type {
 class ScriptRuntime {
     private readonly kernel: Kernel;
     private readonly processRuntimes: Map<number, RuntimeProcess> = new Map();
-    private readonly apiFactories: Map<ApiScope, Map<string, ApiFactory>> = new Map();
+    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[] }> = new Map();
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
-        this.apiFactories.set('all', new Map());
-        this.apiFactories.set('service', new Map());
-        this.apiFactories.set('window', new Map());
-        this.apiFactories.set('console', new Map());
-        this.apiFactories.set('library', new Map());
         this.registerBuiltinApis();
     }
 
@@ -36,12 +30,12 @@ class ScriptRuntime {
     private get permissions() { return this.kernel.resolve('permissions'); }
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
-    registerApi(name: string, factory: ApiFactory, scope: ApiScope = 'all'): void {
-        this.apiFactories.get(scope)!.set(name, factory);
+    registerApi(name: string, factory: ApiFactory, gates: string[] = []): void {
+        this.apiEntries.set(name, { factory, gates });
     }
 
-    unregisterApi(name: string, scope: ApiScope = 'all'): boolean {
-        return this.apiFactories.get(scope)!.delete(name);
+    unregisterApi(name: string): boolean {
+        return this.apiEntries.delete(name);
     }
 
     execute(pid: number, code: string, timeoutMs = DEFAULT_EXECUTION_TIMEOUT_MS, entryPath?: string): RuntimeResult<unknown> {
@@ -226,7 +220,7 @@ class ScriptRuntime {
                     health
                 });
             }
-        }), 'service');
+        }), ['service']);
 
         this.registerApi('windowApi', ({ pid, process }) => ({
             postUiEvent: (name: string, payload?: unknown) =>
@@ -235,7 +229,7 @@ class ScriptRuntime {
                     name,
                     payload
                 })
-        }), 'window');
+        }), ['window']);
 
         this.registerApi('consoleApi', ({ pid, process }) => ({
             writeLine: (text: unknown) => {
@@ -249,7 +243,7 @@ class ScriptRuntime {
                 });
                 return true;
             }
-        }), 'console');
+        }), ['console']);
     }
 
     // ── Runtime 管理 ────────────────────────────────────────
@@ -307,17 +301,12 @@ class ScriptRuntime {
             pid: process.pid,
             process
         };
-        const scope = this.scopeFromType(process.type);
         const merged: Record<string, HostApiValue> = {};
 
-        const allFactories = this.apiFactories.get('all')!;
-        for (const [name, factory] of allFactories) {
-            const wrapped = this.wrapApiObject(name, factory(ctx), process);
-            Object.assign(merged, wrapped);
-        }
-
-        const scopedFactories = this.apiFactories.get(scope)!;
-        for (const [name, factory] of scopedFactories) {
+        for (const [name, { factory, gates }] of this.apiEntries) {
+            if (gates.length > 0 && !gates.some(g => this.permissions.hasAnyUnder(process.processAppId, g))) {
+                continue;
+            }
             const wrapped = this.wrapApiObject(name, factory(ctx), process);
             Object.assign(merged, wrapped);
         }
@@ -345,13 +334,6 @@ class ScriptRuntime {
             }
         }
         return wrapped;
-    }
-
-    private scopeFromType(type: ProcessType): ApiScope {
-        if (type === 'Service') return 'service';
-        if (type === 'Window') return 'window';
-        if (type === 'Library') return 'library';
-        return 'console';
     }
 
     // ── imports() 機制 ──────────────────────────────────────

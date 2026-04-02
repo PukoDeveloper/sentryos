@@ -31,5 +31,5 @@ export function registerConsoleApi(kernel: Kernel): void {
         return true;
       },
     };
-  }, 'console');
+  }, ['console']);
 }

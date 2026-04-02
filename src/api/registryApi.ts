@@ -77,5 +77,5 @@ export function registerRegistryApi(kernel: Kernel): void {
       }
       return { success: true, data: registry.getSnapshot() };
     },
-  }));
+  }), ['registry']);
 }

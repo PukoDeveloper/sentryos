@@ -2,7 +2,6 @@
 import type { AppType } from '../kernel/constants';
 
 type ProcessType = AppType;
-type ApiScope = 'all' | 'service' | 'window' | 'console' | 'library';
 
 type RuntimeError =
     | 'ProcessNotFound'
@@ -67,7 +66,6 @@ type RuntimeProcess = {
 
 export type {
     ProcessType,
-    ApiScope,
     RuntimeError,
     RuntimeResult,
     ProcessView,

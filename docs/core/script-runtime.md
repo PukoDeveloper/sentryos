@@ -10,8 +10,8 @@
 
 | 方法 | 簽章 | 說明 |
 |------|------|------|
-| `registerApi()` | `(name, factory, scope?) → void` | 註冊 Host API 工廠 |
-| `unregisterApi()` | `(name, scope?) → boolean` | 移除 Host API 工廠 |
+| `registerApi()` | `(name, factory, gates?) → void` | 註冊 Host API 工廠（gates 為權限命名空間陣列） |
+| `unregisterApi()` | `(name) → boolean` | 移除 Host API 工廠 |
 | `execute()` | `(pid, code, timeoutMs?) → RuntimeResult` | 在指定程序中執行 JavaScript（預設 300ms 超時） |
 | `evaluateInContext()` | `(pid, code) → RuntimeResult` | 在已存在的程序 Context 中執行（不重新注入 API），用於載入程式庫 |
 | `dispatchUiEvent()` | `(processAppId, event) → RuntimeResult` | 分派 UI 事件到程序中的 `onWindowEvent` |
@@ -21,17 +21,19 @@
 
 ---
 
-## API Scope
+## API Gates（權限門控）
 
-每個 Host API 註冊時可指定作用範圍，僅符合程序類型的 API 會被注入：
+每個 Host API 註冊時可指定 `gates`（權限命名空間陣列）。注入時會檢查程序的應用是否持有對應命名空間下的任一權限：
 
-| Scope | 注入對象 |
-|-------|---------|
-| `all` | 所有程序 |
-| `service` | `type === 'Service'` 的程序 |
-| `window` | `type === 'Window'` 的程序 |
-| `console` | `type === 'Console'` 的程序 |
-| `library` | `type === 'Library'` 的程序 |
+| Gates | 說明 |
+|-------|------|
+| `[]`（空陣列） | 所有程序皆注入 |
+| `['window']` | 僅持有 `window.*` 權限的程序 |
+| `['console']` | 僅持有 `console.*` 權限的程序 |
+| `['service']` | 僅持有 `service.*` 權限的程序 |
+| `['file', 'storage']` | 持有 `file.*` 或 `storage.*` 權限的程序 |
+
+判定邏輯：`PermissionsManager.hasAnyUnder(appId, namespace)` — 檢查應用是否持有以 `{namespace}.` 開頭的任一權限。
 
 ---
 
@@ -39,31 +41,32 @@
 
 ScriptRuntime 自身註冊的 API（扁平化注入至 `OS` 全域物件）：
 
-| API 名稱 | Scope | 提供方法 |
+| API 名稱 | Gates | 提供方法 |
 |-----------|-------|---------|
-| `process` | all | `pid`, `appDefId`, `appId`, `type`, `parentPid`, `status()`, `spawnChild()`, `terminateSelf()`, `listProcesses()`, `terminateProcess()` |
-| `event` | all | `subscribe(name)`, `unsubscribe(name)`, `emit(name, payload?)` |
-| `ipc` | all | `sendToParent(payload)`, `sendToChild(childPid, payload)`, `broadcastChildren(payload)`, `receive()` |
-| `serviceApi` | service | `publishHealth(health)` |
-| `windowApi` | window | `postUiEvent(name, payload?)` |
-| `consoleApi` | console | `writeLine(text)` |
+| `process` | `[]` | `pid`, `appDefId`, `appId`, `type`, `parentPid`, `status()`, `spawnChild()`, `terminateSelf()`, `listProcesses()`, `terminateProcess()` |
+| `event` | `[]` | `subscribe(name)`, `unsubscribe(name)`, `emit(name, payload?)` |
+| `ipc` | `[]` | `sendToParent(payload)`, `sendToChild(childPid, payload)`, `broadcastChildren(payload)`, `receive()` |
+| `serviceApi` | `['service']` | `publishHealth(health)` |
+| `windowApi` | `['window']` | `postUiEvent(name, payload?)` |
+| `consoleApi` | `['console']` | `writeLine(text)` |
 
 ## Bootstrap 註冊 Host API
 
 以下 API 由 `systemBootstrap.ts` 於啟動時註冊（同樣扁平化注入至 `OS`）：
 
-| API 名稱 | Scope | 提供方法 |
+| API 名稱 | Gates | 提供方法 |
 |-----------|-------|---------|
-| `ui` | window | `createWindow(opts)`, `initialize(wid, tree)`, `update()`, `remove()`, `append()`, `label()`, `button()`, `stack()`, `panel()`, `input()`, `textarea()`, `checkbox()`, `select()`, `image()`, `separator()`, `progress()`, `list()` |
-| `systemApi` | all | `terminateProcess(targetPid)` |
-| `storageApi` | all | `readFile()`, `writeFile()`, `deleteFile()`, `listFiles()`, `fileExists()`, `storageUsage()`, `listAllFiles()` |
-| `envApi` | all | `getVariable()`, `getAllVariables()`, `setVariable()`, `removeVariable()`, `registerAutoStart()`, `unregisterAutoStart()`, `loadLibrary()`, `listLibraries()`, `registerCommand()` |
-| `consoleApi` | console | `writeLine()`, `write()`, `clear()`（覆寫內建版本，直接操作 Console 視窗 DOM） |
-| `shellApi` | console | `listProcesses()`, `killProcess()`, `listApps()`, `launch()`, `listWindows()`, `sysinfo()`, `listCommands()`, `resolveCommand()` |
-| `notificationApi` | all | `notify()`, `dismiss()` |
-| `monitorApi` | all | `snapshot()`, `eventStats()`, `apiStats()`, `permissionStats()`, `recentEvents()`, `recentApiCalls()`, `processHistory()` |
-| `settingsApi` | all | `getTheme()`, `applyTheme()`, `saveTheme()`, `loadSavedTheme()`, `sysinfo()`, `getNotificationSettings()`, `setNotificationSettings()`, `getApps()`, `getAppProcesses()` |
-| `networkApi` | all | `request()`, `isAllowed()`, `getStatus()`, `getAllowlist()`, `addAllowlistEntry()`, `removeAllowlistEntry()`, `setEnabled()` |
+| `ui` | `['window']` | `createWindow(opts)`, `initialize(wid, tree)`, `update()`, `remove()`, `append()`, `label()`, `button()`, `stack()`, `panel()`, `input()`, `textarea()`, `checkbox()`, `select()`, `image()`, `separator()`, `progress()`, `list()` |
+| `systemApi` | `['process']` | `terminateProcess(targetPid)` |
+| `storageApi` | `['file', 'storage']` | `readFile()`, `writeFile()`, `deleteFile()`, `listFiles()`, `fileExists()`, `storageUsage()`, `listAllFiles()` |
+| `envApi` | `['env']` | `getVariable()`, `getAllVariables()`, `setVariable()`, `removeVariable()`, `registerAutoStart()`, `unregisterAutoStart()`, `loadLibrary()`, `listLibraries()`, `registerCommand()` |
+| `consoleApi` | `['console']` | `writeLine()`, `write()`, `clear()`（覆寫內建版本，直接操作 Console 視窗 DOM） |
+| `shellApi` | `['shell']` | `listProcesses()`, `killProcess()`, `listApps()`, `launch()`, `listWindows()`, `sysinfo()`, `listCommands()`, `resolveCommand()` |
+| `notificationApi` | `['notification']` | `notify()`, `dismiss()` |
+| `monitorApi` | `['monitor']` | `snapshot()`, `eventStats()`, `apiStats()`, `permissionStats()`, `recentEvents()`, `recentApiCalls()`, `processHistory()` |
+| `settingsApi` | `['settings']` | `getTheme()`, `applyTheme()`, `saveTheme()`, `loadSavedTheme()`, `sysinfo()`, `getNotificationSettings()`, `setNotificationSettings()`, `getApps()`, `getAppProcesses()` |
+| `networkApi` | `['network']` | `request()`, `isAllowed()`, `getStatus()`, `getAllowlist()`, `addAllowlistEntry()`, `removeAllowlistEntry()`, `setEnabled()` |
+| `registryApi` | `['registry']` | `getDefaultApp()`, `getAllRoles()`, `setDefaultApp()`, `getFileTypeHandler()`, `getAllFileTypeHandlers()`, `setFileTypeHandler()`, `getSnapshot()` |
 
 > Bootstrap 的 `consoleApi` 會覆寫 ScriptRuntime 內建版本，提供實際操作 Console 視窗 DOM 的功能。
 
@@ -80,7 +83,7 @@ type ApiFactoryContext = {
 type ApiFactory = (ctx: ApiFactoryContext) => Record<string, HostApiValue>;
 ```
 
-每次 `execute()` 時，會呼叫所有適用 scope 的 factory 產生 API 物件，再扁平化注入沙箱 `OS` 物件。
+每次 `execute()` 時，會呼叫所有通過權限門控的 factory 產生 API 物件，再扁平化注入沙箱 `OS` 物件。
 
 ---
 

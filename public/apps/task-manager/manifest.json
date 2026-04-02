@@ -19,7 +19,12 @@
                 "event.subscribe.process.started",
                 "event.subscribe.process.stopped",
                 "storage.usage",
-                "monitor.read"
+                "monitor.read",
+                "file.list.sys",
+                "file.list.app",
+                "file.list.user",
+                "file.list.cache"
+
             ],
             "maxInstances": 1
         }

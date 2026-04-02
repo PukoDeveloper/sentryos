@@ -89,5 +89,5 @@ export function registerNetworkApi(kernel: Kernel): void {
       persistNetworkState();
       return { success: true, data: null };
     },
-  }), 'all');
+  }), ['network']);
 }

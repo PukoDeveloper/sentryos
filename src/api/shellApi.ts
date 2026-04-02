@@ -146,5 +146,5 @@ export function registerShellApi(kernel: Kernel): void {
         },
       };
     },
-  }), 'console');
+  }), ['shell']);
 }

@@ -17,6 +17,7 @@ type PackageManifest = {
     version: string;
     description?: string;
     author?: string;
+    permissions?: string[];
     apps: AppEntryManifest[];
 };
 
@@ -156,7 +157,7 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
     return {
         name: entry.name,
         version: pkg.version,
-        permissions: entry.permissions ?? [],
+        permissions: entry.permissions ?? pkg.permissions ?? [],
         maxInstances: entry.maxInstances,
         packageName: pkg.name,
         manifestId: entry.id,

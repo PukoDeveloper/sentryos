@@ -171,7 +171,7 @@ export function registerSettingsApi(kernel: Kernel): void {
         })),
       };
     },
-  }));
+  }), ['settings']);
 
   // Load saved theme on boot
   const saved = fileSystem.read(systemAppId, SETTINGS_TIER, SETTINGS_KEY);

@@ -162,5 +162,5 @@ export function registerStorageApi(kernel: Kernel): void {
         return fileSystem.list(appId, tier as StorageTier | undefined);
       },
     };
-  });
+  }, ['file', 'storage']);
 }
