@@ -17,6 +17,7 @@ type PackageManifest = {
     version: string;
     description?: string;
     author?: string;
+    permissions?: string[];
     apps: AppEntryManifest[];
 };
 
@@ -49,6 +50,7 @@ type LegacyManifest = {
 
 type RegisteredApplication = Application & {
     packageName: string;
+    manifestId?: string;
     entryPath: string;
     mainPath: string;
     description?: string;
@@ -155,9 +157,10 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
     return {
         name: entry.name,
         version: pkg.version,
-        permissions: entry.permissions ?? [],
+        permissions: entry.permissions ?? pkg.permissions ?? [],
         maxInstances: entry.maxInstances,
         packageName: pkg.name,
+        manifestId: entry.id,
         description: pkg.description,
         author: pkg.author,
         icon: entry.icon ? `${basePath}/${entry.icon}` : undefined,

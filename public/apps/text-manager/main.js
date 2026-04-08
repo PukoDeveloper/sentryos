@@ -1,4 +1,4 @@
-var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -17,7 +17,7 @@ var state = {
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadDocumentList() {
-  var result = storageApi.list('user:' + PREFIX);
+  var result = OS.listFiles('user:' + PREFIX);
   if (!result.success) { state.documents = []; return; }
   state.documents = (result.data || [])
     .map(function (e) {
@@ -28,22 +28,22 @@ function loadDocumentList() {
 
 function saveDocument() {
   if (!state.currentKey) return;
-  var result = storageApi.write('user:' + state.currentKey, {
+  var result = OS.writeFile('user:' + state.currentKey, {
     title: state.currentTitle,
     content: state.currentContent,
   }, { overwrite: true });
   if (result.success) {
     state.dirty = false;
-    notificationApi.notify('已儲存', state.currentTitle, 'success');
+    OS.notify('已儲存', state.currentTitle, 'success');
   } else {
-    notificationApi.notify('儲存失敗', result.error || '未知錯誤', 'error');
+    OS.notify('儲存失敗', result.error || '未知錯誤', 'error');
   }
 }
 
 function deleteDocument(key) {
-  var result = storageApi.delete('user:' + key);
+  var result = OS.deleteFile('user:' + key);
   if (result.success) {
-    notificationApi.notify('已刪除', '文件已刪除', 'info');
+    OS.notify('已刪除', '文件已刪除', 'info');
   }
 }
 
@@ -57,9 +57,9 @@ function newDocument() {
 }
 
 function openDocument(key) {
-  var result = storageApi.read('user:' + key);
+  var result = OS.readFile('user:' + key);
   if (!result.success) {
-    notificationApi.notify('開啟失敗', result.error || '未知錯誤', 'error');
+    OS.notify('開啟失敗', result.error || '未知錯誤', 'error');
     return;
   }
   state.currentKey = key;

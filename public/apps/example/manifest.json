@@ -18,6 +18,67 @@
                 "env.library.load"
             ],
             "maxInstances": 1
+        },
+        {
+            "id": "example-storage",
+            "name": "儲存空間範例",
+            "main": "storage-demo.js",
+            "type": "Window",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.app",
+                "file.write.app",
+                "file.delete.app",
+                "file.list.app",
+                "storage.usage"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "example-notification",
+            "name": "通知範例",
+            "main": "notification-demo.js",
+            "type": "Window",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "notification.send"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "example-monitor",
+            "name": "系統監控範例",
+            "main": "monitor-demo.js",
+            "type": "Window",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "monitor.read"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "example-env",
+            "name": "環境變數範例",
+            "main": "env-demo.js",
+            "type": "Window",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "env.read",
+                "env.write"
+            ],
+            "maxInstances": 1
         }
     ]
 }

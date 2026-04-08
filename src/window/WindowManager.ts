@@ -6,6 +6,7 @@ import {
 } from '../kernel/constants';
 import type {
     WindowBounds,
+    ContextMenuEntry,
     WindowDescriptor,
     WindowInitOptions,
     WindowLifecycleEvent,
@@ -18,6 +19,9 @@ import type {
     WindowUiStyle,
     ConsoleWindowController,
 } from './types';
+import { uiComponentRegistry } from './UiComponentRegistry';
+import type { RenderContext } from './UiComponentRegistry';
+import './builtinComponents';
 
 const ANIM_CLOSE_MS    = 220;
 const ANIM_MINIMIZE_MS = 280;
@@ -37,6 +41,8 @@ class WindowManager {
     private eventCounter = 0;
     private focusedWindowId: string | null = null;
     private windowChangeListener?: (event: WindowLifecycleEvent) => void;
+    private contextMenuEl: HTMLElement | null = null;
+    private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -220,82 +226,17 @@ class WindowManager {
 
         const controlType = element.dataset.controlType;
 
-        if (patch.text !== undefined && (controlType === 'label' || controlType === 'button')) {
-            element.textContent = patch.text;
-        }
-
-        if (patch.value !== undefined) {
-            if (controlType === 'input') {
-                (element as HTMLInputElement).value = String(patch.value);
-            } else if (controlType === 'textarea') {
-                (element as HTMLTextAreaElement).value = String(patch.value);
-            } else if (controlType === 'select') {
-                (element as HTMLSelectElement).value = String(patch.value);
-            } else if (controlType === 'progress') {
-                const fill = element.querySelector('.window-ui-progress-fill') as HTMLElement;
-                if (fill) {
-                    fill.style.width = `${Math.max(0, Math.min(100, Number(patch.value)))}%`;
+        // Delegate to registered component's patch handler
+        if (controlType) {
+            const renderer = uiComponentRegistry.getRenderer(controlType);
+            if (renderer?.patch) {
+                const ctx = this.buildRenderContext(descriptor.data!, processAppId);
+                // For container patches, clean up child bindings first
+                if (patch.children !== undefined && ['panel', 'stack', 'list'].includes(controlType)) {
+                    this.removeChildrenFromNodeMap(windowId, element);
+                    this.pruneChildBindings(windowId, element);
                 }
-            }
-        }
-
-        if (patch.checked !== undefined && controlType === 'checkbox') {
-            const cb = element.querySelector('input[type="checkbox"]') as HTMLInputElement;
-            if (cb) {
-                cb.checked = patch.checked;
-            }
-        }
-
-        if (patch.label !== undefined && controlType === 'checkbox') {
-            const span = element.querySelector('span');
-            if (span) {
-                span.textContent = patch.label;
-            }
-        }
-
-        if (patch.placeholder !== undefined && controlType === 'input') {
-            (element as HTMLInputElement).placeholder = patch.placeholder;
-        }
-
-        if (patch.placeholder !== undefined && controlType === 'textarea') {
-            (element as HTMLTextAreaElement).placeholder = patch.placeholder;
-        }
-
-        if (patch.rows !== undefined && controlType === 'textarea') {
-            (element as HTMLTextAreaElement).rows = patch.rows;
-        }
-
-        if (patch.color !== undefined && controlType === 'progress') {
-            const fill = element.querySelector('.window-ui-progress-fill') as HTMLElement;
-            if (fill) {
-                fill.style.background = patch.color;
-            }
-        }
-
-        if (patch.src !== undefined && controlType === 'image') {
-            (element as HTMLImageElement).src = patch.src;
-        }
-
-        if (patch.options !== undefined && controlType === 'select') {
-            const select = element as HTMLSelectElement;
-            const currentValue = select.value;
-            select.replaceChildren();
-            for (const opt of patch.options) {
-                const option = document.createElement('option');
-                option.value = opt.value;
-                option.textContent = opt.label;
-                select.appendChild(option);
-            }
-            select.value = currentValue;
-        }
-
-        if (patch.children !== undefined && (controlType === 'panel' || controlType === 'stack' || controlType === 'list')) {
-            this.removeChildrenFromNodeMap(windowId, element);
-            this.pruneChildBindings(windowId, element);
-            element.replaceChildren();
-            for (const child of patch.children) {
-                const rendered = this.renderNode(descriptor.data!, processAppId, child);
-                element.appendChild(rendered);
+                renderer.patch(element, patch, ctx);
             }
         }
 
@@ -493,6 +434,85 @@ class WindowManager {
         return Array.from(this.processWindows.get(processAppId) ?? []);
     }
 
+    showContextMenu(processAppId: string, windowId: string, controlId: string, x: number, y: number, items: ContextMenuEntry[]): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        this.closeContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'desktop-context-menu';
+
+        for (const entry of items) {
+            if ('separator' in entry && entry.separator) {
+                const sep = document.createElement('div');
+                sep.className = 'desktop-context-menu-separator';
+                menu.appendChild(sep);
+                continue;
+            }
+
+            const item = entry as { id: string; label: string; danger?: boolean };
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = item.danger
+                ? 'desktop-context-menu-item desktop-context-menu-item--danger'
+                : 'desktop-context-menu-item';
+            btn.textContent = item.label;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeContextMenu();
+                this.uiEventHandler({
+                    eventId: this.allocateEventId(),
+                    windowId,
+                    processAppId,
+                    type: 'contextmenu-select',
+                    controlId,
+                    value: item.id,
+                });
+            });
+            menu.appendChild(btn);
+        }
+
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+
+        document.body.appendChild(menu);
+        this.contextMenuEl = menu;
+
+        // Adjust position if menu overflows viewport
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth - 8) {
+                menu.style.left = `${x - rect.width}px`;
+            }
+            if (rect.bottom > window.innerHeight - 8) {
+                menu.style.top = `${y - rect.height}px`;
+            }
+        });
+
+        this.contextMenuCloseHandler = (e: MouseEvent) => {
+            if (!menu.contains(e.target as Node)) {
+                this.closeContextMenu();
+            }
+        };
+        document.addEventListener('mousedown', this.contextMenuCloseHandler, true);
+
+        return { success: true, data: windowId };
+    }
+
+    closeContextMenu(): void {
+        if (this.contextMenuEl) {
+            this.contextMenuEl.remove();
+            this.contextMenuEl = null;
+        }
+        if (this.contextMenuCloseHandler) {
+            document.removeEventListener('mousedown', this.contextMenuCloseHandler, true);
+            this.contextMenuCloseHandler = null;
+        }
+    }
+
     createConsoleWindow(
         context: WindowProcessContext,
         title: string,
@@ -583,319 +603,88 @@ class WindowManager {
 
     // ── Private: UI 渲染 ─────────────────────────────────────
 
+    private buildRenderContext(descriptor: WindowDescriptor, processAppId: string): RenderContext {
+        return {
+            windowId: descriptor.id,
+            processAppId,
+            renderChild: (child: WindowUiNode) => this.renderNode(descriptor, processAppId, child),
+            bindEvent: (controlId, type) => {
+                const eid = this.allocateEventId();
+                this.eventBindings.set(eid, {
+                    eventId: eid,
+                    windowId: descriptor.id,
+                    processAppId,
+                    type: type as WindowUiEvent['type'],
+                    controlId,
+                });
+                return (extra?: Partial<WindowUiEvent>) => {
+                    const binding = this.eventBindings.get(eid);
+                    if (binding) this.uiEventHandler({ ...binding, ...extra });
+                };
+            },
+            registerNode: (nodeId, element) => this.registerNode(descriptor.id, nodeId, element),
+            applyStyle: (element, style) => this.applyNodeStyle(element, style),
+        };
+    }
+
     private renderNode(descriptor: WindowDescriptor, processAppId: string, node: WindowUiNode): HTMLElement {
-        const element = document.createElement('div');
-        element.dataset.controlType = node.type;
-        if (node.id) {
-            element.dataset.controlId = node.id;
-        }
+        const ctx = this.buildRenderContext(descriptor, processAppId);
+        const renderer = uiComponentRegistry.getRenderer(node.type);
 
-        this.applyNodeStyle(element, node.style);
-
-        if (node.type === 'label') {
-            element.classList.add('window-ui-label');
-            element.textContent = node.text;
-            this.registerNode(descriptor.id, node.id, element);
+        if (renderer) {
+            const element = renderer.render(node, ctx);
+            this.attachNodeEvents(element, descriptor, processAppId, node);
             return element;
         }
 
-        if (node.type === 'button') {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'window-ui-button';
-            button.dataset.controlType = 'button';
-            if (node.id) {
-                button.dataset.controlId = node.id;
-            }
-            this.applyNodeStyle(button, node.style);
-            button.textContent = node.text;
-
-            const eventId = this.allocateEventId();
-            this.eventBindings.set(eventId, {
-                eventId,
-                windowId: descriptor.id,
-                processAppId,
-                type: node.eventType ?? 'click',
-                controlId: node.id,
-            });
-
-            button.addEventListener('click', () => {
-                const binding = this.eventBindings.get(eventId);
-                if (!binding) {
-                    return;
-                }
-                this.uiEventHandler(binding);
-            });
-
-            this.registerNode(descriptor.id, node.id, button);
-            return button;
-        }
-
-        if (node.type === 'input') {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'window-ui-input';
-            input.dataset.controlType = 'input';
-            if (node.id) {
-                input.dataset.controlId = node.id;
-                input.name = node.id;
-            }
-            if (node.value !== undefined) {
-                input.value = node.value;
-            }
-            if (node.placeholder) {
-                input.placeholder = node.placeholder;
-            }
-            this.applyNodeStyle(input, node.style);
-
-            if (node.id) {
-                const changeEventId = this.allocateEventId();
-                this.eventBindings.set(changeEventId, {
-                    eventId: changeEventId,
-                    windowId: descriptor.id,
-                    processAppId,
-                    type: 'change',
-                    controlId: node.id,
-                });
-                input.addEventListener('input', () => {
-                    const binding = this.eventBindings.get(changeEventId);
-                    if (binding) {
-                        this.uiEventHandler({ ...binding, value: input.value });
-                    }
-                });
-
-                const submitEventId = this.allocateEventId();
-                this.eventBindings.set(submitEventId, {
-                    eventId: submitEventId,
-                    windowId: descriptor.id,
-                    processAppId,
-                    type: 'submit',
-                    controlId: node.id,
-                });
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        const binding = this.eventBindings.get(submitEventId);
-                        if (binding) {
-                            this.uiEventHandler({ ...binding, value: input.value });
-                        }
-                    }
-                });
-            }
-
-            this.registerNode(descriptor.id, node.id, input);
-            return input;
-        }
-
-        if (node.type === 'textarea') {
-            const textarea = document.createElement('textarea');
-            textarea.className = 'window-ui-textarea';
-            textarea.dataset.controlType = 'textarea';
-            if (node.id) {
-                textarea.dataset.controlId = node.id;
-                textarea.name = node.id;
-            }
-            if (node.value !== undefined) {
-                textarea.value = node.value;
-            }
-            if (node.placeholder) {
-                textarea.placeholder = node.placeholder;
-            }
-            if (node.rows) {
-                textarea.rows = node.rows;
-            }
-            this.applyNodeStyle(textarea, node.style);
-
-            if (node.id) {
-                const changeEventId = this.allocateEventId();
-                this.eventBindings.set(changeEventId, {
-                    eventId: changeEventId,
-                    windowId: descriptor.id,
-                    processAppId,
-                    type: 'change',
-                    controlId: node.id,
-                });
-                textarea.addEventListener('input', () => {
-                    const binding = this.eventBindings.get(changeEventId);
-                    if (binding) {
-                        this.uiEventHandler({ ...binding, value: textarea.value });
-                    }
-                });
-            }
-
-            this.registerNode(descriptor.id, node.id, textarea);
-            return textarea;
-        }
-
-        if (node.type === 'checkbox') {
-            const wrapper = document.createElement('label');
-            wrapper.className = 'window-ui-checkbox';
-            wrapper.dataset.controlType = 'checkbox';
-            if (node.id) {
-                wrapper.dataset.controlId = node.id;
-            }
-            this.applyNodeStyle(wrapper, node.style);
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            if (node.id) {
-                checkbox.name = node.id;
-            }
-            if (node.checked) {
-                checkbox.checked = true;
-            }
-            wrapper.appendChild(checkbox);
-
-            if (node.label) {
-                const labelSpan = document.createElement('span');
-                labelSpan.textContent = node.label;
-                wrapper.appendChild(labelSpan);
-            }
-
-            if (node.id) {
-                const eventId = this.allocateEventId();
-                this.eventBindings.set(eventId, {
-                    eventId,
-                    windowId: descriptor.id,
-                    processAppId,
-                    type: 'change',
-                    controlId: node.id,
-                });
-                checkbox.addEventListener('change', () => {
-                    const binding = this.eventBindings.get(eventId);
-                    if (binding) {
-                        this.uiEventHandler({ ...binding, value: checkbox.checked });
-                    }
-                });
-            }
-
-            this.registerNode(descriptor.id, node.id, wrapper);
-            return wrapper;
-        }
-
-        if (node.type === 'select') {
-            const select = document.createElement('select');
-            select.className = 'window-ui-select';
-            select.dataset.controlType = 'select';
-            if (node.id) {
-                select.dataset.controlId = node.id;
-                select.name = node.id;
-            }
-            this.applyNodeStyle(select, node.style);
-
-            for (const opt of node.options ?? []) {
-                const option = document.createElement('option');
-                option.value = opt.value;
-                option.textContent = opt.label;
-                if (node.value === opt.value) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            }
-
-            if (node.id) {
-                const eventId = this.allocateEventId();
-                this.eventBindings.set(eventId, {
-                    eventId,
-                    windowId: descriptor.id,
-                    processAppId,
-                    type: 'change',
-                    controlId: node.id,
-                });
-                select.addEventListener('change', () => {
-                    const binding = this.eventBindings.get(eventId);
-                    if (binding) {
-                        this.uiEventHandler({ ...binding, value: select.value });
-                    }
-                });
-            }
-
-            this.registerNode(descriptor.id, node.id, select);
-            return select;
-        }
-
-        if (node.type === 'image') {
-            const img = document.createElement('img');
-            img.className = 'window-ui-image';
-            img.dataset.controlType = 'image';
-            if (node.id) {
-                img.dataset.controlId = node.id;
-            }
-            img.src = node.src;
-            if (node.alt) {
-                img.alt = node.alt;
-            }
-            this.applyNodeStyle(img, node.style);
-            this.registerNode(descriptor.id, node.id, img);
-            return img;
-        }
-
-        if (node.type === 'separator') {
-            element.classList.add('window-ui-separator');
-            this.registerNode(descriptor.id, node.id, element);
-            return element;
-        }
-
-        if (node.type === 'progress') {
-            element.classList.add('window-ui-progress');
-            const fill = document.createElement('div');
-            fill.className = 'window-ui-progress-fill';
-            const targetWidth = Math.max(0, Math.min(100, node.value));
-            fill.style.width = '0%';
-            if (node.color) {
-                fill.style.background = node.color;
-            }
-            element.appendChild(fill);
-            requestAnimationFrame(() => {
-                fill.style.width = `${targetWidth}%`;
-            });
-            this.registerNode(descriptor.id, node.id, element);
-            return element;
-        }
-
-        if (node.type === 'list') {
-            element.classList.add('window-ui-list');
-            for (const child of node.children ?? []) {
-                element.appendChild(this.renderNode(descriptor, processAppId, child));
-            }
-            this.registerNode(descriptor.id, node.id, element);
-            return element;
-        }
-
-        if (node.type === 'panel' || node.type === 'stack') {
-            element.classList.add(node.type === 'panel' ? 'window-ui-panel' : 'window-ui-stack');
-            if (node.type === 'stack' && !node.style?.flexDirection) {
-                element.style.display = 'flex';
-                element.style.flexDirection = 'column';
-            }
-
-            for (const child of node.children ?? []) {
-                element.appendChild(this.renderNode(descriptor, processAppId, child));
-            }
-            this.registerNode(descriptor.id, node.id, element);
-            return element;
-        }
-
-        this.registerNode(descriptor.id, (node as WindowUiNode).id, element);
-        return element;
+        // Fallback for unknown types
+        const fallback = document.createElement('div');
+        fallback.dataset.controlType = node.type;
+        if (node.id) fallback.dataset.controlId = node.id;
+        this.applyNodeStyle(fallback, node.style);
+        this.registerNode(descriptor.id, node.id, fallback);
+        return fallback;
     }
 
     private applyNodeStyle(element: HTMLElement, style?: WindowUiStyle): void {
-        if (!style) {
-            return;
-        }
-
+        if (!style) return;
         for (const [key, value] of Object.entries(style)) {
-            if (value === undefined) {
-                continue;
-            }
-            if (key === 'className') {
-                element.classList.add(value);
-                continue;
-            }
-            if (key === 'flexDirection') {
-                element.style.display = 'flex';
-            }
+            if (value === undefined) continue;
+            if (key === 'className') { element.classList.add(value); continue; }
+            if (key === 'flexDirection') element.style.display = 'flex';
             (element.style as any)[key] = value;
+        }
+    }
+
+    private attachNodeEvents(element: HTMLElement, descriptor: WindowDescriptor, processAppId: string, node: WindowUiNode): void {
+        const events = (node as any).events as WindowUiEvent['type'][] | undefined;
+        if (!events || !node.id) return;
+
+        for (const evt of events) {
+            // Skip events already handled natively by the component renderer
+            if (evt === 'click' && node.type === 'button') continue;
+            if ((evt === 'change' || evt === 'submit') && ['input', 'textarea', 'checkbox', 'select'].includes(node.type)) continue;
+
+            const eid = this.allocateEventId();
+            this.eventBindings.set(eid, {
+                eventId: eid,
+                windowId: descriptor.id,
+                processAppId,
+                type: evt,
+                controlId: node.id,
+            });
+
+            element.addEventListener(evt, (e: Event) => {
+                if (evt === 'contextmenu') e.preventDefault();
+                const binding = this.eventBindings.get(eid);
+                if (!binding) return;
+                const uiEvent: WindowUiEvent = { ...binding };
+                if (evt === 'contextmenu' && e instanceof MouseEvent) {
+                    uiEvent.x = e.clientX;
+                    uiEvent.y = e.clientY;
+                }
+                this.uiEventHandler(uiEvent);
+            });
         }
     }
 

@@ -29,5 +29,5 @@ export function registerNotificationApi(kernel: Kernel): void {
       notificationManager.dismiss(String(id));
       return { success: true };
     },
-  }), 'all');
+  }), ['notification']);
 }

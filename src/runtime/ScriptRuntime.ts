@@ -5,7 +5,6 @@ import { DEFAULT_EXECUTION_TIMEOUT_MS, Permissions, Events } from '../kernel/con
 import { getQuickJSInstance } from './QuickJsInit';
 import type {
     ProcessType,
-    ApiScope,
     RuntimeResult,
     ProcessView,
     HostApiValue,
@@ -14,20 +13,16 @@ import type {
     ApiFactory,
     Message,
     RuntimeProcess,
+    ResponseType,
 } from './types';
 
 class ScriptRuntime {
     private readonly kernel: Kernel;
     private readonly processRuntimes: Map<number, RuntimeProcess> = new Map();
-    private readonly apiFactories: Map<ApiScope, Map<string, ApiFactory>> = new Map();
+    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[] }> = new Map();
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
-        this.apiFactories.set('all', new Map());
-        this.apiFactories.set('service', new Map());
-        this.apiFactories.set('window', new Map());
-        this.apiFactories.set('console', new Map());
-        this.apiFactories.set('library', new Map());
         this.registerBuiltinApis();
     }
 
@@ -36,12 +31,12 @@ class ScriptRuntime {
     private get permissions() { return this.kernel.resolve('permissions'); }
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
-    registerApi(name: string, factory: ApiFactory, scope: ApiScope = 'all'): void {
-        this.apiFactories.get(scope)!.set(name, factory);
+    registerApi(name: string, factory: ApiFactory, gates: string[] = []): void {
+        this.apiEntries.set(name, { factory, gates });
     }
 
-    unregisterApi(name: string, scope: ApiScope = 'all'): boolean {
-        return this.apiFactories.get(scope)!.delete(name);
+    unregisterApi(name: string): boolean {
+        return this.apiEntries.delete(name);
     }
 
     execute(pid: number, code: string, timeoutMs = DEFAULT_EXECUTION_TIMEOUT_MS, entryPath?: string): RuntimeResult<unknown> {
@@ -52,8 +47,15 @@ class ScriptRuntime {
         const runtimeProcess = this.ensureRuntimeProcess(proc);
         if (entryPath !== undefined) {
             runtimeProcess.entryPath = entryPath;
+            // Inject imports() lazily on first entryPath assignment
+            if (!runtimeProcess.importsInjected) {
+                runtimeProcess.importsInjected = true;
+                const global = runtimeProcess.context.global;
+                this.injectImportCommand(runtimeProcess.context, runtimeProcess); //TIP: 取代imports()載入方法，採用ESModule-like的全域函式實作，提供更靈活的模組載入能力
+                this.injectImportsFunction(runtimeProcess.context, global, runtimeProcess);
+                global.dispose();
+            }
         }
-        this.injectApis(runtimeProcess.context, proc);
 
         runtimeProcess.runtime.setInterruptHandler(
             shouldInterruptAfterDeadline(Date.now() + timeoutMs)
@@ -175,16 +177,21 @@ class ScriptRuntime {
                 if (!this.permissions.has(process.processAppId, Permissions.PROCESS_LIST)) {
                     return { success: false, error: 'PermissionDenied' };
                 }
+                const appManager = this.kernel.resolve('appManager');
                 const all = this.processManager.getAllProcesses();
                 return {
                     success: true,
-                    data: all.map(p => ({
-                        pid: p.pid,
-                        appDefId: p.appDefId,
-                        type: p.type,
-                        status: p.status,
-                        parentPid: p.parentPid,
-                    }))
+                    data: all.map(p => {
+                        const appDef = appManager.get(p.appDefId);
+                        return {
+                            pid: p.pid,
+                            appDefId: p.appDefId,
+                            appName: appDef?.name ?? p.appDefId,
+                            type: p.type,
+                            status: p.status,
+                            parentPid: p.parentPid,
+                        };
+                    })
                 };
             },
             terminateProcess: (targetPid: number) =>
@@ -215,7 +222,7 @@ class ScriptRuntime {
                     health
                 });
             }
-        }), 'service');
+        }), ['service']);
 
         this.registerApi('windowApi', ({ pid, process }) => ({
             postUiEvent: (name: string, payload?: unknown) =>
@@ -224,7 +231,7 @@ class ScriptRuntime {
                     name,
                     payload
                 })
-        }), 'window');
+        }), ['window']);
 
         this.registerApi('consoleApi', ({ pid, process }) => ({
             writeLine: (text: unknown) => {
@@ -238,7 +245,7 @@ class ScriptRuntime {
                 });
                 return true;
             }
-        }), 'console');
+        }), ['console']);
     }
 
     // ── Runtime 管理 ────────────────────────────────────────
@@ -262,6 +269,7 @@ class ScriptRuntime {
             timerNextId: 1,
         };
         this.processRuntimes.set(proc.pid, runtimeProcess);
+        this.injectApis(context, proc);
         return runtimeProcess;
     }
 
@@ -270,45 +278,17 @@ class ScriptRuntime {
     private injectApis(context: any, process: ProcessView): void {
         const runtimeProcess = this.processRuntimes.get(process.pid);
         const global = context.global;
-        const sentryApi = context.newObject();
+        const osApi = context.newObject();
         const surface = this.buildApiSurface(process);
 
         for (const [name, value] of Object.entries(surface)) {
             const handle = this.toHandle(context, value);
-            context.setProp(sentryApi, name, handle);
+            context.setProp(osApi, name, handle);
             handle.dispose();
         }
 
-        context.setProp(global, 'Sentry', sentryApi);
-        sentryApi.dispose();
-
-        const prelude = context.evalCode(`
-            globalThis.processApi = Sentry.process;
-            globalThis.eventApi = Sentry.event;
-            globalThis.ipcApi = Sentry.ipc;
-            globalThis.ui = Sentry.ui ?? {};
-            globalThis.serviceApi = Sentry.serviceApi ?? {};
-            globalThis.windowApi = Sentry.windowApi ?? {};
-            globalThis.consoleApi = Sentry.consoleApi ?? {};
-            globalThis.systemApi = Sentry.systemApi ?? {};
-            globalThis.storageApi = Sentry.storageApi ?? {};
-            globalThis.envApi = Sentry.envApi ?? {};
-            globalThis.shellApi = Sentry.shellApi ?? {};
-            globalThis.notificationApi = Sentry.notificationApi ?? {};
-            globalThis.monitorApi = Sentry.monitorApi ?? {};
-            globalThis.settingsApi = Sentry.settingsApi ?? {};
-            globalThis.networkApi = Sentry.networkApi ?? {};
-        `);
-        if (!prelude.error) {
-            prelude.value.dispose();
-        } else {
-            prelude.error.dispose();
-        }
-
-        // 注入 imports() 函式（僅限有 entryPath 的程序）
-        if (runtimeProcess?.entryPath) {
-            this.injectImportsFunction(context, global, runtimeProcess);
-        }
+        context.setProp(global, 'OS', osApi);
+        osApi.dispose();
 
         // 注入 timer 函式
         if (runtimeProcess) {
@@ -323,17 +303,14 @@ class ScriptRuntime {
             pid: process.pid,
             process
         };
-        const scope = this.scopeFromType(process.type);
         const merged: Record<string, HostApiValue> = {};
 
-        const allFactories = this.apiFactories.get('all')!;
-        for (const [name, factory] of allFactories) {
-            merged[name] = this.wrapApiObject(name, factory(ctx), process);
-        }
-
-        const scopedFactories = this.apiFactories.get(scope)!;
-        for (const [name, factory] of scopedFactories) {
-            merged[name] = this.wrapApiObject(name, factory(ctx), process);
+        for (const [name, { factory, gates }] of this.apiEntries) {
+            if (gates.length > 0 && !gates.some(g => this.permissions.hasAnyUnder(process.processAppId, g))) {
+                continue;
+            }
+            const wrapped = this.wrapApiObject(name, factory(ctx), process);
+            Object.assign(merged, wrapped);
         }
 
         return merged;
@@ -361,14 +338,51 @@ class ScriptRuntime {
         return wrapped;
     }
 
-    private scopeFromType(type: ProcessType): ApiScope {
-        if (type === 'Service') return 'service';
-        if (type === 'Window') return 'window';
-        if (type === 'Library') return 'library';
-        return 'console';
-    }
-
     // ── imports() 機制 ──────────────────────────────────────
+
+    /** 注入 import 預設模組載入方法 */
+    private injectImportCommand(context: any, runtimeProcess: RuntimeProcess): void {
+        runtimeProcess.runtime.setModuleLoader((moduleName: any) => {
+
+            const throwImportError = (msg: string) => {
+                const err = context.newError(msg);
+                return { error: err };
+            };
+
+            const entryPath = runtimeProcess.entryPath;
+            if (!entryPath) {
+                return throwImportError('imports() is not available in this context');
+            }
+
+            const resolved = this.resolveModulePath(entryPath, moduleName);
+            if ('error' in resolved) {
+                return throwImportError(`imports('${moduleName}'): ${resolved.error}`);
+            }
+            const resolvedPath = resolved.path;
+
+            if (runtimeProcess.moduleCache.has(resolvedPath)) {
+                const cached = runtimeProcess.moduleCache.get(resolvedPath) as any;
+                return cached.dup();
+            }
+
+            // 同步載入檔案
+            const [code, type] = this.syncFetch(resolvedPath);
+            if (code === null) {
+                return throwImportError(`imports('${moduleName}'): module not found at '${resolvedPath}'`);
+            }
+            if (type === 'javascript') {
+                return code;
+            }
+            else if (type === 'json') {
+                return Object.entries(JSON.parse(code)).map(([k, v]: any) => {
+                    return "export const " + k + " = " + JSON.stringify(v) + ";";
+                }).join("\n") + "\nexport default " + code + ";";
+            }
+            else {
+                return "const code = " + JSON.stringify(code) + "; export default code;";
+            }
+        });
+    }
 
     /**
      * 注入 imports() 全域函式，讓應用程式可以載入同一套件中的其他檔案。
@@ -411,7 +425,7 @@ class ScriptRuntime {
             }
 
             // 同步載入檔案
-            const code = self.syncFetch(resolvedPath);
+            const [code] = self.syncFetch(resolvedPath);
             if (code === null) {
                 return throwImportError(`imports('${modulePath}'): module not found at '${resolvedPath}'`);
             }
@@ -567,15 +581,23 @@ class ScriptRuntime {
     /**
      * 同步讀取指定路徑的檔案內容（使用 XMLHttpRequest 同步模式）。
      */
-    private syncFetch(path: string): string | null {
+    private syncFetch(path: string): [string, ResponseType] | [null, null] {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', path, false);
             xhr.send();
-            return xhr.status === 200 ? xhr.responseText : null;
+            const typeText = xhr.getResponseHeader('Content-Type') ?? '';
+            const responseType = this.getResponseType(typeText);
+            return xhr.status === 200 ? [xhr.responseText, responseType] : [null, null];
         } catch {
-            return null;
+            return [null, null];
         }
+    }
+
+    private getResponseType(text: string): ResponseType {
+        if (/json/i.test(text)) return 'json';
+        if (/javascript/i.test(text)) return 'javascript';
+        return 'text';
     }
 
     // ── 型別轉換 ────────────────────────────────────────────

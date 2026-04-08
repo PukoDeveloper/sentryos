@@ -2,7 +2,6 @@
 import type { AppType } from '../kernel/constants';
 
 type ProcessType = AppType;
-type ApiScope = 'all' | 'service' | 'window' | 'console' | 'library';
 
 type RuntimeError =
     | 'ProcessNotFound'
@@ -53,6 +52,8 @@ type RuntimeProcess = {
     moduleCache: Map<string, unknown>;
     /** 應用程式套件根目錄（用於 imports() 路徑解析） */
     entryPath: string | null;
+    /** imports() 是否已注入 */
+    importsInjected?: boolean;
     /** 已註冊的 host-side timer ID 集合（用於 process 銷毀時清理） */
     timers: Set<number>;
     /** timer 順序 ID → host timer ID 對應 */
@@ -63,9 +64,10 @@ type RuntimeProcess = {
     timerNextId: number;
 };
 
+type ResponseType = 'text' | 'json' | 'javascript';
+
 export type {
     ProcessType,
-    ApiScope,
     RuntimeError,
     RuntimeResult,
     ProcessView,
@@ -75,4 +77,6 @@ export type {
     ApiFactory,
     Message,
     RuntimeProcess,
+    ResponseType,
+
 };

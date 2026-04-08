@@ -19,6 +19,7 @@
                 "file.read.app",
                 "file.read.user",
                 "file.read.cache",
+                "file.write.user",
                 "file.delete.app",
                 "file.delete.user",
                 "file.delete.cache",
@@ -29,7 +30,9 @@
                 "file.list-all",
                 "file.cross-app",
                 "storage.usage",
-                "notification.send"
+                "notification.send",
+                "registry.read",
+                "shell.launch"
             ],
             "maxInstances": 1
         }

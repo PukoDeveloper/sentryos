@@ -38,6 +38,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
+      if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
       desktopShell.applyTheme(safe);
       return { success: true, data: null };
     },
@@ -53,6 +54,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
+      if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
       desktopShell.applyTheme(safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },
@@ -169,7 +171,7 @@ export function registerSettingsApi(kernel: Kernel): void {
         })),
       };
     },
-  }));
+  }), ['settings']);
 
   // Load saved theme on boot
   const saved = fileSystem.read(systemAppId, SETTINGS_TIER, SETTINGS_KEY);

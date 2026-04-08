@@ -1,12 +1,12 @@
 // ── SentryOS UI Library (stdlib-ui) ─────────────────────────
 // 提供 patch-based 狀態管理與高階元件建構器，簡化 Window 應用程式開發。
-// 載入方式: envApi.loadLibrary('stdlib/UI Utils')
+// 載入方式: OS.loadLibrary('stdlib/UI Utils')
 //
 // 需要權限: env.library.load, window.create
 // 若權限不足將在 globalThis.UI 上提供錯誤訊息而非正常 API。
 (function () {
   // ── 前置權限檢查 ──────────────────────────────────────────
-  if (typeof ui === 'undefined' || typeof ui.createWindow !== 'function') {
+  if (typeof OS === 'undefined' || typeof OS.createWindow !== 'function') {
     globalThis.UI = {
       _error: 'stdlib/UI Utils: ui API not available. Ensure the app has "window.create" permission and is of type "Window".',
       createApp: function () {
@@ -35,6 +35,24 @@
     }
   };
 
+  // ── 事件選項偵測 ────────────────────────────────────────────
+  function hasEventHandlers(obj) {
+    return obj && (obj.onClick || obj.onDblClick || obj.onContextMenu);
+  }
+
+  function bindEvents(id, opts) {
+    var events = [];
+    if (opts.onClick) events.push('click');
+    if (opts.onDblClick) events.push('dblclick');
+    if (opts.onContextMenu) events.push('contextmenu');
+    handlers[id] = function (event) {
+      if (event.type === 'click' && opts.onClick) opts.onClick(event);
+      if (event.type === 'dblclick' && opts.onDblClick) opts.onDblClick(event);
+      if (event.type === 'contextmenu' && opts.onContextMenu) opts.onContextMenu(event);
+    };
+    return events;
+  }
+
   // ── 應用程式框架 ────────────────────────────────────────────
   // render() 只在初始化呼叫一次，後續所有變更透過 app.patch() 精確更新。
   function createApp(options) {
@@ -51,7 +69,7 @@
     if (options.alwaysOnTop !== undefined) winOptions.alwaysOnTop = options.alwaysOnTop;
     if (options.resizable !== undefined) winOptions.resizable = options.resizable;
 
-    var win = ui.createWindow(winOptions);
+    var win = OS.createWindow(winOptions);
     if (!win.success) return null;
     var windowId = win.data;
 
@@ -60,26 +78,33 @@
       state: state,
       // 精確更新單一節點 (不重建整棵樹)
       patch: function (nodeId, patch) {
-        return ui.update(windowId, nodeId, patch);
+        return OS.update(windowId, nodeId, patch);
       },
       remove: function (nodeId) {
-        return ui.remove(windowId, nodeId);
+        return OS.remove(windowId, nodeId);
       },
       append: function (parentId, nodes) {
-        return ui.append(windowId, parentId, Array.isArray(nodes) ? nodes : [nodes]);
+        return OS.append(windowId, parentId, Array.isArray(nodes) ? nodes : [nodes]);
       },
       // 完整重繪 (適用於需要大幅度改變 UI 結構的場景，如切換分頁)
       rerender: function () {
         handlers = {};
         handlerCounter = 0;
         var tree = options.render(state, app);
-        ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+        OS.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+      },
+      // 顯示系統右鍵選單
+      showContextMenu: function (controlId, x, y, items) {
+        return OS.showContextMenu(windowId, controlId, x, y, items);
+      },
+      closeContextMenu: function () {
+        return OS.closeContextMenu();
       },
     };
 
     // 初始繪製 (僅此一次)
     var tree = options.render(state, app);
-    ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+    OS.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
     return app;
   }
 
@@ -88,43 +113,95 @@
     createApp: createApp,
 
     // 佈局
-    column: function (children, style, id) {
+    column: function (children, styleOrOptions, id) {
       var s = { flexDirection: 'column', gap: '8px' };
-      if (style) for (var k in style) s[k] = style[k];
-      return ui.stack(children, s, id);
+      var events;
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
+        id = opts.id || id || allocId();
+        events = bindEvents(id, opts);
+      } else {
+        if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
+      }
+      return OS.stack(children, s, id, events);
     },
-    row: function (children, style, id) {
+    row: function (children, styleOrOptions, id) {
       var s = { flexDirection: 'row', gap: '8px' };
-      if (style) for (var k in style) s[k] = style[k];
-      return ui.stack(children, s, id);
+      var events;
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
+        id = opts.id || id || allocId();
+        events = bindEvents(id, opts);
+      } else {
+        if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
+      }
+      return OS.stack(children, s, id, events);
     },
-    box: function (children, style, id) {
-      return ui.panel(children, style, id);
+    box: function (children, styleOrOptions, id) {
+      var events;
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        id = opts.id || id || allocId();
+        events = bindEvents(id, opts);
+        return OS.panel(children, opts.style, id, events);
+      }
+      return OS.panel(children, styleOrOptions, id);
     },
 
     // 基本顯示
-    text: function (text, style, id) {
-      return ui.label(text, style, id);
+    text: function (text, styleOrOptions, id) {
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        id = opts.id || id || allocId();
+        var events = bindEvents(id, opts);
+        return OS.label(text, opts.style, id, events);
+      }
+      return OS.label(text, styleOrOptions, id);
     },
-    heading: function (text, style, id) {
+    heading: function (text, styleOrOptions, id) {
       var s = { fontSize: '18px', fontWeight: 'bold' };
-      if (style) for (var k in style) s[k] = style[k];
-      return ui.label(text, s, id);
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
+        id = opts.id || id || allocId();
+        var events = bindEvents(id, opts);
+        return OS.label(text, s, id, events);
+      }
+      if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
+      return OS.label(text, s, id);
     },
-    subheading: function (text, style, id) {
+    subheading: function (text, styleOrOptions, id) {
       var s = { fontSize: '14px', fontWeight: 'bold', color: 'rgba(216,232,255,0.7)' };
-      if (style) for (var k in style) s[k] = style[k];
-      return ui.label(text, s, id);
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
+        id = opts.id || id || allocId();
+        var events = bindEvents(id, opts);
+        return OS.label(text, s, id, events);
+      }
+      if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
+      return OS.label(text, s, id);
     },
 
     // 互動元件 (自動綁定回呼)
     button: function (text, options) {
       options = options || {};
       var id = options.id || allocId();
-      if (options.onClick) {
-        handlers[id] = function () { options.onClick(); };
+      var extraEvents = [];
+      if (options.onDblClick) extraEvents.push('dblclick');
+      if (options.onContextMenu) extraEvents.push('contextmenu');
+      if (options.onClick || options.onDblClick || options.onContextMenu) {
+        handlers[id] = function (event) {
+          if (event.type === 'click' && options.onClick) options.onClick(event);
+          if (event.type === 'dblclick' && options.onDblClick) options.onDblClick(event);
+          if (event.type === 'contextmenu' && options.onContextMenu) options.onContextMenu(event);
+        };
       }
-      return ui.button(text, options.style, id);
+      var node = OS.button(text, options.style, id);
+      if (extraEvents.length > 0) node.events = extraEvents;
+      return node;
     },
     input: function (options) {
       options = options || {};
@@ -135,7 +212,7 @@
           if (event.type === 'submit' && options.onSubmit) options.onSubmit(event.value, event);
         };
       }
-      return ui.input(options.value, options.placeholder, options.style, id);
+      return OS.input(options.value, options.placeholder, options.style, id);
     },
     textarea: function (options) {
       options = options || {};
@@ -145,7 +222,7 @@
           if (event.type === 'change') options.onChange(event.value, event);
         };
       }
-      return ui.textarea(options.value, options.placeholder, options.rows, options.style, id);
+      return OS.textarea(options.value, options.placeholder, options.rows, options.style, id);
     },
     checkbox: function (options) {
       options = options || {};
@@ -153,7 +230,7 @@
       if (options.onChange) {
         handlers[id] = function (event) { options.onChange(event.value, event); };
       }
-      return ui.checkbox(options.checked, options.label, options.style, id);
+      return OS.checkbox(options.checked, options.label, options.style, id);
     },
     select: function (options) {
       options = options || {};
@@ -161,35 +238,50 @@
       if (options.onChange) {
         handlers[id] = function (event) { options.onChange(event.value, event); };
       }
-      return ui.select(options.options || [], options.value, options.style, id);
+      return OS.select(options.options || [], options.value, options.style, id);
     },
 
     // 顯示元件
     image: function (src, options) {
       options = options || {};
-      return ui.image(src, options.alt, options.style, options.id);
+      return OS.image(src, options.alt, options.style, options.id);
     },
     separator: function (style, id) {
-      return ui.separator(style, id);
+      return OS.separator(style, id);
     },
     progress: function (value, options) {
       options = options || {};
-      return ui.progress(value, options.color, options.style, options.id);
+      return OS.progress(value, options.color, options.style, options.id);
     },
-    list: function (children, style, id) {
-      return ui.list(children, style, id);
+    list: function (children, styleOrOptions, id) {
+      var events;
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        id = opts.id || id || allocId();
+        events = bindEvents(id, opts);
+        return OS.list(children, opts.style, id, events);
+      }
+      return OS.list(children, styleOrOptions, id);
     },
 
     // 複合元件
-    card: function (children, style, id) {
+    card: function (children, styleOrOptions, id) {
       var s = {
         padding: '14px',
         borderRadius: '10px',
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.06)',
       };
-      if (style) for (var k in style) s[k] = style[k];
-      return ui.panel(children, s, id);
+      var events;
+      if (hasEventHandlers(styleOrOptions)) {
+        var opts = styleOrOptions;
+        if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
+        id = opts.id || id || allocId();
+        events = bindEvents(id, opts);
+      } else {
+        if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
+      }
+      return OS.panel(children, s, id, events);
     },
     badge: function (text, style) {
       var s = {
@@ -199,7 +291,7 @@
         background: 'rgba(255,255,255,0.05)',
       };
       if (style) for (var k in style) s[k] = style[k];
-      return ui.label(text, s);
+      return OS.label(text, s);
     },
   };
 })();

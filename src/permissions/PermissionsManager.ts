@@ -68,6 +68,13 @@ class PermissionsManager {
         this.monitor?.recordPermissionCheck(appId, permission, granted);
         return granted;
     }
+    /** 檢查應用程式是否持有指定命名空間下的任一權限 */
+    hasAnyUnder(appId: string, namespace: string): boolean {
+        const perms = this.appPermissions[appId];
+        if (!perms) return false;
+        const prefix = namespace + '.';
+        return Array.from(perms).some(p => p === '*' || p.startsWith(prefix) || p === namespace);
+    }
     grant(fromAppId: string, toAppId: string, permission: string): PermissionResult {
         if (!this.inited) {
             return { success: false, error: 'NotInitialized' };

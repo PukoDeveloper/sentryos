@@ -15,6 +15,7 @@ import type { SystemAlert } from '../notification/SystemAlert';
 import type { KernelConsole } from '../console/KernelConsole';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
 import type { NetworkAdapter } from '../network/NetworkAdapter';
+import type { SystemRegistry } from '../registry/SystemRegistry';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -32,6 +33,7 @@ export interface ServiceMap {
   systemAlert: SystemAlert;
   kernelConsole: KernelConsole;
   networkManager: NetworkAdapter;
+  systemRegistry: SystemRegistry;
 }
 
 export interface ValueMap {

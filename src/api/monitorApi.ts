@@ -53,5 +53,5 @@ export function registerMonitorApi(kernel: Kernel): void {
       }
       return { success: true, data: systemMonitor.getProcessHistory() };
     },
-  }), 'all');
+  }), ['monitor']);
 }

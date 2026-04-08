@@ -6,5 +6,6 @@
     "app/text-manager",
     "app/file-manager",
     "app/utilities",
-    "app/settings"
+    "app/settings",
+    "app/developer-tools"
 ]

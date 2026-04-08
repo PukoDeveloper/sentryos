@@ -1,6 +1,7 @@
 import type { Kernel } from '../kernel/Kernel';
 import type { StorageTier } from '../storage/FileSystem';
 import { Permissions } from '../kernel/constants';
+import type { RegisteredApplication } from '../application/ApplicationCatalog';
 
 // ── Path Resolution ────────────────────────────────────────
 // 路徑格式: [tier:][@namespace/]filename
@@ -9,8 +10,8 @@ import { Permissions } from '../kernel/constants';
 //   filename     檔案名稱（支援 / 子目錄）
 //
 // 範例:
-//   "test.json"                → app 層, key = "{appId}/test.json"
-//   "user:doc:readme"          → user 層, key = "{appId}/doc:readme"
+//   "test.json"                → app 層, key = "{storageId}/test.json"
+//   "user:doc:readme"          → user 層, key = "{storageId}/doc:readme"
 //   "sys:boot-config"          → sys 層, key = "boot-config"（全域，無命名空間）
 //   "@terminal/config.json"    → app 層, key = "terminal/config.json"（跨應用）
 //   "user:@terminal/data.json" → user 層, key = "terminal/data.json"（跨應用）
@@ -66,9 +67,17 @@ export function registerStorageApi(kernel: Kernel): void {
   const runtime = kernel.resolve('runtime');
   const permissions = kernel.resolve('permissions');
   const fileSystem = kernel.resolve('fileSystem');
+  const catalogApps = kernel.get('catalogApps');
+
+  /** 用 appDefId 查出穩定的 manifestId，作為儲存命名空間 */
+  function resolveStorageId(appDefId: string): string {
+    const entry = catalogApps.find((a: RegisteredApplication) => a.appId === appDefId);
+    return entry?.manifestId ?? appDefId;
+  }
 
   runtime.registerApi('storageApi', ({ process }) => {
-    const appId = process.processAppId;
+    const appId = process.processAppId;           // 權限檢查用
+    const storageId = resolveStorageId(process.appDefId);  // 儲存命名空間用
 
     function checkCrossApp(resolved: ResolvedPath): string | null {
       if (resolved.crossApp && !permissions.has(appId, Permissions.FILE_CROSS_APP)) {
@@ -78,8 +87,8 @@ export function registerStorageApi(kernel: Kernel): void {
     }
 
     return {
-      read: (path: string) => {
-        const resolved = resolvePath(path, appId);
+      readFile: (path: string) => {
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -93,8 +102,8 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      write: (path: string, data: unknown, options?: Record<string, unknown>) => {
-        const resolved = resolvePath(path, appId);
+      writeFile: (path: string, data: unknown, options?: Record<string, unknown>) => {
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -108,16 +117,16 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      delete: (path: string) => {
-        const resolved = resolvePath(path, appId);
+      deleteFile: (path: string) => {
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
         return fileSystem.delete(appId, resolved.tier, resolved.key);
       },
 
-      list: (path?: string) => {
-        const resolved = resolvePath(path || '', appId);
+      listFiles: (path?: string) => {
+        const resolved = resolvePath(path || '', storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
@@ -131,27 +140,27 @@ export function registerStorageApi(kernel: Kernel): void {
         return result;
       },
 
-      exists: (path: string) => {
-        const resolved = resolvePath(path, appId);
+      fileExists: (path: string) => {
+        const resolved = resolvePath(path, storageId);
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
         return fileSystem.exists(appId, resolved.tier, resolved.key);
       },
 
-      usage: () => {
+      storageUsage: () => {
         if (!permissions.has(appId, Permissions.STORAGE_USAGE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         return fileSystem.usage(appId);
       },
 
-      listAll: (tier?: string) => {
+      listAllFiles: (tier?: string) => {
         if (!permissions.has(appId, Permissions.FILE_LIST_ALL)) {
           return { success: false, error: 'PermissionDenied' };
         }
         return fileSystem.list(appId, tier as StorageTier | undefined);
       },
     };
-  });
+  }, ['file', 'storage']);
 }

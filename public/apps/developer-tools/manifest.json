@@ -1,0 +1,19 @@
+{
+    "name": "Development Tools",
+    "version": "1.0.0",
+    "description": "A collection of development tools for SentryOS.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "Console",
+            "name": "控制台",
+            "main": "main.js",
+            "type": "Console",
+            "icon": "icon.svg",
+            "permissions": [
+                "*"
+            ],
+            "maxInstances": 1
+        }
+    ]
+}

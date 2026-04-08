@@ -1,4 +1,4 @@
-var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -40,6 +40,7 @@ var selectedAccent = 0;
 var selectedOpacity = 2;
 var startMenuWidth = 380;
 var startMenuHeight = 480;
+var startMenuGroupByPackage = false;
 var currentPage = 'home';
 
 // 摺疊狀態
@@ -51,7 +52,7 @@ var collapsed = {
 };
 
 // Load saved settings
-var saved = settingsApi.loadSavedTheme();
+var saved = OS.loadSavedTheme();
 if (saved.success && saved.data) {
   var d = saved.data;
   for (var i = 0; i < wallpapers.length; i++) {
@@ -65,6 +66,7 @@ if (saved.success && saved.data) {
   }
   if (typeof d.startMenuWidth === 'number') startMenuWidth = d.startMenuWidth;
   if (typeof d.startMenuHeight === 'number') startMenuHeight = d.startMenuHeight;
+  if (typeof d.startMenuGroupByPackage === 'boolean') startMenuGroupByPackage = d.startMenuGroupByPackage;
 }
 
 // ── Styles ───────────────────────────────────────────────────
@@ -194,11 +196,12 @@ function buildThemeObject() {
     taskbarOpacity: opacitySteps[selectedOpacity].value,
     startMenuWidth: startMenuWidth,
     startMenuHeight: startMenuHeight,
+    startMenuGroupByPackage: startMenuGroupByPackage,
   };
 }
 
 function liveApply() {
-  settingsApi.applyTheme(buildThemeObject());
+  OS.applyTheme(buildThemeObject());
 }
 
 function collapsible(key, title, renderBody, self) {
@@ -237,7 +240,7 @@ var pages = [
 
 // ── Page renderers ───────────────────────────────────────────
 function renderHomePage(self) {
-  var info = settingsApi.sysinfo();
+  var info = OS.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([
@@ -430,6 +433,31 @@ function renderStartMenuSection(self) {
     UI.box([], { height: '6px' }),
     UI.text('高度', sectionTitle),
     UI.box(heightItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box([], { height: '6px' }),
+    UI.text('顯示模式', sectionTitle),
+    UI.row([
+      UI.column([
+        UI.text('依套件分組', { fontSize: '13px', fontWeight: 'bold', color: '#d8e8ff' }),
+        UI.text('將相同套件的應用程式收合成一個群組', { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
+      ], { flex: '1', gap: '2px' }),
+      UI.button(startMenuGroupByPackage ? '✓ 已啟用' : '○ 已停用', {
+        onClick: function () {
+          startMenuGroupByPackage = !startMenuGroupByPackage;
+          liveApply();
+          self.rerender();
+        },
+        style: {
+          padding: '6px 14px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          flexShrink: '0',
+          background: startMenuGroupByPackage ? 'rgba(80,250,123,0.15)' : 'rgba(255,255,255,0.06)',
+          color: startMenuGroupByPackage ? '#50fa7b' : 'rgba(216,232,255,0.5)',
+          border: startMenuGroupByPackage ? '1px solid rgba(80,250,123,0.25)' : '1px solid transparent',
+        },
+      }),
+    ], { alignItems: 'center', gap: '12px' }),
   ], { gap: '6px' });
 }
 
@@ -443,6 +471,7 @@ function renderSaveRow(self) {
         selectedOpacity = 2;
         startMenuWidth = 380;
         startMenuHeight = 480;
+        startMenuGroupByPackage = false;
         liveApply();
         self.rerender();
       },
@@ -459,7 +488,7 @@ function renderSaveRow(self) {
     UI.button('儲存設定', {
       id: 'btn-save',
       onClick: function () {
-        var result = settingsApi.saveTheme(buildThemeObject());
+        var result = OS.saveTheme(buildThemeObject());
         if (result.success) {
           self.patch('btn-save', { text: '✓ 已儲存' });
           setTimeout(function () {
@@ -485,7 +514,7 @@ function renderSaveRow(self) {
 var notifSettings = { doNotDisturb: false, defaultDuration: 4000, maxVisible: 5 };
 
 function loadNotifSettings() {
-  var result = settingsApi.getNotificationSettings();
+  var result = OS.getNotificationSettings();
   if (result.success && result.data) {
     notifSettings = result.data;
   }
@@ -527,7 +556,7 @@ function renderNotificationsPage(self) {
         UI.button(notifSettings.doNotDisturb ? '🔕 已開啟' : '🔔 已關閉', {
           onClick: function () {
             notifSettings.doNotDisturb = !notifSettings.doNotDisturb;
-            settingsApi.setNotificationSettings(notifSettings);
+            OS.setNotificationSettings(notifSettings);
             self.rerender();
           },
           style: {
@@ -557,7 +586,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.defaultDuration = opt.value;
-                settingsApi.setNotificationSettings(notifSettings);
+                OS.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -589,7 +618,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.maxVisible = opt.value;
-                settingsApi.setNotificationSettings(notifSettings);
+                OS.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -617,7 +646,7 @@ function renderNotificationsPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button('發送測試', {
           onClick: function () {
-            notificationApi.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
+            OS.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
           },
           style: {
             padding: '8px 18px',
@@ -639,9 +668,9 @@ function renderNotificationsPage(self) {
 var appsSelectedApp = null;
 
 function renderAppsPage(self) {
-  var appsResult = settingsApi.getApps();
+  var appsResult = OS.getApps();
   var apps = (appsResult.success && appsResult.data) ? appsResult.data : [];
-  var procsResult = settingsApi.getAppProcesses();
+  var procsResult = OS.getAppProcesses();
   var procs = (procsResult.success && procsResult.data) ? procsResult.data : [];
 
   // 每個 app 的執行中程序數
@@ -858,8 +887,8 @@ var networkNewPattern = '';
 var networkNewDesc = '';
 
 function loadNetworkData() {
-  var statusResult = networkApi.getStatus();
-  var listResult = networkApi.getAllowlist();
+  var statusResult = OS.getStatus();
+  var listResult = OS.getAllowlist();
   return {
     status: (statusResult.success && statusResult.data) ? statusResult.data : { enabled: true, allowlistCount: 0, totalRequests: 0, blockedRequests: 0 },
     allowlist: (listResult.success && listResult.data) ? listResult.data : [],
@@ -886,7 +915,7 @@ function renderNetworkPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button(status.enabled ? '🌐 已啟用' : '🚫 已停用', {
           onClick: function () {
-            networkApi.setEnabled(!status.enabled);
+            OS.setEnabled(!status.enabled);
             self.rerender();
           },
           style: {
@@ -945,7 +974,7 @@ function renderNetworkPage(self) {
             onClick: function () {
               var pat = networkNewPattern.trim();
               if (!pat) {
-                notificationApi.notify('新增失敗', '請輸入網域規則', 'warning');
+                OS.notify('新增失敗', '請輸入網域規則', 'warning');
                 return;
               }
               // 驗證格式：* | *.domain.tld | sub.domain.tld
@@ -955,16 +984,16 @@ function renderNetworkPage(self) {
               var domainRegex = new RegExp('^(\\*|\\*\\.' + label + '(\\.' + label + ')*\\.' + tld + '|' + label + '(\\.' + label + ')*\\.' + tld + ')$');
               var valid = domainRegex.test(pat);
               if (!valid) {
-                notificationApi.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
+                OS.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
                 return;
               }
-              var result = networkApi.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
+              var result = OS.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
               if (result.success) {
-                notificationApi.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
+                OS.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
                 networkNewPattern = '';
                 networkNewDesc = '';
               } else {
-                notificationApi.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
+                OS.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
               }
               self.rerender();
             },
@@ -998,7 +1027,7 @@ function renderNetworkPage(self) {
             ], { flex: '1', gap: '1px' }),
             UI.button('移除', {
               onClick: function () {
-                networkApi.removeAllowlistEntry(entry.pattern);
+                OS.removeAllowlistEntry(entry.pattern);
                 self.rerender();
               },
               style: {
@@ -1052,7 +1081,7 @@ function renderAccessibilityPage(self) {
 
 // ── 關於頁面 ─────────────────────────────────────────────────
 function renderAboutPage(self) {
-  var info = settingsApi.sysinfo();
+  var info = OS.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([

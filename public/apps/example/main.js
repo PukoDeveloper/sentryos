@@ -1,6 +1,6 @@
 var styles = imports('styles.js');
 
-var _loadResult = envApi.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -80,7 +80,7 @@ var app = UI.createApp({
               self.patch('input-echo', { text: v ? 'You typed: ' + v : 'Start typing above…' });
             },
             onSubmit: function (v) {
-              notificationApi.notify('Submitted', v, 'info');
+              OS.notify('Submitted', v, 'info');
             },
           }),
           UI.text('Start typing above…', {
@@ -156,19 +156,19 @@ var app = UI.createApp({
           UI.subheading('Notifications'),
           UI.row([
             UI.button('Info', {
-              onClick: function () { notificationApi.notify('Hello!', 'This is an info notification.', 'info'); },
+              onClick: function () { OS.notify('Hello!', 'This is an info notification.', 'info'); },
               style: styles.notifButton(styles.colors.info),
             }),
             UI.button('Success', {
-              onClick: function () { notificationApi.notify('Done', 'Operation completed successfully.', 'success'); },
+              onClick: function () { OS.notify('Done', 'Operation completed successfully.', 'success'); },
               style: styles.notifButton(styles.colors.success),
             }),
             UI.button('Warning', {
-              onClick: function () { notificationApi.notify('Caution', 'Something needs your attention.', 'warning'); },
+              onClick: function () { OS.notify('Caution', 'Something needs your attention.', 'warning'); },
               style: styles.notifButton(styles.colors.warning),
             }),
             UI.button('Error', {
-              onClick: function () { notificationApi.notify('Error', 'Something went wrong!', 'error'); },
+              onClick: function () { OS.notify('Error', 'Something went wrong!', 'error'); },
               style: styles.notifButton(styles.colors.error),
             }),
           ]),
@@ -176,8 +176,8 @@ var app = UI.createApp({
       ]),
 
       // Footer
-      ui.panel([
-        ui.label('PID: ' + processApi.pid + '  |  Type: ' + processApi.type, {
+      OS.panel([
+        OS.label('PID: ' + OS.pid + '  |  Type: ' + OS.type, {
           fontSize: '11px',
           color: styles.colors.textDim,
         }),

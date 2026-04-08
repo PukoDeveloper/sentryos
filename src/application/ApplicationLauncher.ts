@@ -192,14 +192,17 @@ export class ApplicationLauncher {
   onWindowUiEvent(event: WindowUiEvent): void {
     let result: ReturnType<typeof this.runtime.dispatchUiEvent>;
     try {
-      result = this.runtime.dispatchUiEvent(event.processAppId, {
+      const payload: Record<string, unknown> = {
         eventId: event.eventId,
         windowId: event.windowId,
         processAppId: event.processAppId,
         type: event.type,
         controlId: event.controlId,
         value: event.value,
-      });
+      };
+      if (event.x !== undefined) payload.x = event.x;
+      if (event.y !== undefined) payload.y = event.y;
+      result = this.runtime.dispatchUiEvent(event.processAppId, payload);
     } catch {
       // Runtime was destroyed (e.g. process terminated) — expected, ignore
       return;

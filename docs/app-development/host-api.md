@@ -1,74 +1,119 @@
 # Host API 參考
 
-本文件列出沙箱應用程式（`main.js`）中可使用的所有全域 API。
+本文件列出沙箱應用程式（`main.js`）中可透過全域物件 **`OS`** 存取的所有 API。
 
-> 每個 API 標註了其 **Scope**，只有符合程序類型的 API 才會被注入：
->
-> | Scope | 注入對象 |
-> |-------|---------|
-> | `all` | 所有程序（Service、Window、Console、Library） |
-> | `service` | `type === 'Service'` |
-> | `window` | `type === 'Window'` |
-> | `console` | `type === 'Console'` |
-> | `library` | `type === 'Library'` |
+> **v2 變更**：所有 API 已統一扁平化至單一 `OS` 全域物件。不再需要 `consoleApi.xxx`、`shellApi.xxx` 等分離的命名空間，直接使用 `OS.xxx` 即可。
 
 ---
 
-## processApi
+## Scope（作用範圍）
 
-**Scope**: `all`
+每個方法標註了 **Scope**，只有符合程序類型的方法才會被注入 `OS` 物件：
 
-| 欄位/方法 | 型別 | 說明 |
-|-----------|------|------|
-| `processApi.pid` | `number` | 目前 PID |
-| `processApi.appDefId` | `string` | 應用定義 ID |
-| `processApi.appId` | `string` | 程序實例的 processAppId |
-| `processApi.type` | `string` | 程序類型（`'Service'` / `'Window'` / `'Console'` / `'Library'`） |
-| `processApi.parentPid` | `number \| null` | 父程序 PID（`null` 表示根程序） |
-| `processApi.status()` | `() → string` | 查詢當前狀態 |
-| `processApi.spawnChild(appDefId?, type?)` | `() → { success, pid? }` | 啟動子程序 |
-| `processApi.terminateSelf()` | `() → ProcessResult` | 終止自身 |
-| `processApi.listProcesses()` | `() → { success, data? }` | 列出所有程序（需 `process.list`） |
-| `processApi.terminateProcess(targetPid)` | `(number) → ProcessResult` | 終止指定程序 |
+| Scope | 注入對象 |
+|-------|---------|
+| `all` | 所有程序（Service、Window、Console、Library） |
+| `service` | `type === 'Service'` |
+| `window` | `type === 'Window'` |
+| `console` | `type === 'Console'` |
 
-### spawnChild
+---
+
+## 權限系統
+
+部分 API 需要特定權限才能執行，否則回傳 `{ success: false, error: 'PermissionDenied' }`。
+
+- 權限字串定義位置：[`src/kernel/constants.ts`](../../src/kernel/constants.ts)（`Permissions` 物件）
+- 權限檢查由 [`PermissionsManager`](../core/permissions-manager.md) 執行，支援萬用字元匹配
+- 應用程式在 `manifest.json` 的 `permissions` 欄位中宣告所需權限
+
+### 權限分類
+
+| 分類 | 權限前綴 | 說明 |
+|------|---------|------|
+| **程序** | `process.*` | 程序啟動、終止、暫停、列表 |
+| **事件** | `event.*` | 事件訂閱與發送（動態：`event.subscribe.<name>`、`event.emit.<name>`） |
+| **IPC** | `process.ipc.*` | 程序間通訊 |
+| **檔案系統** | `file.*` | 檔案讀寫刪除列表（動態：`file.<action>.<tier>`） |
+| **視窗** | `window.*` | 視窗建立 |
+| **主控台** | `console.*` | 主控台讀寫 |
+| **服務** | `service.*` | 服務健康狀態發布 |
+| **環境** | `env.*` | 環境變數、自動啟動、程式庫載入 |
+| **Shell** | `shell.*` | 系統指令（應用列表、啟動、視窗查詢） |
+| **儲存** | `storage.*` | 儲存空間查詢 |
+| **通知** | `notification.*` | 系統通知 |
+| **監控** | `monitor.*` | 系統監控統計 |
+| **設定** | `settings.*` | 主題與系統設定 |
+| **網路** | `network.*` | HTTP 連線與允許清單管理 |
+
+---
+
+## 程序 API
+
+**Scope**: `all` · **來源**: `ScriptRuntime` 內建
+
+### 屬性
+
+| 屬性 | 型別 | 說明 |
+|------|------|------|
+| `OS.pid` | `number` | 目前 PID |
+| `OS.appDefId` | `string` | 應用定義 ID |
+| `OS.appId` | `string` | 程序實例的 processAppId |
+| `OS.type` | `string` | 程序類型（`'Service'` / `'Window'` / `'Console'` / `'Library'`） |
+| `OS.parentPid` | `number \| null` | 父程序 PID（`null` 表示根程序） |
+
+### 方法
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.status()` | `() → string` | — | 查詢當前狀態 |
+| `OS.spawnChild(appDefId?, type?)` | `(string?, string?) → { success, pid? }` | `process.launch.<appDefId>` | 啟動子程序 |
+| `OS.terminateSelf()` | `() → ProcessResult` | — | 終止自身 |
+| `OS.listProcesses()` | `() → { success, data? }` | [`process.list`](../../src/kernel/constants.ts) | 列出所有程序 |
+| `OS.terminateProcess(targetPid)` | `(number) → { success, data? }` | [`process.terminate`](../../src/kernel/constants.ts) | 完整終止指定程序（關閉視窗 + 銷毀 Runtime） |
+
+> **注意**：`OS.terminateProcess` 會以 `setTimeout` 非同步執行，避免同步終止造成 re-entrant 問題。
+
+### spawnChild 範例
 
 ```javascript
 // 啟動與自身相同應用的子程序
-var result = processApi.spawnChild();
+var result = OS.spawnChild();
 
 // 啟動指定應用的子程序
-var result = processApi.spawnChild('appdef_xxx', 'Window');
+var result = OS.spawnChild('appdef_xxx', 'Window');
 ```
 
 ---
 
-## eventApi
+## 事件 API
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: `ScriptRuntime` 內建
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `eventApi.subscribe(eventName)` | `(string) → EventBusResult` | 訂閱事件 |
-| `eventApi.unsubscribe(eventName)` | `(string) → EventBusResult` | 取消訂閱 |
-| `eventApi.emit(eventName, payload?)` | `(string, any?) → EventBusResult` | 發送事件 |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.subscribe(eventName)` | `(string) → EventBusResult` | `event.subscribe.<eventName>` | 訂閱事件 |
+| `OS.unsubscribe(eventName)` | `(string) → EventBusResult` | — | 取消訂閱 |
+| `OS.emit(eventName, payload?)` | `(string, any?) → EventBusResult` | `event.emit.<eventName>` | 發送事件 |
+
+> 事件權限為動態產生：[`Permissions.eventSubscribe()`](../../src/kernel/constants.ts)、[`Permissions.eventEmit()`](../../src/kernel/constants.ts)
 
 ### 訂閱後的接收
 
-訂閱的事件會被放入程序的 inbox，可透過 `ipcApi.receive()` 讀取。
+訂閱的事件會被放入程序的 inbox，可透過 `OS.receive()` 讀取。
 
 ---
 
-## ipcApi
+## IPC API
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: `ScriptRuntime` 內建
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `ipcApi.sendToParent(payload)` | `(any) → RuntimeResult` | 傳訊息給父程序（需 `process.ipc.send-parent`） |
-| `ipcApi.sendToChild(childPid, payload)` | `(number, any) → RuntimeResult` | 傳訊息給子程序（需 `process.ipc.send-child`） |
-| `ipcApi.broadcastChildren(payload)` | `(any) → RuntimeResult` | 廣播給所有子程序 |
-| `ipcApi.receive()` | `() → Message[]` | 讀取收件匣（一次性清空） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.sendToParent(payload)` | `(any) → RuntimeResult` | [`process.ipc.send-parent`](../../src/kernel/constants.ts) | 傳訊息給父程序 |
+| `OS.sendToChild(childPid, payload)` | `(number, any) → RuntimeResult` | [`process.ipc.send-child`](../../src/kernel/constants.ts) | 傳訊息給子程序 |
+| `OS.broadcastChildren(payload)` | `(any) → RuntimeResult` | [`process.ipc.send-child`](../../src/kernel/constants.ts) | 廣播給所有子程序 |
+| `OS.receive()` | `() → Message[]` | — | 讀取收件匣（一次性清空） |
 
 ### Message 結構
 
@@ -85,48 +130,30 @@ var result = processApi.spawnChild('appdef_xxx', 'Window');
 
 ---
 
-## systemApi
+## UI API（僅 Window 類程序）
 
-**Scope**: `all`
+**Scope**: `window` · **來源**: [`src/api/uiApi.ts`](../../src/api/uiApi.ts)
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `systemApi.terminateProcess(targetPid)` | `(number) → { success, data? }` | 完整終止某程序（關閉視窗 + 銷毀 Runtime + 終止程序樹，需 `process.terminate`） |
+### 視窗操作
 
-> **注意**：`systemApi.terminateProcess` 會以 `setTimeout` 非同步執行，避免同步終止造成 re-entrant 問題。
-
----
-
-## storageApi
-
-**Scope**: `all`
-
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `storageApi.usage()` | `() → { success, data? }` | 查詢虛擬儲存空間使用量（需 `storage.usage`） |
-
----
-
-## ui（僅 Window 類程序）
-
-**Scope**: `window`
-
-### 視窗建立
-
-| 方法 | 說明 |
-|------|------|
-| `ui.createWindow(options)` | 建立視窗，回傳 `{ success, data: windowId }` |
-| `ui.initialize(windowId, tree)` | 以 UI tree 替換視窗內容 |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.createWindow(options)` | `(object) → { success, data: windowId }` | [`window.create`](../../src/kernel/constants.ts) | 建立視窗 |
+| `OS.initialize(windowId, tree)` | `(string, array) → void` | — | 以 UI tree 替換視窗內容 |
+| `OS.update(windowId, nodeId, patch)` | `(string, string, object) → void` | — | 更新指定節點屬性 |
+| `OS.remove(windowId, nodeId)` | `(string, string) → void` | — | 移除指定節點 |
+| `OS.append(windowId, parentId, nodes)` | `(string, string, array) → void` | — | 在父節點下新增子節點 |
 
 #### createWindow options
 
 ```javascript
-ui.createWindow({
+OS.createWindow({
   title: 'My App',            // 視窗標題
   width: 520, height: 400,    // 初始尺寸
   x: 100, y: 80,              // 初始位置（可省略）
   useDefaultFrame: true,       // 是否使用預設標題列
   alwaysOnTop: false,          // 置頂模式
+  resizable: true,             // 可否調整大小
   style: {                     // 視窗框樣式
     background: '...',
     color: '...',
@@ -137,14 +164,24 @@ ui.createWindow({
 });
 ```
 
-### UI 節點工廠
+### UI 節點建構器
+
+所有節點建構器為純函式，不需要權限。
 
 | 方法 | 說明 |
 |------|------|
-| `ui.label(text, style?, id?)` | 建立文字標籤節點 |
-| `ui.button(text, style?, id?)` | 建立按鈕節點 |
-| `ui.stack(children, style?, id?)` | 建立堆疊容器（預設垂直排列） |
-| `ui.panel(children, style?, id?)` | 建立面板容器 |
+| `OS.label(text, style?, id?)` | 建立文字標籤節點 |
+| `OS.button(text, style?, id?)` | 建立按鈕節點 |
+| `OS.stack(children, style?, id?)` | 建立堆疊容器（預設垂直排列） |
+| `OS.panel(children, style?, id?)` | 建立面板容器 |
+| `OS.input(value?, placeholder?, style?, id?)` | 建立文字輸入框 |
+| `OS.textarea(value?, placeholder?, rows?, style?, id?)` | 建立多行文字區域 |
+| `OS.checkbox(checked?, label?, style?, id?)` | 建立核取方塊 |
+| `OS.select(options, value?, style?, id?)` | 建立下拉選單 |
+| `OS.image(src, alt?, style?, id?)` | 建立圖片節點 |
+| `OS.separator(style?, id?)` | 建立分隔線 |
+| `OS.progress(value, color?, style?, id?)` | 建立進度條 |
+| `OS.list(children, style?, id?)` | 建立列表容器 |
 
 #### 參數說明
 
@@ -153,7 +190,8 @@ ui.createWindow({
   - `background`, `color`, `padding`, `gap`, `borderRadius`, `border`
   - `fontSize`, `justifyContent`, `alignItems`, `flexDirection`
 - `id`：`string` — 控制項 ID，用於事件回呼比對
-- `children`：`array` — 子節點陣列（stack / panel 使用）
+- `children`：`array` — 子節點陣列（stack / panel / list 使用）
+- `options`：`array` — 選項陣列（select 使用）
 
 ---
 
@@ -163,8 +201,8 @@ ui.createWindow({
 
 ```javascript
 globalThis.onWindowEvent = function(event) {
-  // event.controlId — 觸發的控制項 ID（對應 ui.button 的第三個參數）
-  // event.type       — 事件類型（'click'）
+  // event.controlId — 觸發的控制項 ID（對應 OS.button 的第三個參數）
+  // event.type       — 事件類型（'click', 'change' 等）
   // event.windowId   — 所屬視窗 ID
   // event.eventId    — 事件唯一 ID
   // event.processAppId — 程序 ID
@@ -173,35 +211,35 @@ globalThis.onWindowEvent = function(event) {
 
 ---
 
-## serviceApi（僅 Service 類程序）
+## Service API（僅 Service 類程序）
 
-**Scope**: `service`
+**Scope**: `service` · **來源**: `ScriptRuntime` 內建
 
-| 方法 | 說明 |
-|------|------|
-| `serviceApi.publishHealth(health)` | 發送健康檢查事件 `service.health` |
-
----
-
-## windowApi（僅 Window 類程序）
-
-**Scope**: `window`
-
-| 方法 | 說明 |
-|------|------|
-| `windowApi.postUiEvent(name, payload?)` | 發送自訂 UI 事件 `window.ui` |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.publishHealth(health)` | `(any) → EventBusResult` | [`service.publish-health`](../../src/kernel/constants.ts) | 發送健康檢查事件 `service.health` |
 
 ---
 
-## consoleApi（僅 Console 類程序）
+## Window API（僅 Window 類程序）
 
-**Scope**: `console`
+**Scope**: `window` · **來源**: `ScriptRuntime` 內建
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `consoleApi.writeLine(text)` | `(any) → boolean` | 輸出一行文字到 Console 視窗（需 `console.write`） |
-| `consoleApi.write(text)` | `(any) → boolean` | 附加文字到最後一行（不換行，需 `console.write`） |
-| `consoleApi.clear()` | `() → boolean` | 清除 Console 視窗所有輸出（需 `console.write`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.postUiEvent(name, payload?)` | `(string, any?) → EventBusResult` | `event.emit.window.ui` | 發送自訂 UI 事件 |
+
+---
+
+## Console API（僅 Console 類程序）
+
+**Scope**: `console` · **來源**: [`src/api/consoleApi.ts`](../../src/api/consoleApi.ts)
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.writeLine(text)` | `(any) → boolean` | [`console.write`](../../src/kernel/constants.ts) | 輸出一行文字到 Console 視窗 |
+| `OS.write(text)` | `(any) → boolean` | [`console.write`](../../src/kernel/constants.ts) | 附加文字到最後一行（不換行） |
+| `OS.clear()` | `() → boolean` | [`console.write`](../../src/kernel/constants.ts) | 清除 Console 視窗所有輸出 |
 
 ### onConsoleInput（Console 回呼）
 
@@ -210,65 +248,115 @@ Console 類程式可定義 `globalThis.onConsoleInput` 接收使用者輸入：
 ```javascript
 globalThis.onConsoleInput = function(line) {
   // line — 使用者在 Console 輸入框按下 Enter 送出的文字
-  consoleApi.writeLine('你輸入了: ' + line);
+  OS.writeLine('你輸入了: ' + line);
 };
 ```
 
 ---
 
-## envApi（環境 API）
+## System API
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: [`src/api/systemApi.ts`](../../src/api/systemApi.ts)
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.terminateProcess(targetPid)` | `(number) → { success, data? }` | [`process.terminate`](../../src/kernel/constants.ts) | 完整終止程序（關閉視窗 + 銷毀 Runtime + 終止程序樹） |
+
+> 此方法會覆寫內建 Process API 的同名方法，提供更完整的終止流程。
+
+---
+
+## Storage API（檔案儲存）
+
+**Scope**: `all` · **來源**: [`src/api/storageApi.ts`](../../src/api/storageApi.ts)
+
+所有路徑格式為 `[tier:][@namespace/]filename`。
+
+| Tier | 說明 |
+|------|------|
+| `app`（預設） | 應用私有空間 |
+| `user` | 使用者空間 |
+| `sys` | 系統全域空間 |
+| `cache` | 快取空間 |
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.readFile(path)` | `(string) → { success, data? }` | `file.read.<tier>` | 讀取檔案 |
+| `OS.writeFile(path, data, options?)` | `(string, any, object?) → { success, data? }` | `file.write.<tier>` | 寫入檔案 |
+| `OS.deleteFile(path)` | `(string) → { success }` | `file.delete.<tier>` | 刪除檔案 |
+| `OS.listFiles(path?)` | `(string?) → { success, data? }` | `file.list.<tier>` | 列出檔案 |
+| `OS.fileExists(path)` | `(string) → { success, data? }` | `file.list.<tier>` | 檢查檔案是否存在 |
+| `OS.storageUsage()` | `() → { success, data? }` | [`storage.usage`](../../src/kernel/constants.ts) | 查詢儲存空間使用量 |
+| `OS.listAllFiles(tier?)` | `(string?) → { success, data? }` | [`file.list-all`](../../src/kernel/constants.ts) | 列出所有應用的全部檔案 |
+
+> 檔案權限為動態產生：[`Permissions.fileAction(action, tier)`](../../src/kernel/constants.ts)
+>
+> 跨應用存取（路徑含 `@namespace/`）額外需要 [`file.cross-app`](../../src/kernel/constants.ts) 權限。
+
+### 路徑範例
+
+```javascript
+OS.readFile('test.json');                     // app 層, 本應用
+OS.readFile('user:doc/readme');               // user 層, 本應用
+OS.readFile('@terminal/config.json');         // app 層, 跨應用（需 file.cross-app）
+OS.writeFile('cache:temp', { key: 'value' }); // cache 層
+```
+
+---
+
+## 環境 API
+
+**Scope**: `all` · **來源**: [`src/api/envApi.ts`](../../src/api/envApi.ts)
 
 提供環境變數、自動啟動註冊、程式庫載入與命令註冊功能。
 
 ### 環境變數
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `envApi.getVariable(key)` | `(string) → { success, data? }` | 讀取環境變數（需 `env.read`） |
-| `envApi.getAllVariables()` | `() → { success, data? }` | 讀取所有環境變數（需 `env.read`） |
-| `envApi.setVariable(key, value)` | `(string, string) → { success }` | 設定環境變數（需 `env.write`） |
-| `envApi.removeVariable(key)` | `(string) → { success, data? }` | 刪除環境變數（需 `env.write`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.getVariable(key)` | `(string) → { success, data? }` | [`env.read`](../../src/kernel/constants.ts) | 讀取環境變數 |
+| `OS.getAllVariables()` | `() → { success, data? }` | [`env.read`](../../src/kernel/constants.ts) | 讀取所有環境變數 |
+| `OS.setVariable(key, value)` | `(string, string) → { success }` | [`env.write`](../../src/kernel/constants.ts) | 設定環境變數 |
+| `OS.removeVariable(key)` | `(string) → { success, data? }` | [`env.write`](../../src/kernel/constants.ts) | 刪除環境變數 |
 
 ### 自動啟動
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `envApi.registerAutoStart()` | `() → { success }` | 將目前程式註冊為自動啟動（需 `env.autostart`） |
-| `envApi.unregisterAutoStart()` | `() → { success }` | 取消自動啟動（需 `env.autostart`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.registerAutoStart()` | `() → { success }` | [`env.autostart`](../../src/kernel/constants.ts) | 將目前程式註冊為自動啟動 |
+| `OS.unregisterAutoStart()` | `() → { success }` | [`env.autostart`](../../src/kernel/constants.ts) | 取消自動啟動 |
 
 ### 程式庫
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `envApi.loadLibrary(libraryId)` | `(string) → RuntimeResult` | 載入程式庫到目前程序（在現有 Context 中執行程式碼，需 `env.library.load`） |
-| `envApi.listLibraries()` | `() → { success, data: string[] }` | 列出所有已註冊的程式庫 ID |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.loadLibrary(libraryId)` | `(string) → RuntimeResult` | [`env.library.load`](../../src/kernel/constants.ts) | 載入程式庫到目前程序 |
+| `OS.listLibraries()` | `() → { success, data: string[] }` | — | 列出所有已註冊的程式庫 ID |
 
 #### loadLibrary 用法
 
 ```javascript
-// libraryId 格式為 "packageName/appName"，例如 "stdlib/Math Utils"
-var result = envApi.loadLibrary('stdlib/Math Utils');
+// libraryId 格式為 "packageName/appName"
+var result = OS.loadLibrary('stdlib/Math Utils');
 if (result.success) {
-  // 程式庫已載入，其匯出的全域物件（如 MathUtils）可直接使用
+  // 程式庫已載入，其匯出的全域物件可直接使用
   var n = MathUtils.factorial(5); // 120
 }
 ```
 
 ### 命令註冊
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `envApi.registerCommand(name, description, usage?)` | `(string, string, string?) → { success }` | 註冊 CLI 命令到系統命令表 |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.registerCommand(name, description, usage?)` | `(string, string, string?) → { success }` | — | 註冊 CLI 命令到系統命令表 |
 
 #### registerCommand 用法
 
 ```javascript
 // 通常在 Library 的 init 階段註冊命令
-envApi.registerCommand('factorial', '計算階乘', 'factorial <n>');
+OS.registerCommand('factorial', '計算階乘', 'factorial <n>');
 
-// 同時提供命令處理函式（掛在 __commands 全域物件上）
+// 同時提供命令處理函式
 globalThis.__commands = globalThis.__commands || {};
 globalThis.__commands['factorial'] = function(args) {
   var n = parseInt(args[0], 10);
@@ -278,18 +366,18 @@ globalThis.__commands['factorial'] = function(args) {
 
 ---
 
-## shellApi（系統指令 API）
+## Shell API（系統指令）
 
-**Scope**: `console`（僅 Console 類程序可用）
+**Scope**: `console` · **來源**: [`src/api/shellApi.ts`](../../src/api/shellApi.ts)
 
-提供系統層級操作，如程序管理、應用啟動、視窗查詢和系統資訊。
+提供系統層級操作，僅 Console 類程序可用。
 
 ### 程序管理
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `shellApi.listProcesses()` | `() → { success, data? }` | 列出所有程序（需 `process.list`） |
-| `shellApi.killProcess(targetPid)` | `(number) → { success, data? }` | 終止指定程序（需 `process.terminate`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.listProcesses()` | `() → { success, data? }` | [`process.list`](../../src/kernel/constants.ts) | 列出所有程序 |
+| `OS.killProcess(targetPid)` | `(number) → { success, data? }` | [`process.terminate`](../../src/kernel/constants.ts) | 終止指定程序 |
 
 #### listProcesses 回傳
 
@@ -305,36 +393,24 @@ globalThis.__commands['factorial'] = function(args) {
 
 ### 應用管理
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `shellApi.listApps()` | `() → { success, data? }` | 列出所有已註冊應用（需 `shell.apps`） |
-| `shellApi.launch(appDefId)` | `(string) → { success, data? }` | 啟動應用（可以使用 appId 或名稱，需 `shell.launch`） |
-
-#### listApps 回傳
-
-```javascript
-{
-  success: true,
-  data: [
-    { appId: '...', name: 'Example App', version: '1.0.0', type: 'Window', package: 'example', autoStart: false },
-    ...
-  ]
-}
-```
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.listApps()` | `() → { success, data? }` | [`shell.apps`](../../src/kernel/constants.ts) | 列出所有已註冊應用 |
+| `OS.launch(appDefId)` | `(string) → { success, data? }` | [`shell.launch`](../../src/kernel/constants.ts) | 啟動應用（支援 appId 或名稱） |
 
 > `launch` 不支援啟動 Library 類應用，會回傳 `{ success: false, error: 'CannotLaunchLibrary' }`。
 
 ### 視窗查詢
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `shellApi.listWindows()` | `() → { success, data? }` | 列出所有開啟中視窗（需 `shell.windows`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.listWindows()` | `() → { success, data? }` | [`shell.windows`](../../src/kernel/constants.ts) | 列出所有開啟中視窗 |
 
 ### 系統資訊
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `shellApi.sysinfo()` | `() → { success, data? }` | 取得系統摘要（需 `shell.sysinfo`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.sysinfo()` | `() → { success, data? }` | [`shell.sysinfo`](../../src/kernel/constants.ts) | 取得系統摘要 |
 
 #### sysinfo 回傳
 
@@ -354,45 +430,37 @@ globalThis.__commands['factorial'] = function(args) {
 
 ### 命令查詢
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `shellApi.listCommands()` | `() → { success, data? }` | 列出所有已註冊 CLI 命令 |
-| `shellApi.resolveCommand(name)` | `(string) → { success, data? }` | 解析命令名稱，取得其 libraryId 等資訊 |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.listCommands()` | `() → { success, data? }` | — | 列出所有已註冊 CLI 命令 |
+| `OS.resolveCommand(name)` | `(string) → { success, data? }` | — | 解析命令名稱，取得其 libraryId 等資訊 |
 
 #### 命令自動分派模式
 
-Console 應用可透過 `resolveCommand` + `loadLibrary` + `__commands` 實現自動命令分派：
-
 ```javascript
-// 1. 使用者輸入未識別的命令
 var cmd = 'factorial';
 var args = ['5'];
 
-// 2. 查詢命令是否已註冊
-var resolved = shellApi.resolveCommand(cmd);
+var resolved = OS.resolveCommand(cmd);
 if (resolved.success) {
-  // 3. 載入對應的程式庫
-  envApi.loadLibrary(resolved.data.libraryId);
-  // 4. 執行命令處理函式
+  OS.loadLibrary(resolved.data.libraryId);
   if (globalThis.__commands && globalThis.__commands[cmd]) {
     var output = globalThis.__commands[cmd](args);
-    consoleApi.writeLine(output);
+    OS.writeLine(output);
   }
 }
 ```
 
 ---
 
-## notificationApi（通知 API）
+## Notification API（通知）
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: [`src/api/notificationApi.ts`](../../src/api/notificationApi.ts)
 
-提供全域通知功能，可由任何應用類型使用。
-
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `notificationApi.notify(title, body?, type?, duration?)` | `(string, string?, string?, number?) → { success, data? }` | 發送通知（需 `notification.send`） |
-| `notificationApi.dismiss(id)` | `(string) → { success }` | 關閉指定通知（需 `notification.send`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.notify(title, body?, type?, duration?)` | `(string, string?, string?, number?) → { success, data? }` | [`notification.send`](../../src/kernel/constants.ts) | 發送通知 |
+| `OS.dismiss(id)` | `(string) → { success }` | — | 關閉指定通知 |
 
 ### notify 參數
 
@@ -407,39 +475,38 @@ if (resolved.success) {
 
 ```javascript
 // 基本通知
-notificationApi.notify('操作完成');
+OS.notify('操作完成');
 
 // 帶類型與內容的通知
-notificationApi.notify('儲存成功', '檔案已成功寫入', 'success');
+OS.notify('儲存成功', '檔案已成功寫入', 'success');
 
 // 不自動消失的錯誤通知
-notificationApi.notify('錯誤', '無法連接伺服器', 'error', 0);
+OS.notify('錯誤', '無法連接伺服器', 'error', 0);
 
 // 手動關閉通知
-var result = notificationApi.notify('處理中...');
+var result = OS.notify('處理中...');
 if (result.success) {
-  // result.data 為通知 ID
-  notificationApi.dismiss(result.data);
+  OS.dismiss(result.data);
 }
 ```
 
 ---
 
-## monitorApi（系統監控 API）
+## Monitor API（系統監控）
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: [`src/api/monitorApi.ts`](../../src/api/monitorApi.ts)
 
-提供系統監控統計數據，所有方法均需 `monitor.read` 權限。
+所有方法均需 [`monitor.read`](../../src/kernel/constants.ts) 權限。
 
 | 方法 | 簽章 | 說明 |
 |------|------|------|
-| `monitorApi.snapshot()` | `() → { success, data? }` | 取得完整監控快照 |
-| `monitorApi.eventStats()` | `() → { success, data? }` | 取得事件統計 |
-| `monitorApi.apiStats()` | `() → { success, data? }` | 取得 API 呼叫統計 |
-| `monitorApi.permissionStats()` | `() → { success, data? }` | 取得權限檢查統計 |
-| `monitorApi.recentEvents(limit?)` | `(number?) → { success, data? }` | 取得最近事件記錄 |
-| `monitorApi.recentApiCalls(limit?)` | `(number?) → { success, data? }` | 取得最近 API 呼叫記錄 |
-| `monitorApi.processHistory()` | `() → { success, data? }` | 取得程序歷史記錄 |
+| `OS.snapshot()` | `() → { success, data? }` | 取得完整監控快照 |
+| `OS.eventStats()` | `() → { success, data? }` | 取得事件統計 |
+| `OS.apiStats()` | `() → { success, data? }` | 取得 API 呼叫統計 |
+| `OS.permissionStats()` | `() → { success, data? }` | 取得權限檢查統計 |
+| `OS.recentEvents(limit?)` | `(number?) → { success, data? }` | 取得最近事件記錄 |
+| `OS.recentApiCalls(limit?)` | `(number?) → { success, data? }` | 取得最近 API 呼叫記錄 |
+| `OS.processHistory()` | `() → { success, data? }` | 取得程序歷史記錄 |
 
 ### snapshot 回傳
 
@@ -456,37 +523,81 @@ if (result.success) {
 }
 ```
 
-### 用法範例
+---
+
+## Settings API（系統設定）
+
+**Scope**: `all` · **來源**: [`src/api/settingsApi.ts`](../../src/api/settingsApi.ts)
+
+### 主題設定
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.getTheme()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 取得目前主題 |
+| `OS.applyTheme(theme)` | `(object) → { success }` | [`settings.write`](../../src/kernel/constants.ts) | 套用主題（不持久化） |
+| `OS.saveTheme(theme)` | `(object) → { success }` | [`settings.write`](../../src/kernel/constants.ts) | 套用並儲存主題 |
+| `OS.loadSavedTheme()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 讀取已儲存的主題 |
+
+#### 主題屬性
 
 ```javascript
-// 取得完整快照
-var snap = monitorApi.snapshot();
-if (snap.success) {
-  consoleApi.writeLine('Events: ' + snap.data.events.total);
-  consoleApi.writeLine('API calls: ' + snap.data.api.total);
-}
-
-// 取得最近 10 筆事件
-var events = monitorApi.recentEvents(10);
-
-// 取得權限統計
-var perms = monitorApi.permissionStats();
+OS.applyTheme({
+  wallpaper: 'url(...)',       // 桌面背景
+  tint: 'rgba(0,0,0,0.5)',    // 色調覆蓋
+  accentPrimary: '#4a9eff',   // 主色調
+  accentSecondary: '#2d7dd2', // 次色調
+  taskbarOpacity: 0.85,       // 工作列透明度
+  startMenuWidth: 320,        // 開始選單寬度
+  startMenuHeight: 480,       // 開始選單高度
+});
 ```
+
+### 系統資訊
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.sysinfo()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 取得系統摘要（所有程序類型可用） |
+
+> **注意**：Console 程序中此方法會被 Shell API 的同名方法覆蓋（改為需要 `shell.sysinfo` 權限）。
+
+### 通知設定
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.getNotificationSettings()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 取得通知設定 |
+| `OS.setNotificationSettings(settings)` | `(object) → { success, data? }` | [`settings.write`](../../src/kernel/constants.ts) | 更新通知設定 |
+
+#### 通知設定屬性
+
+```javascript
+OS.setNotificationSettings({
+  doNotDisturb: false,   // 勿擾模式
+  defaultDuration: 4000, // 預設顯示時間（毫秒）
+  maxVisible: 5,         // 同時顯示最大數量
+});
+```
+
+### 應用資訊
+
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.getApps()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 取得所有已註冊應用的詳細資訊 |
+| `OS.getAppProcesses()` | `() → { success, data? }` | [`settings.read`](../../src/kernel/constants.ts) | 取得所有程序列表 |
 
 ---
 
-## networkApi（網路 API）
+## Network API（網路）
 
-**Scope**: `all`
+**Scope**: `all` · **來源**: [`src/api/networkApi.ts`](../../src/api/networkApi.ts)
 
 提供受控的 HTTP 連線功能。所有連線受允許清單約束，僅匹配的網域可發送請求。
 
 ### 請求
 
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `networkApi.request(url, options?)` | `(string, object?) → Promise<{ success, data? }>` | 發送 HTTP 請求（需 `network.request`） |
-| `networkApi.isAllowed(url)` | `(string) → { success, data? }` | 檢查 URL 是否在允許清單中（需 `network.status`） |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.request(url, options?)` | `(string, object?) → Promise<{ success, data? }>` | [`network.request`](../../src/kernel/constants.ts) | 發送 HTTP 請求 |
+| `OS.isAllowed(url)` | `(string) → { success, data? }` | [`network.status`](../../src/kernel/constants.ts) | 檢查 URL 是否在允許清單中 |
 
 #### request options
 
@@ -497,98 +608,90 @@ var perms = monitorApi.permissionStats();
 | `body` | `string` | 請求主體（GET / HEAD 時忽略） |
 | `timeout` | `number` | 逾時時間（毫秒），預設 10000 |
 
-#### request 回傳
+### 狀態與管理
 
-```javascript
-{
-  success: true,
-  data: {
-    status: 200,
-    statusText: 'OK',
-    headers: { 'content-type': 'application/json' },
-    body: '{"key": "value"}'
-  }
-}
-```
-
-#### 錯誤碼
-
-| 錯誤 | 說明 |
-|------|------|
-| `PermissionDenied` | 缺少 `network.request` 權限 |
-| `NotAllowed` | URL 不在允許清單中 |
-| `Disabled` | 網路功能已停用 |
-| `Timeout` | 請求逾時 |
-| `ConnectionFailed` | 連線失敗 |
-| `InvalidUrl` | URL 格式無效 |
-
-### 狀態查詢
-
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `networkApi.getStatus()` | `() → { success, data? }` | 取得網路狀態摘要（需 `network.status`） |
-
-#### getStatus 回傳
-
-```javascript
-{
-  success: true,
-  data: {
-    enabled: true,
-    allowlistCount: 3,
-    totalRequests: 15,
-    blockedRequests: 2
-  }
-}
-```
-
-### 允許清單管理（管理員）
-
-以下方法需要 `network.manage` 權限：
-
-| 方法 | 簽章 | 說明 |
-|------|------|------|
-| `networkApi.getAllowlist()` | `() → { success, data? }` | 取得完整允許清單 |
-| `networkApi.addAllowlistEntry(pattern, description?)` | `(string, string?) → { success, data? }` | 新增允許規則 |
-| `networkApi.removeAllowlistEntry(pattern)` | `(string) → { success, data? }` | 移除允許規則 |
-| `networkApi.setEnabled(enabled)` | `(boolean) → { success }` | 啟用或停用網路功能 |
-
-#### 允許規則格式
-
-| 格式 | 範例 | 說明 |
-|------|------|------|
-| 全域萬用字元 | `*` | 允許所有網域 |
-| 萬用字元子網域 | `*.example.com` | 匹配所有子網域 |
-| 精確匹配 | `api.github.com` | 僅匹配該網域 |
+| 方法 | 簽章 | 權限 | 說明 |
+|------|------|------|------|
+| `OS.getStatus()` | `() → { success, data? }` | [`network.status`](../../src/kernel/constants.ts) | 取得網路狀態 |
+| `OS.getAllowlist()` | `() → { success, data? }` | [`network.manage`](../../src/kernel/constants.ts) | 取得允許清單 |
+| `OS.addAllowlistEntry(pattern, description?)` | `(string, string?) → { success }` | [`network.manage`](../../src/kernel/constants.ts) | 新增允許清單項目 |
+| `OS.removeAllowlistEntry(pattern)` | `(string) → { success }` | [`network.manage`](../../src/kernel/constants.ts) | 移除允許清單項目 |
+| `OS.setEnabled(enabled)` | `(boolean) → { success }` | [`network.manage`](../../src/kernel/constants.ts) | 啟用/停用網路功能 |
 
 ### 用法範例
 
 ```javascript
+// 檢查 URL 是否允許
+var check = OS.isAllowed('https://api.example.com');
+
 // 發送 GET 請求
-var result = networkApi.request('https://api.example.com/data');
-if (result.success) {
-  var body = JSON.parse(result.data.body);
-}
+var res = OS.request('https://api.example.com/data');
 
 // 發送 POST 請求
-var result = networkApi.request('https://api.example.com/submit', {
+var res = OS.request('https://api.example.com/submit', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ name: 'test' }),
+  body: JSON.stringify({ key: 'value' }),
   timeout: 5000
 });
-
-// 檢查 URL 是否允許
-var check = networkApi.isAllowed('https://api.example.com');
-if (check.success && check.data) {
-  // URL 在允許清單中
-}
-
-// 查詢網路狀態
-var status = networkApi.getStatus();
-
-// 管理允許清單
-networkApi.addAllowlistEntry('*.github.com', 'GitHub API');
-networkApi.removeAllowlistEntry('*.github.com');
-networkApi.setEnabled(false);  // 停用網路
 ```
+
+---
+
+## 全域函式
+
+### imports（模組載入）
+
+```javascript
+var module = imports('./utils.js');
+```
+
+使用 CommonJS-like 模式載入同一套件中的其他檔案。模組內可使用 `module.exports` 匯出。
+
+### Timer 函式
+
+| 函式 | 說明 |
+|------|------|
+| `setTimeout(fn, delay)` | 延遲執行（回傳 timer ID） |
+| `setInterval(fn, delay)` | 週期執行（回傳 timer ID） |
+| `clearTimeout(id)` | 取消 setTimeout |
+| `clearInterval(id)` | 取消 setInterval |
+
+---
+
+## 權限速查表
+
+以下列出所有 API 使用的權限字串，定義於 [`src/kernel/constants.ts`](../../src/kernel/constants.ts) 的 `Permissions` 物件。
+
+| 權限字串 | 常數名稱 | 對應 API |
+|---------|---------|---------|
+| `process.list` | `PROCESS_LIST` | `OS.listProcesses()` |
+| `process.terminate` | `PROCESS_TERMINATE` | `OS.terminateProcess()`, `OS.killProcess()` |
+| `process.launch.<id>` | `processLaunch(id)` | `OS.spawnChild()` |
+| `process.ipc.send-parent` | `IPC_SEND_PARENT` | `OS.sendToParent()` |
+| `process.ipc.send-child` | `IPC_SEND_CHILD` | `OS.sendToChild()`, `OS.broadcastChildren()` |
+| `event.subscribe.<name>` | `eventSubscribe(name)` | `OS.subscribe()` |
+| `event.emit.<name>` | `eventEmit(name)` | `OS.emit()` |
+| `window.create` | `WINDOW_CREATE` | `OS.createWindow()` |
+| `console.write` | `CONSOLE_WRITE` | `OS.writeLine()`, `OS.write()`, `OS.clear()` |
+| `console.read` | `CONSOLE_READ` | Console 輸入事件 |
+| `service.publish-health` | `SERVICE_PUBLISH_HEALTH` | `OS.publishHealth()` |
+| `file.<action>.<tier>` | `fileAction(action, tier)` | `OS.readFile()`, `OS.writeFile()`, `OS.deleteFile()`, `OS.listFiles()` |
+| `file.cross-app` | `FILE_CROSS_APP` | 跨應用檔案存取 |
+| `file.list-all` | `FILE_LIST_ALL` | `OS.listAllFiles()` |
+| `storage.usage` | `STORAGE_USAGE` | `OS.storageUsage()` |
+| `env.read` | `ENV_READ` | `OS.getVariable()`, `OS.getAllVariables()` |
+| `env.write` | `ENV_WRITE` | `OS.setVariable()`, `OS.removeVariable()` |
+| `env.autostart` | `ENV_AUTOSTART` | `OS.registerAutoStart()`, `OS.unregisterAutoStart()` |
+| `env.library.load` | `ENV_LOAD_LIBRARY` | `OS.loadLibrary()` |
+| `shell.apps` | `SHELL_LIST_APPS` | `OS.listApps()` |
+| `shell.launch` | `SHELL_LAUNCH` | `OS.launch()` |
+| `shell.windows` | `SHELL_WINDOWS` | `OS.listWindows()` |
+| `shell.sysinfo` | `SHELL_SYSINFO` | `OS.sysinfo()`（Console） |
+| `notification.send` | `NOTIFICATION_SEND` | `OS.notify()` |
+| `monitor.read` | `MONITOR_READ` | `OS.snapshot()`, `OS.eventStats()`, `OS.apiStats()`, `OS.permissionStats()`, `OS.recentEvents()`, `OS.recentApiCalls()`, `OS.processHistory()` |
+| `settings.read` | `SETTINGS_READ` | `OS.getTheme()`, `OS.loadSavedTheme()`, `OS.sysinfo()`（非 Console）, `OS.getNotificationSettings()`, `OS.getApps()`, `OS.getAppProcesses()` |
+| `settings.write` | `SETTINGS_WRITE` | `OS.applyTheme()`, `OS.saveTheme()`, `OS.setNotificationSettings()` |
+| `network.request` | `NETWORK_REQUEST` | `OS.request()` |
+| `network.status` | `NETWORK_STATUS` | `OS.isAllowed()`, `OS.getStatus()` |
+| `network.manage` | `NETWORK_MANAGE` | `OS.getAllowlist()`, `OS.addAllowlistEntry()`, `OS.removeAllowlistEntry()`, `OS.setEnabled()` |

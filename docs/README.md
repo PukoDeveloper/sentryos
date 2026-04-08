@@ -45,7 +45,7 @@
 
 | 文件 | 說明 |
 |------|------|
-| [Host API 參考](./app-development/host-api.md) | 沙箱內可用的全域 API（processApi、eventApi、ipcApi、ui、envApi、shellApi、consoleApi、notificationApi、monitorApi、networkApi） |
+| [Host API 參考](./app-development/host-api.md) | 沙箱內全域 `OS` 物件 API（程序、事件、IPC、UI、儲存、環境、Shell、通知、監控、設定、網路） |
 | [Manifest 格式](./app-development/manifest.md) | manifest.json 欄位規格（Package / Legacy 格式） |
 | [開發指南](./app-development/guide.md) | 新增應用程式步驟、範本（Window / Service / Console / Library）、設計模式 |
 

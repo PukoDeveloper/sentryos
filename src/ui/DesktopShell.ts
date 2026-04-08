@@ -11,7 +11,7 @@ type DesktopOverlayRegistration = {
   order?: number;
 };
 
-export type ThemeSettings = {
+type ThemeSettings = {
   wallpaper?: string;
   tint?: string;
   accentPrimary?: string;
@@ -19,6 +19,7 @@ export type ThemeSettings = {
   taskbarOpacity?: number;
   startMenuWidth?: number;
   startMenuHeight?: number;
+  startMenuGroupByPackage?: boolean;
 };
 
 class DesktopShell {
@@ -54,6 +55,17 @@ class DesktopShell {
   private contextMenu: HTMLDivElement | null = null;
   private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
   private pinnedAppIds: string[] = [];
+  private expandedPackage: string | null = null;
+
+  /** Return a stable identifier for an app that survives page refreshes */
+  private stableId(app: RegisteredApplication): string {
+    return app.manifestId ?? app.mainPath;
+  }
+
+  /** Find an app by its stable identifier */
+  private findAppByStableId(stableId: string): RegisteredApplication | undefined {
+    return this.allApps.find(a => (a.manifestId ?? a.mainPath) === stableId);
+  }
 
   mount(_applications: Application[]): boolean {
     const appRoot = getAppDiv();
@@ -223,6 +235,7 @@ class DesktopShell {
   setApplications(applications: RegisteredApplication[]): void {
     this.allApps = applications;
     this.renderStartMenu();
+    this.renderFoldersTab();
   }
 
   onLaunchRequest(handler: (app: RegisteredApplication) => void): void {
@@ -312,7 +325,13 @@ class DesktopShell {
       const h = Math.max(300, Math.min(800, theme.startMenuHeight));
       this.startPanel.style.setProperty('--start-menu-height', `${h}px`);
     }
+    if (theme.startMenuGroupByPackage !== undefined) {
+      this.expandedPackage = null;
+    }
     Object.assign(this.currentTheme, theme);
+    if (theme.startMenuGroupByPackage !== undefined) {
+      this.renderStartMenu();
+    }
   }
 
   getTheme(): ThemeSettings {
@@ -707,7 +726,7 @@ class DesktopShell {
 
   private showSearchContextMenu(e: MouseEvent, app: RegisteredApplication): void {
     if (!app.appId) return;
-    const appId = app.appId;
+    const sid = this.stableId(app);
 
     const rootRect = this.root?.getBoundingClientRect();
     const x = e.clientX - (rootRect?.left ?? 0);
@@ -715,23 +734,23 @@ class DesktopShell {
 
     const items: { label: string; action: () => void }[] = [];
 
-    if (!this.pinnedAppIds.includes(appId)) {
+    if (!this.pinnedAppIds.includes(sid)) {
       items.push({
         label: '📌 釘選到選單',
-        action: () => this.pinApp(appId),
+        action: () => this.pinApp(sid),
       });
     } else {
       items.push({
         label: '📌 從選單取消釘選',
-        action: () => this.unpinApp(appId),
+        action: () => this.unpinApp(sid),
       });
     }
 
     for (const folder of this.folders) {
-      if (!folder.appIds.includes(appId)) {
+      if (!folder.appIds.includes(sid)) {
         items.push({
           label: `📁 新增到「${folder.name}」`,
-          action: () => this.addAppToFolder(folder.name, appId),
+          action: () => this.addAppToFolder(folder.name, sid),
         });
       }
     }
@@ -739,22 +758,22 @@ class DesktopShell {
     this.showContextMenu(x, y, items);
   }
 
-  private showPinnedContextMenu(e: MouseEvent, appId: string): void {
+  private showPinnedContextMenu(e: MouseEvent, sid: string): void {
     const rootRect = this.root?.getBoundingClientRect();
     const x = e.clientX - (rootRect?.left ?? 0);
     const y = e.clientY - (rootRect?.top ?? 0);
 
     const items: { label: string; action: () => void }[] = [
-      { label: '📌 從選單取消釘選', action: () => this.unpinApp(appId) },
+      { label: '📌 從選單取消釘選', action: () => this.unpinApp(sid) },
     ];
 
     for (const folder of this.folders) {
-      if (!folder.appIds.includes(appId)) {
+      if (!folder.appIds.includes(sid)) {
         items.push({
           label: `📁 移動到「${folder.name}」`,
           action: () => {
-            this.pinnedAppIds = this.pinnedAppIds.filter(id => id !== appId);
-            this.addAppToFolder(folder.name, appId);
+            this.pinnedAppIds = this.pinnedAppIds.filter(id => id !== sid);
+            this.addAppToFolder(folder.name, sid);
           },
         });
       }
@@ -796,19 +815,19 @@ class DesktopShell {
     }
 
     // ── Root view: pinned apps + folder tiles ──
-    for (const appId of this.pinnedAppIds) {
-      const app = this.allApps.find(a => a.appId === appId);
+    for (const sid of this.pinnedAppIds) {
+      const app = this.findAppByStableId(sid);
       if (!app) continue;
 
       const item = this.createAppItem(app);
       item.draggable = true;
       item.addEventListener('dragstart', (e) => {
-        e.dataTransfer?.setData('text/plain', appId);
+        e.dataTransfer?.setData('text/plain', sid);
         e.dataTransfer?.setData('application/x-sentryos-source', 'pinned');
       });
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        this.showPinnedContextMenu(e, appId);
+        this.showPinnedContextMenu(e, sid);
       });
       this.startFolderList.appendChild(item);
     }
@@ -974,8 +993,8 @@ class DesktopShell {
       hint.textContent = '從搜尋拖曳應用程式到此資料夾';
       this.startFolderList.appendChild(hint);
     } else {
-      for (const appId of folder.appIds) {
-        const app = this.allApps.find(a => a.appId === appId);
+      for (const sid of folder.appIds) {
+        const app = this.findAppByStableId(sid);
         if (!app) continue;
 
         const row = document.createElement('div');
@@ -990,7 +1009,7 @@ class DesktopShell {
         removeBtn.title = '從資料夾移除';
         removeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.removeAppFromFolder(folder.name, appId);
+          this.removeAppFromFolder(folder.name, sid);
         });
 
         row.appendChild(appBtn);
@@ -1011,31 +1030,133 @@ class DesktopShell {
         return true;
       }
 
-      const text = `${app.name} ${app.description ?? ''}`.toLowerCase();
+      const text = `${app.name} ${app.description ?? ''} ${app.packageName ?? ''}`.toLowerCase();
       return text.includes(keyword);
     });
 
     this.startSearchList.replaceChildren();
 
-    for (const app of matches) {
-      const button = this.createAppItem(app);
+    const groupByPackage = this.currentTheme.startMenuGroupByPackage === true;
 
-      // Right-click context menu
-      button.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        this.showSearchContextMenu(e, app);
-      });
-
-      // Draggable
-      if (app.appId) {
-        button.draggable = true;
-        button.addEventListener('dragstart', (e) => {
-          e.dataTransfer?.setData('text/plain', app.appId!);
-          e.dataTransfer?.setData('application/x-sentryos-source', 'search');
-        });
+    if (groupByPackage && !keyword) {
+      // ── Package grouped mode ──
+      const packageMap = new Map<string, RegisteredApplication[]>();
+      for (const app of matches) {
+        const pkg = app.packageName || app.name;
+        if (!packageMap.has(pkg)) {
+          packageMap.set(pkg, []);
+        }
+        packageMap.get(pkg)!.push(app);
       }
 
-      this.startSearchList.appendChild(button);
+      for (const [pkgName, apps] of packageMap) {
+        if (apps.length === 1) {
+          // Single app in package — render directly
+          const button = this.createAppItem(apps[0]);
+          button.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showSearchContextMenu(e, apps[0]);
+          });
+          button.draggable = true;
+          button.addEventListener('dragstart', (e) => {
+            e.dataTransfer?.setData('text/plain', this.stableId(apps[0]));
+            e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+          });
+          this.startSearchList.appendChild(button);
+        } else {
+          // Multiple apps — render as collapsible group
+          const isExpanded = this.expandedPackage === pkgName;
+          const group = document.createElement('div');
+          group.className = 'desktop-start-package-group';
+          if (isExpanded) group.classList.add('is-expanded');
+
+          const header = document.createElement('button');
+          header.type = 'button';
+          header.className = 'desktop-start-package-header';
+
+          const iconEl = document.createElement('span');
+          iconEl.className = 'desktop-start-item-icon';
+          // Use first app's icon or package initial
+          const firstApp = apps[0];
+          if (firstApp.icon) {
+            const img = document.createElement('img');
+            img.src = firstApp.icon;
+            img.alt = '';
+            img.draggable = false;
+            img.addEventListener('error', () => {
+              img.remove();
+              iconEl.textContent = pkgName.charAt(0).toUpperCase();
+            });
+            iconEl.appendChild(img);
+          } else {
+            iconEl.textContent = pkgName.charAt(0).toUpperCase();
+          }
+
+          const label = document.createElement('span');
+          label.className = 'desktop-start-item-label';
+          label.textContent = pkgName;
+
+          const badge = document.createElement('span');
+          badge.className = 'desktop-start-package-badge';
+          badge.textContent = String(apps.length);
+
+          const chevron = document.createElement('span');
+          chevron.className = 'desktop-start-package-chevron';
+          chevron.textContent = isExpanded ? '▼' : '▶';
+
+          header.appendChild(iconEl);
+          header.appendChild(label);
+          header.appendChild(badge);
+          header.appendChild(chevron);
+
+          header.addEventListener('click', () => {
+            this.expandedPackage = this.expandedPackage === pkgName ? null : pkgName;
+            this.renderStartMenu();
+          });
+
+          group.appendChild(header);
+
+          if (isExpanded) {
+            const body = document.createElement('div');
+            body.className = 'desktop-start-package-body';
+
+            for (const app of apps) {
+              const button = this.createAppItem(app);
+              button.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showSearchContextMenu(e, app);
+              });
+              button.draggable = true;
+              button.addEventListener('dragstart', (e) => {
+                e.dataTransfer?.setData('text/plain', this.stableId(app));
+                e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+              });
+              body.appendChild(button);
+            }
+            group.appendChild(body);
+          }
+
+          this.startSearchList.appendChild(group);
+        }
+      }
+    } else {
+      // ── Flat mode (default / search active) ──
+      for (const app of matches) {
+        const button = this.createAppItem(app);
+
+        button.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.showSearchContextMenu(e, app);
+        });
+
+        button.draggable = true;
+        button.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('text/plain', this.stableId(app));
+          e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+        });
+
+        this.startSearchList.appendChild(button);
+      }
     }
   }
 

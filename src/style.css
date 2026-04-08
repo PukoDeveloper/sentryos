@@ -663,6 +663,7 @@ body {
 	transform-origin: bottom left;
 	transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 	overflow: hidden;
+	padding-bottom: 12px;
 }
 
 .desktop-start-panel.is-hidden {
@@ -740,7 +741,8 @@ body {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	overflow: auto;
+	flex: 1;
+	min-height: 0;
 }
 
 /* ── Folder pane ── */
@@ -937,7 +939,7 @@ body {
 .desktop-context-menu {
 	position: absolute;
 	min-width: 180px;
-	padding: 6px 0;
+	padding: 6px;
 	border-radius: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.15);
 	background: rgba(12, 18, 28, 0.94);
@@ -945,12 +947,14 @@ body {
 	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 	z-index: 10000;
 	overflow: hidden;
+	pointer-events: auto;
 }
 
 .desktop-context-menu-item {
 	display: block;
 	width: 100%;
 	border: 0;
+	border-radius: 10px;
 	background: transparent;
 	color: #f4f7fb;
 	padding: 9px 16px;
@@ -962,6 +966,20 @@ body {
 
 .desktop-context-menu-item:hover {
 	background: rgba(109, 213, 255, 0.12);
+}
+
+.desktop-context-menu-item--danger {
+	color: #ff5555;
+}
+
+.desktop-context-menu-item--danger:hover {
+	background: rgba(255, 85, 85, 0.12);
+}
+
+.desktop-context-menu-separator {
+	height: 1px;
+	margin: 4px 8px;
+	background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Drag ghost ── */
@@ -1018,6 +1036,74 @@ body {
 
 .desktop-start-item-label {
 	font-size: 14px;
+}
+
+/* ── Package group (start menu grouped mode) ── */
+
+.desktop-start-package-group {
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	/* overflow: hidden; */
+	transition: border-color 0.15s;
+}
+
+.desktop-start-package-group.is-expanded {
+	border-color: rgba(109, 213, 255, 0.25);
+}
+
+.desktop-start-package-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	border: 0;
+	padding: 10px 12px;
+	text-align: left;
+	background: rgba(255, 255, 255, 0.05);
+	color: #f4f7fb;
+	cursor: pointer;
+	transition: background 0.15s;
+	border-radius: 10px;
+}
+
+.desktop-start-package-header:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.desktop-start-package-badge {
+	margin-left: auto;
+	font-size: 11px;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: rgba(109, 213, 255, 0.12);
+	color: #6dd5ff;
+	flex-shrink: 0;
+}
+
+.desktop-start-package-chevron {
+	font-size: 10px;
+	color: rgba(244, 247, 251, 0.4);
+	flex-shrink: 0;
+	width: 14px;
+	text-align: center;
+}
+
+.desktop-start-package-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px 6px 6px 6px;
+}
+
+.desktop-start-package-body .desktop-start-item {
+	border-radius: 8px;
+	padding: 8px 10px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.desktop-start-package-body .desktop-start-item:hover {
+	background: rgba(255, 255, 255, 0.12);
 }
 
 .desktop-watermark {
