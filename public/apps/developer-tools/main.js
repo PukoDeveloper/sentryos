@@ -1,16 +1,6 @@
+import console from "./test.api.js";
+import manifest from "./manifest.json";
 
-OS.writeLine('Developer Tools Process Info:');
+console.log(manifest.version);
 
-const result = OS.listProcesses();
-
-if (result.success) {
-    const processes = result.data;
-    // OS.writeLine(JSON.stringify(processes));
-    for (var i = 0; i < processes.length; i++) {
-        var p = processes[i];
-        OS.writeLine(p.appName);
-    }
-}
-else {
-    OS.writeLine('Failed to list processes: ' + (result.error || 'Unknown error'));
-}
+console.log("Hello world!");

@@ -13,6 +13,7 @@ import type {
     ApiFactory,
     Message,
     RuntimeProcess,
+    ResponseType,
 } from './types';
 
 class ScriptRuntime {
@@ -50,6 +51,7 @@ class ScriptRuntime {
             if (!runtimeProcess.importsInjected) {
                 runtimeProcess.importsInjected = true;
                 const global = runtimeProcess.context.global;
+                this.injectImportCommand(runtimeProcess.context, runtimeProcess); //TIP: 取代imports()載入方法，採用ESModule-like的全域函式實作，提供更靈活的模組載入能力
                 this.injectImportsFunction(runtimeProcess.context, global, runtimeProcess);
                 global.dispose();
             }
@@ -338,6 +340,50 @@ class ScriptRuntime {
 
     // ── imports() 機制 ──────────────────────────────────────
 
+    /** 注入 import 預設模組載入方法 */
+    private injectImportCommand(context: any, runtimeProcess: RuntimeProcess): void {
+        runtimeProcess.runtime.setModuleLoader((moduleName: any) => {
+
+            const throwImportError = (msg: string) => {
+                const err = context.newError(msg);
+                return { error: err };
+            };
+
+            const entryPath = runtimeProcess.entryPath;
+            if (!entryPath) {
+                return throwImportError('imports() is not available in this context');
+            }
+
+            const resolved = this.resolveModulePath(entryPath, moduleName);
+            if ('error' in resolved) {
+                return throwImportError(`imports('${moduleName}'): ${resolved.error}`);
+            }
+            const resolvedPath = resolved.path;
+
+            if (runtimeProcess.moduleCache.has(resolvedPath)) {
+                const cached = runtimeProcess.moduleCache.get(resolvedPath) as any;
+                return cached.dup();
+            }
+
+            // 同步載入檔案
+            const [code, type] = this.syncFetch(resolvedPath);
+            if (code === null) {
+                return throwImportError(`imports('${moduleName}'): module not found at '${resolvedPath}'`);
+            }
+            if (type === 'javascript') {
+                return code;
+            }
+            else if (type === 'json') {
+                return Object.entries(JSON.parse(code)).map(([k, v]: any) => {
+                    return "export const " + k + " = " + JSON.stringify(v) + ";";
+                }).join("\n") + "\nexport default " + code + ";";
+            }
+            else {
+                return "const code = " + JSON.stringify(code) + "; export default code;";
+            }
+        });
+    }
+
     /**
      * 注入 imports() 全域函式，讓應用程式可以載入同一套件中的其他檔案。
      * 使用 CommonJS-like 的 module.exports 慣例。
@@ -379,7 +425,7 @@ class ScriptRuntime {
             }
 
             // 同步載入檔案
-            const code = self.syncFetch(resolvedPath);
+            const [code] = self.syncFetch(resolvedPath);
             if (code === null) {
                 return throwImportError(`imports('${modulePath}'): module not found at '${resolvedPath}'`);
             }
@@ -535,15 +581,23 @@ class ScriptRuntime {
     /**
      * 同步讀取指定路徑的檔案內容（使用 XMLHttpRequest 同步模式）。
      */
-    private syncFetch(path: string): string | null {
+    private syncFetch(path: string): [string, ResponseType] | [null, null] {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', path, false);
             xhr.send();
-            return xhr.status === 200 ? xhr.responseText : null;
+            const typeText = xhr.getResponseHeader('Content-Type') ?? '';
+            const responseType = this.getResponseType(typeText);
+            return xhr.status === 200 ? [xhr.responseText, responseType] : [null, null];
         } catch {
-            return null;
+            return [null, null];
         }
+    }
+
+    private getResponseType(text: string): ResponseType {
+        if (/json/i.test(text)) return 'json';
+        if (/javascript/i.test(text)) return 'javascript';
+        return 'text';
     }
 
     // ── 型別轉換 ────────────────────────────────────────────

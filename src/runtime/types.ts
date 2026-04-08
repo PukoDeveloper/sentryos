@@ -64,6 +64,8 @@ type RuntimeProcess = {
     timerNextId: number;
 };
 
+type ResponseType = 'text' | 'json' | 'javascript';
+
 export type {
     ProcessType,
     RuntimeError,
@@ -75,4 +77,6 @@ export type {
     ApiFactory,
     Message,
     RuntimeProcess,
+    ResponseType,
+
 };
