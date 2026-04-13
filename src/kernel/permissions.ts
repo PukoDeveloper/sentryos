@@ -86,6 +86,7 @@ export const Events = {
   PROCESS_STARTED: 'process.started',
   PROCESS_STOPPED: 'process.stopped',
   NOTIFICATION: 'notification',
+  KEYBOARD: 'keyboard',
 } as const;
 
 // ── User Default Permissions ────────────────────────────────

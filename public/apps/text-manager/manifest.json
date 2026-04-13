@@ -16,9 +16,11 @@
                 "event.emit.window.ui",
                 "env.library.load",
                 "file.read.user",
+                "file.read.app",
                 "file.write.user",
                 "file.delete.user",
                 "file.list.user",
+                "file.cross-app",
                 "notification.send"
             ],
             "maxInstances": 1

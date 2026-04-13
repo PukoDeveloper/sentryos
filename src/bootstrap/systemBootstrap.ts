@@ -208,6 +208,39 @@ async function bootstrapSystem(): Promise<void> {
     }
   });
 
+  // 7.5 Wire keyboard events
+  // 有焦點視窗時 → 直接 dispatch 給該程序的 onKeyboardEvent
+  // 無焦點視窗時 → 透過 EventBus 廣播 keyboard 事件
+  const handleKeyboardEvent = (e: KeyboardEvent) => {
+    // 忽略輸入欄位中的按鍵，避免干擾正常文字輸入
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
+      return;
+    }
+
+    const keyEvent: Record<string, unknown> = {
+      type: e.type,
+      key: e.key,
+      code: e.code,
+      altKey: e.altKey,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      metaKey: e.metaKey,
+      repeat: e.repeat,
+    };
+
+    const focusedProcessAppId = windowManager.getFocusedProcessAppId();
+    if (focusedProcessAppId) {
+      try {
+        runtime.dispatchKeyboardEvent(focusedProcessAppId, keyEvent);
+      } catch { /* process may be gone */ }
+    } else {
+      eventBus.emit(systemAppId, Events.KEYBOARD, keyEvent);
+    }
+  };
+  document.addEventListener('keydown', handleKeyboardEvent);
+  document.addEventListener('keyup', handleKeyboardEvent);
+
   // 8. Boot auto-start apps (Library → Service → Window/Console)
   // 自動啟動由系統發起，使用 systemAppId 繞過使用者權限限制
   const systemAppIdForBoot = kernel.get('systemAppId');

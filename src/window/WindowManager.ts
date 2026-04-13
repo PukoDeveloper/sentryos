@@ -434,6 +434,14 @@ class WindowManager {
         return Array.from(this.processWindows.get(processAppId) ?? []);
     }
 
+    /** 取得目前擁有焦點的視窗所屬 processAppId，若無焦點視窗回傳 null */
+    getFocusedProcessAppId(): string | null {
+        if (!this.focusedWindowId) return null;
+        const descriptor = this.windows.get(this.focusedWindowId);
+        if (!descriptor || descriptor.state === 'closed' || descriptor.state === 'minimized') return null;
+        return descriptor.processAppId;
+    }
+
     showContextMenu(processAppId: string, windowId: string, controlId: string, x: number, y: number, items: ContextMenuEntry[]): WindowSystemResult<string> {
         const descriptor = this.getOwnedWindow(processAppId, windowId);
         if (!descriptor.success) {

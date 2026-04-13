@@ -21,6 +21,8 @@ var state = {
 // 右鍵選單暫存（不在 render state 中，由系統層管理）
 var pendingContextTarget = null;  // { type: 'file'|'folder', entry?, namespace? }
 
+
+
 // ── Helpers ──────────────────────────────────────────────────
 function loadUsage() {
   var result = OS.storageUsage();
@@ -120,7 +122,13 @@ function openWithDefaultApp(entry) {
     OS.notify('無法開啟', '沒有設定 ' + ext + ' 的預設應用程式', 'warning');
     return;
   }
-  var result = OS.launch(handler.data.appDefId);
+  var fileInfo = {
+    key: entry.key,
+    tier: entry.tier || state.currentTier,
+    extension: ext,
+    mimeType: handler.data.mimeType || '',
+  };
+  var result = OS.launch(handler.data.appDefId, fileInfo);
   if (!result.success) {
     OS.notify('啟動失敗', result.error || '未知錯誤', 'error');
   }
@@ -580,35 +588,15 @@ function renderFileList(entries, s, self) {
           }),
         ], { flex: '1', gap: '1px' }),
       ], {
-        onClick: function () {
-          state.selectedEntry = entry;
-          self.rerender();
-        },
         onDblClick: function () {
-          // 嘗試以預設應用程式開啟，否則顯示詳情
-          var ext = getFileExtension(entry.key);
-          if (ext) {
-            var handler = OS.getFileTypeHandler(ext);
-            if (handler.success && handler.data) {
-              OS.launch(handler.data.appDefId);
-              return;
-            }
-          }
-          state.selectedEntry = entry;
-          self.rerender();
+          openWithDefaultApp(entry);
         },
         onContextMenu: function (event) {
           pendingContextTarget = { type: 'file', entry: entry };
           var menuItems = [
+            { id: 'open-default', label: '📂 開啟' },
             { id: 'view', label: '📋 查看詳情' },
           ];
-          var ext = getFileExtension(entry.key);
-          if (ext) {
-            var handlerResult = OS.getFileTypeHandler(ext);
-            if (handlerResult.success && handlerResult.data) {
-              menuItems.push({ id: 'open-default', label: '📂 以預設應用程式開啟' });
-            }
-          }
           if (state.currentTier !== 'sys') {
             menuItems.push({ separator: true });
             menuItems.push({ id: 'delete', label: '🗑 刪除', danger: true });

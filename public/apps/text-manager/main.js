@@ -4,37 +4,44 @@ if (!_loadResult.success) {
 }
 
 // ── State ────────────────────────────────────────────────────
-var PREFIX = 'doc:';
-
 var state = {
   view: 'list',        // 'list' | 'editor'
-  documents: [],       // [{ key, title, updatedAt }]
-  currentKey: null,
-  currentTitle: '',
+  documents: [],       // [{ key, filename, updatedAt }]
+  currentKey: null,    // 目前開啟的儲存 key（即檔名）
+  currentFilename: '', // 編輯中的檔名（含副檔名）
   currentContent: '',
   dirty: false,
 };
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadDocumentList() {
-  var result = OS.listFiles('user:' + PREFIX);
+  var result = OS.listFiles('user:');
   if (!result.success) { state.documents = []; return; }
   state.documents = (result.data || [])
     .map(function (e) {
-      return { key: e.key, title: e.data.title || e.key.slice(PREFIX.length), updatedAt: e.updatedAt };
+      return { key: e.key, filename: e.key, updatedAt: e.updatedAt };
     })
     .sort(function (a, b) { return b.updatedAt - a.updatedAt; });
 }
 
 function saveDocument() {
-  if (!state.currentKey) return;
-  var result = OS.writeFile('user:' + state.currentKey, {
-    title: state.currentTitle,
-    content: state.currentContent,
-  }, { overwrite: true });
+  if (!state.currentFilename) return;
+  var filename = state.currentFilename.trim();
+  if (!filename) {
+    OS.notify('儲存失敗', '檔案名稱不可為空', 'warning');
+    return;
+  }
+
+  // 若檔名變更，先刪除舊檔
+  if (state.currentKey && state.currentKey !== filename) {
+    OS.deleteFile('user:' + state.currentKey);
+  }
+
+  var result = OS.writeFile('user:' + filename, state.currentContent, { overwrite: true });
   if (result.success) {
+    state.currentKey = filename;
     state.dirty = false;
-    OS.notify('已儲存', state.currentTitle, 'success');
+    OS.notify('已儲存', filename, 'success');
   } else {
     OS.notify('儲存失敗', result.error || '未知錯誤', 'error');
   }
@@ -48,9 +55,8 @@ function deleteDocument(key) {
 }
 
 function newDocument() {
-  var id = 'doc_' + Date.now();
-  state.currentKey = PREFIX + id;
-  state.currentTitle = '未命名文件';
+  state.currentKey = null;
+  state.currentFilename = '未命名文件.txt';
   state.currentContent = '';
   state.dirty = true;
   state.view = 'editor';
@@ -63,8 +69,14 @@ function openDocument(key) {
     return;
   }
   state.currentKey = key;
-  state.currentTitle = result.data.data.title || '';
-  state.currentContent = result.data.data.content || '';
+  state.currentFilename = key;
+  // 相容舊格式：若 data 是物件則取 content 欄位，否則直接當字串
+  var raw = result.data.data;
+  if (raw && typeof raw === 'object' && raw.content !== undefined) {
+    state.currentContent = String(raw.content);
+  } else {
+    state.currentContent = raw != null ? String(raw) : '';
+  }
   state.dirty = false;
   state.view = 'editor';
 }
@@ -151,7 +163,7 @@ function renderList(s, self) {
         items.push(
           UI.row([
             UI.column([
-              UI.text(doc.title, { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+              UI.text(doc.filename, { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
               UI.text(formatTime(doc.updatedAt), { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
             ], { flex: '1', gap: '2px' }),
             UI.button('開啟', {
@@ -210,10 +222,10 @@ function renderEditor(s, self) {
       }),
       UI.input({
         id: 'title-input',
-        value: s.currentTitle,
-        placeholder: '文件標題…',
+        value: s.currentFilename,
+        placeholder: '檔案名稱（例如 note.txt）…',
         onChange: function (v) {
-          state.currentTitle = v;
+          state.currentFilename = v;
           state.dirty = true;
           self.patch('save-indicator', { text: '● 未儲存' });
         },
@@ -267,4 +279,39 @@ function renderEditor(s, self) {
       },
     }),
   ], { padding: '18px', flex: '1', gap: '8px' });
+}
+
+// ── onFileOpen callback ─────────────────────────────────────
+// 從檔案管理器以預設程式開啟時觸發
+function onFileOpen(file) {
+  if (!file || !file.key) return;
+  // 從完整 key 中提取檔名（去除命名空間前綴）
+  var filename = file.key;
+  var slashIdx = filename.indexOf('/');
+  if (slashIdx >= 0) filename = filename.slice(slashIdx + 1);
+
+  // 嘗試讀取檔案內容（使用跨應用路徑）
+  var path = file.tier + ':@' + file.key;
+  var result = OS.readFile(path);
+  if (!result.success) {
+    // 若跨應用路徑失敗，嘗試直接路徑
+    result = OS.readFile(file.tier + ':' + filename);
+  }
+
+  var content = '';
+  if (result.success && result.data) {
+    var raw = result.data.data;
+    if (raw && typeof raw === 'object' && raw.content !== undefined) {
+      content = String(raw.content);
+    } else {
+      content = raw != null ? String(raw) : '';
+    }
+  }
+
+  state.currentKey = null; // 外部檔案，不繫結 key
+  state.currentFilename = filename;
+  state.currentContent = content;
+  state.dirty = false;
+  state.view = 'editor';
+  app.rerender();
 }

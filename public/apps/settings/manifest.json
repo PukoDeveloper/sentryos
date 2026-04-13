@@ -19,7 +19,9 @@
                 "settings.write",
                 "notification.send",
                 "network.status",
-                "network.manage"
+                "network.manage",
+                "registry.read",
+                "registry.write"
             ],
             "maxInstances": 1
         }
