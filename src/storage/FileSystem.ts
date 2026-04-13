@@ -52,6 +52,8 @@ type StorageGuardResult =
 interface WriteOptions {
 	metadata?: Record<string, string | number | boolean | null>;
 	overwrite?: boolean;
+	/** 若提供，寫入時以此作為 ownerAppId（用於顯示穩定的擁有者識別） */
+	ownerLabel?: string;
 }
 
 interface FileSystemAdapter {
@@ -178,7 +180,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		const nextEntry: StorageEntry<TData> = {
 			key,
 			tier,
-			ownerAppId: existingEntry?.ownerAppId ?? appId,
+			ownerAppId: existingEntry?.ownerAppId ?? options.ownerLabel ?? appId,
 			data: cloneStorageData(data),
 			createdAt: existingEntry?.createdAt ?? now,
 			updatedAt: now,

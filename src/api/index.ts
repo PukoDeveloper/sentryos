@@ -10,6 +10,7 @@ import { registerMonitorApi } from './monitorApi';
 import { registerSettingsApi } from './settingsApi';
 import { registerNetworkApi } from './networkApi';
 import { registerRegistryApi } from './registryApi';
+import { registerDialogApi } from './dialogApi';
 
 export function registerAllHostApis(kernel: Kernel): void {
   registerUiApi(kernel);
@@ -23,4 +24,5 @@ export function registerAllHostApis(kernel: Kernel): void {
   registerSettingsApi(kernel);
   registerNetworkApi(kernel);
   registerRegistryApi(kernel);
+  registerDialogApi(kernel);
 }

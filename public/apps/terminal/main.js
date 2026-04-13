@@ -4,6 +4,10 @@ OS.writeLine('=== SentryOS Terminal ===');
 OS.writeLine('Type "help" for available commands.');
 OS.writeLine('');
 
+function onKeyboardEvent(e) {
+    OS.writeLine('Key event: ' + e.type + ' - ' + e.key);
+}
+
 function padRight(s, len) {
     s = String(s);
     while (s.length < len) s += ' ';

@@ -5,6 +5,7 @@
     "app/task-manager",
     "app/text-manager",
     "app/file-manager",
+    "app/file-picker",
     "app/utilities",
     "app/settings",
     "app/developer-tools"

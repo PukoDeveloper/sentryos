@@ -9,6 +9,8 @@ export interface LaunchContext {
   type: AppType;
   /** 發起啟動請求的權限實體。省略時使用 userAppId（使用者發起）。 */
   callerAppId?: string;
+  /** 啟動時傳入的檔案資訊，若存在則在腳本執行後以 onFileOpen 回呼傳遞。 */
+  fileArgs?: Record<string, unknown>;
 }
 
 export class ApplicationLauncher {
@@ -82,8 +84,19 @@ export class ApplicationLauncher {
     }
   }
 
+  /** 向已執行中的 app 派發 onFileOpen 回呼 */
+  private dispatchFileOpenToApp(appDefId: string, fileArgs: Record<string, unknown>): void {
+    const processes = this.processManager.getByApp(appDefId);
+    for (const proc of processes) {
+      if (proc.status === 'running') {
+        this.runtime.dispatchFileOpen(proc.processAppId, fileArgs);
+        return;
+      }
+    }
+  }
+
   async launchApplication(context: LaunchContext): Promise<void> {
-    const { app, type, callerAppId } = context;
+    const { app, type, callerAppId, fileArgs } = context;
     const caller = callerAppId ?? this.userAppId;
     if (!app.appId) {
       return;
@@ -93,6 +106,10 @@ export class ApplicationLauncher {
     if (!launch.success || typeof launch.data !== 'number') {
       if (launch.error === 'MaxInstancesReached') {
         this.focusExistingInstance(app.appId);
+        // Dispatch file-open to existing instance if fileArgs provided
+        if (fileArgs) {
+          this.dispatchFileOpenToApp(app.appId, fileArgs);
+        }
       } else if (launch.error === 'PermissionDenied') {
         bios.log('PROC', 'ERROR', `Failed to launch ${app.name}: ${launch.error}`);
         this.systemAlert.show({ code: 'PERMISSION_DENIED', detail: `無法啟動「${app.name}」` });
@@ -179,6 +196,11 @@ export class ApplicationLauncher {
       const errorDetail = this.formatError(executed.data ?? executed.error);
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
       return;
+    }
+
+    // Dispatch file-open callback if launched with file arguments
+    if (fileArgs) {
+      this.runtime.dispatchFileOpen(proc.processAppId, fileArgs);
     }
 
     // Emit lifecycle event

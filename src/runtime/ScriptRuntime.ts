@@ -19,7 +19,7 @@ import type {
 class ScriptRuntime {
     private readonly kernel: Kernel;
     private readonly processRuntimes: Map<number, RuntimeProcess> = new Map();
-    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[] }> = new Map();
+    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[]; group?: string }> = new Map();
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
@@ -31,8 +31,8 @@ class ScriptRuntime {
     private get permissions() { return this.kernel.resolve('permissions'); }
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
-    registerApi(name: string, factory: ApiFactory, gates: string[] = []): void {
-        this.apiEntries.set(name, { factory, gates });
+    registerApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
+        this.apiEntries.set(name, { factory, gates, group });
     }
 
     unregisterApi(name: string): boolean {
@@ -146,6 +146,39 @@ class ScriptRuntime {
             if (proc && proc.processAppId === processAppId && proc.status === 'running') {
                 const escaped = JSON.stringify(line);
                 return this.execute(pid, `if(typeof onConsoleInput==='function'){onConsoleInput(${escaped})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+            }
+        }
+        return { success: false, error: 'ProcessNotFound' };
+    }
+
+    dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
+        for (const [pid] of this.processRuntimes) {
+            const proc = this.getProcess(pid);
+            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
+                const payload = JSON.stringify(event);
+                return this.execute(pid, `if(typeof onKeyboardEvent==='function'){onKeyboardEvent(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+            }
+        }
+        return { success: false, error: 'ProcessNotFound' };
+    }
+
+    dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown> {
+        for (const [pid] of this.processRuntimes) {
+            const proc = this.getProcess(pid);
+            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
+                const payload = JSON.stringify(fileInfo);
+                return this.execute(pid, `if(typeof onFileOpen==='function'){onFileOpen(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+            }
+        }
+        return { success: false, error: 'ProcessNotFound' };
+    }
+
+    dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown> {
+        for (const [pid] of this.processRuntimes) {
+            const proc = this.getProcess(pid);
+            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
+                const payload = JSON.stringify(result);
+                return this.execute(pid, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
             }
         }
         return { success: false, error: 'ProcessNotFound' };
@@ -305,12 +338,18 @@ class ScriptRuntime {
         };
         const merged: Record<string, HostApiValue> = {};
 
-        for (const [name, { factory, gates }] of this.apiEntries) {
+        for (const [name, { factory, gates, group }] of this.apiEntries) {
             if (gates.length > 0 && !gates.some(g => this.permissions.hasAnyUnder(process.processAppId, g))) {
                 continue;
             }
             const wrapped = this.wrapApiObject(name, factory(ctx), process);
-            Object.assign(merged, wrapped);
+            if (group) {
+                const existing = (merged[group] ?? {}) as Record<string, HostApiValue>;
+                Object.assign(existing, wrapped);
+                merged[group] = existing;
+            } else {
+                Object.assign(merged, wrapped);
+            }
         }
 
         return merged;
@@ -738,14 +777,22 @@ class ScriptRuntime {
         }
 
         const targetRuntime = this.ensureRuntimeProcess(targetProc);
-        targetRuntime.inbox.push({
+        const message: Message = {
             fromPid,
             toPid,
             type: 'ipc',
             channel,
             payload,
             timestamp: Date.now()
-        });
+        };
+        targetRuntime.inbox.push(message);
+
+        // 自動呼叫目標程序的 onMessage 回呼（若存在）
+        try {
+            const safeMsg = JSON.stringify({ fromPid: message.fromPid, channel: message.channel, payload: message.payload, timestamp: message.timestamp });
+            this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+        } catch { /* target context may be gone */ }
+
         return { success: true, data: true };
     }
 

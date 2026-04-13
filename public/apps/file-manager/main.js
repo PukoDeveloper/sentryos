@@ -16,10 +16,14 @@ var state = {
   createMode: null,          // 'folder' | 'file' | null
   createName: '',            // 新增項目的名稱
   createContent: '',         // 新增檔案的內容
+  renameEntry: null,         // 正在重新命名的檔案
+  renameName: '',            // 新檔名
 };
 
 // 右鍵選單暫存（不在 render state 中，由系統層管理）
 var pendingContextTarget = null;  // { type: 'file'|'folder', entry?, namespace? }
+
+
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadUsage() {
@@ -52,7 +56,19 @@ function loadEntries() {
 }
 
 function getFilteredEntries() {
-  if (state.currentTier === 'sys' || !state.currentNamespace) {
+  if (state.currentTier === 'sys' || state.currentTier === 'user') {
+    if (!state.currentNamespace) {
+      // 總覽：顯示頂層檔案（沒有 / 的 key）
+      return state.entries.filter(function (e) {
+        return e.key.indexOf('/') < 0;
+      });
+    }
+    var prefix = state.currentNamespace + '/';
+    return state.entries.filter(function (e) {
+      return e.key.indexOf(prefix) === 0;
+    });
+  }
+  if (!state.currentNamespace) {
     return state.entries;
   }
   var prefix = state.currentNamespace + '/';
@@ -62,7 +78,10 @@ function getFilteredEntries() {
 }
 
 function getDisplayKey(entry) {
-  if (state.currentTier === 'sys') return entry.key;
+  if (state.currentTier === 'sys' || state.currentTier === 'user') {
+    var slashIdx = entry.key.lastIndexOf('/');
+    return slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
+  }
   var slashIdx = entry.key.indexOf('/');
   return slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
 }
@@ -86,15 +105,21 @@ function deleteEntry(entry) {
     OS.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
     return;
   }
-  // 使用跨應用路徑刪除
-  var ns = '';
-  var slashIdx = entry.key.indexOf('/');
-  if (slashIdx > 0) {
-    ns = entry.key.slice(0, slashIdx);
-  }
-  var filename = slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
   var tier = state.currentTier;
-  var path = tier + ':@' + ns + '/' + filename;
+  var path;
+  if (tier === 'user') {
+    // user 層是共享空間，直接使用 key
+    path = 'user:' + entry.key;
+  } else {
+    // 使用跨應用路徑刪除
+    var ns = '';
+    var slashIdx = entry.key.indexOf('/');
+    if (slashIdx > 0) {
+      ns = entry.key.slice(0, slashIdx);
+    }
+    var filename = slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
+    path = tier + ':@' + ns + '/' + filename;
+  }
   var result = OS.deleteFile(path);
   if (result.success) {
     OS.notify('已刪除', entry.key, 'info');
@@ -109,6 +134,61 @@ function getFileExtension(key) {
   return key.slice(dotIdx).toLowerCase();
 }
 
+function renameEntry(entry, newName) {
+  newName = (newName || '').trim();
+  if (!newName) {
+    OS.notify('重新命名失敗', '請輸入新名稱', 'warning');
+    return false;
+  }
+  if (state.currentTier === 'sys') {
+    OS.notify('無法重新命名', '系統層檔案不可從此處重新命名', 'warning');
+    return false;
+  }
+  var tier = state.currentTier;
+  var oldPath, newPath;
+
+  if (tier === 'user') {
+    // user 層是共享空間，直接使用 key
+    var folderPrefix = '';
+    var lastSlash = entry.key.lastIndexOf('/');
+    if (lastSlash >= 0) folderPrefix = entry.key.slice(0, lastSlash + 1);
+    oldPath = 'user:' + entry.key;
+    newPath = 'user:' + folderPrefix + newName;
+  } else {
+    // 解析命名空間與舊檔名
+    var ns = '';
+    var slashIdx = entry.key.indexOf('/');
+    if (slashIdx > 0) {
+      ns = entry.key.slice(0, slashIdx);
+    }
+    oldPath = tier + ':@' + (ns ? ns + '/' : '') + (slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key);
+    newPath = tier + ':@' + (ns ? ns + '/' : '') + newName;
+  }
+
+  // 讀取舊檔案內容
+  var readResult = OS.readFile(oldPath);
+  if (!readResult.success) {
+    OS.notify('重新命名失敗', '無法讀取原始檔案: ' + (readResult.error || '未知錯誤'), 'error');
+    return false;
+  }
+
+  // 寫入新檔案
+  var writeResult = OS.writeFile(newPath, readResult.data.data, { overwrite: false });
+  if (!writeResult.success) {
+    if (writeResult.error === 'AlreadyExists') {
+      OS.notify('重新命名失敗', '「' + newName + '」已存在', 'warning');
+    } else {
+      OS.notify('重新命名失敗', writeResult.error || '未知錯誤', 'error');
+    }
+    return false;
+  }
+
+  // 刪除舊檔案
+  OS.deleteFile(oldPath);
+  OS.notify('已重新命名', entry.key + ' → ' + newName, 'info');
+  return true;
+}
+
 function openWithDefaultApp(entry) {
   var ext = getFileExtension(entry.key);
   if (!ext) {
@@ -120,7 +200,13 @@ function openWithDefaultApp(entry) {
     OS.notify('無法開啟', '沒有設定 ' + ext + ' 的預設應用程式', 'warning');
     return;
   }
-  var result = OS.launch(handler.data.appDefId);
+  var fileInfo = {
+    key: entry.key,
+    tier: entry.tier || state.currentTier,
+    extension: ext,
+    mimeType: handler.data.mimeType || '',
+  };
+  var result = OS.launch(handler.data.appDefId, fileInfo);
   if (!result.success) {
     OS.notify('啟動失敗', result.error || '未知錯誤', 'error');
   }
@@ -153,8 +239,8 @@ function createFolder(name) {
     OS.notify('建立失敗', '請輸入資料夾名稱', 'warning');
     return false;
   }
-  // 使用跨應用路徑建立獨立命名空間
-  var path = 'user:@' + name + '/.folder';
+  // user 層是共享空間，資料夾即前綴路徑
+  var path = 'user:' + name + '/.folder';
   var result = OS.writeFile(path, null, { overwrite: false });
   if (!result.success) {
     if (result.error === 'AlreadyExists') {
@@ -177,10 +263,10 @@ function createFile(name, content) {
   var ns = state.currentNamespace;
   var path;
   if (ns) {
-    // 在目前命名空間下建立
-    path = 'user:@' + ns + '/' + name;
+    // 在目前資料夾下建立
+    path = 'user:' + ns + '/' + name;
   } else {
-    // 沒有選擇命名空間，建立在自己的命名空間
+    // 頂層建立
     path = 'user:' + name;
   }
   var data = content || '';
@@ -293,6 +379,10 @@ function renderMain(s, self) {
 
   if (s.createMode) {
     children.push(renderCreateForm(s, self));
+  }
+
+  if (s.renameEntry) {
+    children.push(renderRenameForm(s, self));
   }
 
   children.push(s.selectedEntry ? renderDetail(s, self) : renderContent(s, self));
@@ -412,6 +502,27 @@ function renderContent(s, self) {
     return renderFileList(s.entries, s, self);
   }
 
+  // user 層：共享空間，顯示資料夾 + 頂層檔案
+  if (s.currentTier === 'user') {
+    if (!s.currentNamespace) {
+      var topLevelFiles = getFilteredEntries();
+      var children = [];
+      if (s.namespaces.length > 0) {
+        children.push(renderNamespaceList(s, self));
+      }
+      if (topLevelFiles.length > 0) {
+        children.push(renderFileList(topLevelFiles, s, self));
+      }
+      if (children.length === 0) {
+        return UI.text('此層級沒有任何檔案。', {
+          fontSize: '13px', color: 'rgba(216,232,255,0.4)', padding: '20px 0', textAlign: 'center',
+        });
+      }
+      return UI.column(children, { gap: '4px' });
+    }
+    return renderFileList(getFilteredEntries(), s, self);
+  }
+
   // 未選擇命名空間 → 顯示命名空間清單
   if (!s.currentNamespace) {
     return renderNamespaceList(s, self);
@@ -508,6 +619,61 @@ function renderCreateForm(s, self) {
   });
 }
 
+function renderRenameForm(s, self) {
+  var entry = s.renameEntry;
+  var displayKey = getDisplayKey(entry);
+
+  return UI.column([
+    UI.row([
+      UI.text('✏️ 重新命名「' + displayKey + '」', { fontSize: '13px', fontWeight: 'bold', color: '#67b8ff' }),
+      UI.button('✕', {
+        onClick: function () {
+          state.renameEntry = null;
+          state.renameName = '';
+          self.rerender();
+        },
+        style: { padding: '2px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(255,255,255,0.06)', color: 'rgba(216,232,255,0.5)' },
+      }),
+    ], { alignItems: 'center', justifyContent: 'space-between' }),
+    UI.row([
+      UI.text('新名稱：', { fontSize: '12px', color: 'rgba(216,232,255,0.6)', minWidth: '55px' }),
+      UI.input({
+        value: s.renameName,
+        placeholder: '輸入新檔案名稱',
+        style: inputStyle,
+        onChange: function (val) { state.renameName = val; },
+      }),
+      UI.button('確定', {
+        onClick: function () {
+          var ok = renameEntry(entry, state.renameName);
+          if (ok) {
+            state.renameEntry = null;
+            state.renameName = '';
+            loadEntries();
+            loadUsage();
+          }
+          self.rerender();
+        },
+        style: createBtn,
+      }),
+      UI.button('取消', {
+        onClick: function () {
+          state.renameEntry = null;
+          state.renameName = '';
+          self.rerender();
+        },
+        style: btnSmall,
+      }),
+    ], { alignItems: 'center', gap: '6px' }),
+  ], {
+    gap: '6px',
+    padding: '12px',
+    borderRadius: '8px',
+    background: 'rgba(103,184,255,0.04)',
+    border: '1px solid rgba(103,184,255,0.12)',
+  });
+}
+
 function renderNamespaceList(s, self) {
   if (s.namespaces.length === 0) {
     return UI.text('此層級沒有任何檔案。', {
@@ -580,36 +746,17 @@ function renderFileList(entries, s, self) {
           }),
         ], { flex: '1', gap: '1px' }),
       ], {
-        onClick: function () {
-          state.selectedEntry = entry;
-          self.rerender();
-        },
         onDblClick: function () {
-          // 嘗試以預設應用程式開啟，否則顯示詳情
-          var ext = getFileExtension(entry.key);
-          if (ext) {
-            var handler = OS.getFileTypeHandler(ext);
-            if (handler.success && handler.data) {
-              OS.launch(handler.data.appDefId);
-              return;
-            }
-          }
-          state.selectedEntry = entry;
-          self.rerender();
+          openWithDefaultApp(entry);
         },
         onContextMenu: function (event) {
           pendingContextTarget = { type: 'file', entry: entry };
           var menuItems = [
+            { id: 'open-default', label: '📂 開啟' },
             { id: 'view', label: '📋 查看詳情' },
           ];
-          var ext = getFileExtension(entry.key);
-          if (ext) {
-            var handlerResult = OS.getFileTypeHandler(ext);
-            if (handlerResult.success && handlerResult.data) {
-              menuItems.push({ id: 'open-default', label: '📂 以預設應用程式開啟' });
-            }
-          }
           if (state.currentTier !== 'sys') {
+            menuItems.push({ id: 'rename', label: '✏️ 重新命名' });
             menuItems.push({ separator: true });
             menuItems.push({ id: 'delete', label: '🗑 刪除', danger: true });
           }
@@ -748,6 +895,12 @@ function handleContextMenuAction(actionId, target) {
       app.rerender();
     } else if (actionId === 'open-default') {
       openWithDefaultApp(target.entry);
+    } else if (actionId === 'rename') {
+      var oldKey = target.entry.key;
+      var slashIdx = oldKey.indexOf('/');
+      state.renameEntry = target.entry;
+      state.renameName = slashIdx > 0 ? oldKey.slice(slashIdx + 1) : oldKey;
+      app.rerender();
     } else if (actionId === 'delete') {
       deleteEntry(target.entry);
       loadEntries();

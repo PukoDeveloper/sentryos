@@ -16,6 +16,7 @@ import type { KernelConsole } from '../console/KernelConsole';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
 import type { NetworkAdapter } from '../network/NetworkAdapter';
 import type { SystemRegistry } from '../registry/SystemRegistry';
+import type { DialogManager } from '../dialog/DialogManager';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -34,6 +35,7 @@ export interface ServiceMap {
   kernelConsole: KernelConsole;
   networkManager: NetworkAdapter;
   systemRegistry: SystemRegistry;
+  dialogManager: DialogManager;
 }
 
 export interface ValueMap {

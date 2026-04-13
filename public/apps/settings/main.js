@@ -1,4 +1,4 @@
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+﻿var _loadResult = OS.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -231,6 +231,7 @@ var pages = [
   { id: 'appearance', label: '🎨  外觀' },
   { id: 'notifications', label: '🔔  通知' },
   { id: 'apps', label: '📦  應用程式' },
+  { id: 'defaults', label: '📂  預設程式' },
   { id: 'storage', label: '💾  儲存空間' },
   { id: 'network', label: '🌐  網路' },
   { id: 'security', label: '🔒  安全性' },
@@ -254,6 +255,7 @@ function renderHomePage(self) {
       quickNavBtn('🎨', '外觀', 'appearance', self),
       quickNavBtn('🔔', '通知', 'notifications', self),
       quickNavBtn('📦', '應用程式', 'apps', self),
+      quickNavBtn('📂', '預設程式', 'defaults', self),
       quickNavBtn('💾', '儲存空間', 'storage', self),
       quickNavBtn('🔒', '安全性', 'security', self),
       quickNavBtn('ℹ️', '關於', 'about', self),
@@ -870,6 +872,130 @@ function infoRow(label, value) {
   ], infoRowStyle);
 }
 
+// ── 預設程式頁面 ─────────────────────────────────────────────
+var defaultsNewExt = '';
+var defaultsNewApp = '';
+
+function renderDefaultsPage(self) {
+  // 取得所有檔案類型關聯（陣列 [{ extension, appDefId, mimeType }]）
+  var handlersResult = OS.getAllFileTypeHandlers();
+  var handlers = (handlersResult.success && handlersResult.data) ? handlersResult.data : [];
+  // 過濾掉空的 appDefId
+  handlers = handlers.filter(function (h) { return h.appDefId; });
+  handlers.sort(function (a, b) { return a.extension.localeCompare(b.extension); });
+
+  // 取得所有可選應用程式（僅 Window / Console 類型）
+  var appsResult = OS.getApps();
+  var allApps = (appsResult.success && appsResult.data) ? appsResult.data : [];
+  var launchableApps = allApps.filter(function (a) { return a.runtimeType === 'Window' || a.runtimeType === 'Console'; });
+
+  // 建立 appId → name 映射
+  var appNameMap = {};
+  for (var i = 0; i < launchableApps.length; i++) {
+    appNameMap[launchableApps[i].appId] = launchableApps[i].name;
+  }
+
+  // 現有關聯列表
+  var handlerItems = [];
+  for (var idx = 0; idx < handlers.length; idx++) {
+    (function (h) {
+      var appName = appNameMap[h.appDefId] || h.appDefId;
+      handlerItems.push(UI.card([
+        UI.row([
+          UI.column([
+            UI.text(h.extension, { fontSize: '14px', fontWeight: 'bold', color: '#67b8ff', fontFamily: 'monospace' }),
+            UI.text(appName + (h.mimeType ? ' (' + h.mimeType + ')' : ''), { fontSize: '12px', color: 'rgba(216,232,255,0.5)' }),
+          ], { flex: '1', gap: '2px' }),
+          UI.button('移除', {
+            onClick: function () {
+              OS.removeFileTypeHandler(h.extension);
+              self.rerender();
+            },
+            style: {
+              padding: '4px 12px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              flexShrink: '0',
+              background: 'rgba(255,85,85,0.12)',
+              color: '#ff5555',
+              border: '1px solid rgba(255,85,85,0.2)',
+            },
+          }),
+        ], itemCardStyle),
+      ]));
+    })(handlers[idx]);
+  }
+
+  // 應用程式下拉選項
+  var appOptions = launchableApps.map(function (a) {
+    return { label: a.name, value: a.appId };
+  });
+
+  return UI.column([
+    UI.heading('預設程式', { color: '#ecf4ff' }),
+    UI.text('設定各類檔案的預設開啟應用程式', { fontSize: '13px', color: 'rgba(216,232,255,0.45)' }),
+
+    UI.box([], { height: '8px' }),
+
+    // ── 新增關聯 ──
+    UI.card([
+      UI.column([
+        UI.text('新增檔案類型關聯', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+        UI.text('輸入副檔名（含點號，例如 .txt）並選擇對應的應用程式', { fontSize: '12px', color: 'rgba(216,232,255,0.4)', marginBottom: '8px' }),
+        UI.row([
+          UI.input({
+            value: defaultsNewExt,
+            placeholder: '.txt',
+            onChange: function (v) { defaultsNewExt = v; },
+            style: { width: '100px', fontSize: '12px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: '#d8e8ff', border: '1px solid rgba(255,255,255,0.1)', fontFamily: 'monospace' },
+          }),
+          UI.select({
+            value: defaultsNewApp,
+            options: appOptions,
+            placeholder: '選擇應用程式',
+            onChange: function (v) { defaultsNewApp = v; },
+            style: { flex: '1', fontSize: '12px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: '#d8e8ff', border: '1px solid rgba(255,255,255,0.1)' },
+          }),
+          UI.button('新增', {
+            onClick: function () {
+              var ext = defaultsNewExt.trim().toLowerCase();
+              if (!ext || ext.indexOf('.') !== 0) {
+                OS.notify('格式錯誤', '副檔名需以 . 開頭，例如 .txt', 'warning');
+                return;
+              }
+              if (!defaultsNewApp) {
+                OS.notify('請選擇應用程式', '請從下拉選單中選擇一個應用程式', 'warning');
+                return;
+              }
+              OS.setFileTypeHandler(ext, defaultsNewApp);
+              OS.notify('已設定', ext + ' 將使用所選應用程式開啟', 'success');
+              defaultsNewExt = '';
+              defaultsNewApp = '';
+              self.rerender();
+            },
+            style: {
+              padding: '8px 18px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              flexShrink: '0',
+              background: 'linear-gradient(135deg, #4a7fff, #67b8ff)',
+              color: '#05101c',
+            },
+          }),
+        ], { gap: '6px', width: '100%' }),
+      ], { gap: '6px', width: '100%' }),
+    ]),
+
+    // ── 已設定的關聯 ──
+    UI.text('已設定的檔案類型關聯', sectionTitle),
+    handlers.length === 0
+      ? UI.text('尚未設定任何檔案類型關聯', { fontSize: '12px', color: 'rgba(216,232,255,0.35)', fontStyle: 'italic', padding: '10px 0' })
+      : UI.column(handlerItems, { gap: '4px', overflow: 'auto', flex: '1' }),
+
+  ], { gap: '8px', flex: '1' });
+}
+
 // ── 儲存空間頁面（預留）──────────────────────────────────────
 function renderStoragePage(self) {
   return UI.column([
@@ -1178,6 +1304,7 @@ var app = UI.createApp({
       case 'appearance': content = renderAppearancePage(self); break;
       case 'notifications': content = renderNotificationsPage(self); break;
       case 'apps': content = renderAppsPage(self); break;
+      case 'defaults': content = renderDefaultsPage(self); break;
       case 'storage': content = renderStoragePage(self); break;
       case 'network': content = renderNetworkPage(self); break;
       case 'security': content = renderSecurityPage(self); break;

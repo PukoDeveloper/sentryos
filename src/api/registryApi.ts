@@ -70,6 +70,17 @@ export function registerRegistryApi(kernel: Kernel): void {
       return { success: true, data: null };
     },
 
+    /** 移除副檔名的檔案類型關聯（需寫入權限） */
+    removeFileTypeHandler: (extension: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.REGISTRY_WRITE)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof extension !== 'string') return { success: false, error: 'InvalidArgument' };
+      const removed = registry.removeFileTypeHandler(extension);
+      if (removed) registry.persist();
+      return { success: true, data: removed };
+    },
+
     /** 取得完整註冊表快照 */
     getSnapshot: () => {
       if (!permissions.has(process.processAppId, Permissions.REGISTRY_READ)) {

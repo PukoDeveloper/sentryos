@@ -62,7 +62,7 @@ export function registerShellApi(kernel: Kernel): void {
         })),
       };
     },
-    launch: (appDefId: unknown) => {
+    launch: (appDefId: unknown, fileArgs?: unknown) => {
       if (!permissions.has(process.processAppId, Permissions.SHELL_LAUNCH)) {
         return { success: false, error: 'PermissionDenied' };
       }
@@ -71,10 +71,13 @@ export function registerShellApi(kernel: Kernel): void {
       if (!app) return { success: false, error: 'AppNotFound' };
       if (app.runtimeType === 'Library') return { success: false, error: 'CannotLaunchLibrary' };
       // Fire-and-forget launch (async)
+      const fArgs = (fileArgs && typeof fileArgs === 'object' && !Array.isArray(fileArgs))
+        ? fileArgs as Record<string, unknown>
+        : undefined;
       if (app.appId === BUILTIN_KERNEL_CONSOLE) {
         launcher.launchKernelConsole(BUILTIN_KERNEL_CONSOLE, app.name, app.icon);
       } else {
-        launcher.launchApplication({ app, type: app.runtimeType });
+        launcher.launchApplication({ app, type: app.runtimeType, fileArgs: fArgs });
       }
       return { success: true, data: app.name };
     },

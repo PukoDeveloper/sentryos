@@ -51,14 +51,16 @@ function resolvePath(path: string, appId: string): ResolvedPath {
     }
   }
 
-  // 3. 建立最終 key（sys 層是全域的，不加命名空間前綴）
-  const key = tier === 'sys' ? remaining : `${namespace}/${remaining}`;
+  // 3. 建立最終 key（sys / user 層是全域共享的，不加命名空間前綴）
+  const key = (tier === 'sys' || tier === 'user')
+    ? (crossApp ? `${namespace}/${remaining}` : remaining)
+    : `${namespace}/${remaining}`;
 
   return { tier, key, crossApp, namespace };
 }
 
 function stripNamespaceFromKey(key: string, namespace: string, tier: StorageTier): string {
-  if (tier === 'sys') return key;
+  if (tier === 'sys' || tier === 'user') return key;
   const prefix = namespace + '/';
   return key.startsWith(prefix) ? key.slice(prefix.length) : key;
 }
@@ -80,7 +82,7 @@ export function registerStorageApi(kernel: Kernel): void {
     const storageId = resolveStorageId(process.appDefId);  // 儲存命名空間用
 
     function checkCrossApp(resolved: ResolvedPath): string | null {
-      if (resolved.crossApp && !permissions.has(appId, Permissions.FILE_CROSS_APP)) {
+      if (resolved.crossApp && resolved.tier !== 'user' && !permissions.has(appId, Permissions.FILE_CROSS_APP)) {
         return 'PermissionDenied';
       }
       return null;
@@ -107,7 +109,7 @@ export function registerStorageApi(kernel: Kernel): void {
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
-        const result = fileSystem.write(appId, resolved.tier, resolved.key, data as any, options);
+        const result = fileSystem.write(appId, resolved.tier, resolved.key, data as any, { ...options, ownerLabel: storageId });
         if (result.success && result.data) {
           result.data = {
             ...result.data,
