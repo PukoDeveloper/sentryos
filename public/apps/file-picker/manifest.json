@@ -1,30 +1,28 @@
 {
-    "name": "Text Manager",
+    "name": "File Picker",
     "version": "1.0.0",
-    "description": "A simple text document manager for SentryOS.",
+    "description": "System file/folder picker dialog.",
     "author": "SentryOS Team",
     "apps": [
         {
-            "id": "text-manager-app",
-            "name": "文字編輯器",
+            "id": "file-picker-app",
+            "name": "File Picker",
             "main": "main.js",
             "type": "Window",
-            "icon": "icon.svg",
+            "icon": "📂",
             "permissions": [
                 "window.create",
                 "event.subscribe.window.ui",
                 "event.emit.window.ui",
                 "env.library.load",
                 "file.read.user",
-                "file.read.app",
-                "file.write.user",
-                "file.delete.user",
                 "file.list.user",
-                "file.cross-app",
+                "file.list-all",
                 "notification.send",
-                "dialog.open"
+                "dialog.resolve"
             ],
-            "maxInstances": 1
+            "maxInstances": 4,
+            "hidden": true
         }
     ]
 }

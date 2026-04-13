@@ -173,6 +173,17 @@ class ScriptRuntime {
         return { success: false, error: 'ProcessNotFound' };
     }
 
+    dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown> {
+        for (const [pid] of this.processRuntimes) {
+            const proc = this.getProcess(pid);
+            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
+                const payload = JSON.stringify(result);
+                return this.execute(pid, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+            }
+        }
+        return { success: false, error: 'ProcessNotFound' };
+    }
+
     // ── 內建 API 註冊 ──────────────────────────────────────
 
     private registerBuiltinApis(): void {

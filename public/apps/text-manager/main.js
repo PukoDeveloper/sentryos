@@ -5,8 +5,7 @@ if (!_loadResult.success) {
 
 // ── State ────────────────────────────────────────────────────
 var state = {
-  view: 'list',        // 'list' | 'editor'
-  documents: [],       // [{ key, filename, updatedAt }]
+  view: 'welcome',     // 'welcome' | 'editor'
   currentKey: null,    // 目前開啟的儲存 key（即檔名）
   currentFilename: '', // 編輯中的檔名（含副檔名）
   currentContent: '',
@@ -14,15 +13,6 @@ var state = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────
-function loadDocumentList() {
-  var result = OS.listFiles('user:');
-  if (!result.success) { state.documents = []; return; }
-  state.documents = (result.data || [])
-    .map(function (e) {
-      return { key: e.key, filename: e.key, updatedAt: e.updatedAt };
-    })
-    .sort(function (a, b) { return b.updatedAt - a.updatedAt; });
-}
 
 function saveDocument() {
   if (!state.currentFilename) return;
@@ -63,6 +53,14 @@ function newDocument() {
   state.currentContent = '';
   state.dirty = true;
   state.view = 'editor';
+}
+
+function openFilePicker() {
+  OS.dialog.pickFile({
+    mode: 'file',
+    extensions: ['.txt', '.md', '.json', '.js', '.css', '.html', '.xml', '.csv', '.log'],
+    title: '開啟檔案',
+  });
 }
 
 function openDocument(key) {
@@ -128,7 +126,7 @@ var ghostBtn = {
 
 // ── Render ───────────────────────────────────────────────────
 var app = UI.createApp({
-  title: '文字管理器',
+  title: '文字編輯器',
   width: 660,
   height: 580,
   resizable: true,
@@ -143,145 +141,138 @@ var app = UI.createApp({
     if (s.view === 'editor') {
       return renderEditor(s, self);
     }
-    loadDocumentList();
-    return renderList(s, self);
+    return renderWelcome(s, self);
   },
 });
 
-function renderList(s, self) {
-  var items = [];
+function renderNavBar(s, self) {
+  return UI.row([
+    UI.button('📄 新增檔案', {
+      onClick: function () {
+        newDocument();
+        self.rerender();
+      },
+      style: ghostBtn,
+    }),
+    UI.button('📂 開啟檔案', {
+      onClick: function () {
+        openFilePicker();
+      },
+      style: ghostBtn,
+    }),
+  ], {
+    gap: '4px',
+    padding: '6px 12px',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(255,255,255,0.02)',
+  });
+}
 
-  if (s.documents.length === 0) {
-    items.push(
-      UI.text('尚無文件，點擊「新增文件」開始。', {
-        fontSize: '13px',
-        color: 'rgba(216,232,255,0.5)',
-        padding: '20px 0',
-        textAlign: 'center',
-      })
-    );
-  } else {
-    for (var i = 0; i < s.documents.length; i++) {
-      (function (doc) {
-        items.push(
-          UI.row([
-            UI.column([
-              UI.text(doc.filename, { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
-              UI.text(formatTime(doc.updatedAt), { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
-            ], { flex: '1', gap: '2px' }),
-            UI.button('開啟', {
-              onClick: function () {
-                openDocument(doc.key);
-                self.rerender();
-              },
-              style: btnStyle,
-            }),
-            UI.button('刪除', {
-              onClick: function () {
-                deleteDocument(doc.key);
-                loadDocumentList();
-                self.rerender();
-              },
-              style: dangerBtn,
-            }),
-          ], {
-            alignItems: 'center',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            background: cardBg,
-            border: cardBorder,
-          })
-        );
-      })(s.documents[i]);
-    }
-  }
-
+function renderWelcome(s, self) {
   return UI.column([
-    UI.row([
-      UI.heading('文字管理器', { color: '#d8e8ff', flex: '1' }),
-      UI.button('＋ 新增文件', {
-        onClick: function () {
-          newDocument();
-          self.rerender();
-        },
-        style: primaryBtn,
+    renderNavBar(s, self),
+    UI.column([
+      UI.text('✨', { fontSize: '42px', textAlign: 'center', padding: '12px 0 0' }),
+      UI.text('歡迎使用文字編輯器', {
+        fontSize: '20px', fontWeight: 'bold', color: '#d8e8ff', textAlign: 'center',
       }),
-    ], { alignItems: 'center' }),
-    UI.separator(),
-    UI.column(items, { gap: '6px', overflow: 'auto', flex: '1' }),
-  ], { padding: '18px', flex: '1' });
+      UI.text('建立新檔案或開啟現有檔案來開始編輯', {
+        fontSize: '13px', color: 'rgba(216,232,255,0.5)', textAlign: 'center', padding: '4px 0 20px',
+      }),
+      UI.row([
+        UI.button('📄 新增檔案', {
+          onClick: function () {
+            newDocument();
+            self.rerender();
+          },
+          style: primaryBtn,
+        }),
+        UI.button('📂 開啟檔案', {
+          onClick: function () {
+            openFilePicker();
+          },
+          style: ghostBtn,
+        }),
+      ], { justifyContent: 'center', gap: '10px' }),
+    ], {
+      flex: '1', justifyContent: 'center', alignItems: 'center', gap: '4px',
+    }),
+  ], { flex: '1', height: '100%' });
 }
 
 function renderEditor(s, self) {
   return UI.column([
-    // ── Toolbar ──
-    UI.row([
-      UI.button('← 返回', {
-        onClick: function () {
-          state.view = 'list';
-          self.rerender();
-        },
-        style: ghostBtn,
-      }),
-      UI.input({
-        id: 'title-input',
-        value: s.currentFilename,
-        placeholder: '檔案名稱（例如 note.txt）…',
+    renderNavBar(s, self),
+    UI.column([
+      // ── Toolbar ──
+      UI.row([
+        UI.button('← 返回', {
+          onClick: function () {
+            state.view = 'welcome';
+            self.rerender();
+          },
+          style: ghostBtn,
+        }),
+        UI.input({
+          id: 'title-input',
+          value: s.currentFilename,
+          placeholder: '檔案名稱（例如 note.txt）…',
+          onChange: function (v) {
+            state.currentFilename = v;
+            state.dirty = true;
+            self.patch('save-indicator', { text: '● 未儲存' });
+          },
+          style: {
+            flex: '1',
+            fontSize: '15px',
+            fontWeight: 'bold',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            color: '#ecf4ff',
+          },
+        }),
+        UI.button('儲存', {
+          onClick: function () {
+            saveDocument();
+            self.patch('save-indicator', { text: '✓ 已儲存' });
+          },
+          style: primaryBtn,
+        }),
+      ], { alignItems: 'center' }),
+
+      UI.text(s.dirty ? '● 未儲存' : '✓ 已儲存', {
+        fontSize: '11px',
+        color: s.dirty ? '#ffb74d' : 'rgba(216,232,255,0.4)',
+        textAlign: 'right',
+      }, 'save-indicator'),
+
+      // ── Editor area ──
+      UI.textarea({
+        id: 'content-editor',
+        value: s.currentContent,
+        placeholder: '開始輸入文字…',
+        rows: 18,
         onChange: function (v) {
-          state.currentFilename = v;
+          state.currentContent = v;
           state.dirty = true;
           self.patch('save-indicator', { text: '● 未儲存' });
         },
         style: {
           flex: '1',
-          fontSize: '15px',
-          fontWeight: 'bold',
+          resize: 'none',
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.08)',
-          padding: '8px 12px',
-          borderRadius: '8px',
           color: '#ecf4ff',
+          padding: '12px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          lineHeight: '1.6',
         },
       }),
-      UI.button('儲存', {
-        onClick: function () {
-          saveDocument();
-          self.patch('save-indicator', { text: '✓ 已儲存' });
-        },
-        style: primaryBtn,
-      }),
-    ], { alignItems: 'center' }),
-
-    UI.text(s.dirty ? '● 未儲存' : '✓ 已儲存', {
-      fontSize: '11px',
-      color: s.dirty ? '#ffb74d' : 'rgba(216,232,255,0.4)',
-      textAlign: 'right',
-    }, 'save-indicator'),
-
-    // ── Editor area ──
-    UI.textarea({
-      id: 'content-editor',
-      value: s.currentContent,
-      placeholder: '開始輸入文字…',
-      rows: 18,
-      onChange: function (v) {
-        state.currentContent = v;
-        state.dirty = true;
-        self.patch('save-indicator', { text: '● 未儲存' });
-      },
-      style: {
-        flex: '1',
-        resize: 'none',
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        color: '#ecf4ff',
-        padding: '12px',
-        borderRadius: '8px',
-        fontSize: '13px',
-        lineHeight: '1.6',
-      },
-    }),
-  ], { padding: '18px', flex: '1', gap: '8px' });
+    ], { padding: '18px', flex: '1', gap: '8px' }),
+  ], { flex: '1', height: '100%' });
 }
 
 // ── onFileOpen callback ─────────────────────────────────────
@@ -334,4 +325,15 @@ function onFileOpen(file) {
   state.dirty = false;
   state.view = 'editor';
   app.rerender();
+}
+
+// ── onDialogResult callback ─────────────────────────────────
+function onDialogResult(result) {
+  if (!result || result.cancelled) return;
+  if (!result.path) return;
+  // 透過 dialog 選取的檔案，用 onFileOpen 的相同邏輯開啟
+  onFileOpen({
+    key: result.path,
+    tier: result.tier || 'user',
+  });
 }

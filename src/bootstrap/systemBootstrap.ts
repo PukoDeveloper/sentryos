@@ -15,6 +15,7 @@ import { SystemAlert } from '../notification/SystemAlert';
 import { KernelConsole } from '../console/KernelConsole';
 import { AllowlistNetworkManager } from '../network/AllowlistNetworkManager';
 import { SystemRegistry } from '../registry/SystemRegistry';
+import { DialogManager } from '../dialog/DialogManager';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
@@ -104,6 +105,7 @@ async function bootstrapSystem(): Promise<void> {
     icon: '🖥',
     runtimeType: 'Console',
     autoStart: false,
+    hidden: false,
   };
   catalogApps.push(kernelConsoleEntry);
   applications.push({ ...kernelConsoleEntry });
@@ -121,7 +123,7 @@ async function bootstrapSystem(): Promise<void> {
     return;
   }
 
-  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library'));
+  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 
   // Register notification overlay
   const notifContainer = kernel.resolve('notificationManager').createContainer();
@@ -143,6 +145,9 @@ async function bootstrapSystem(): Promise<void> {
   const launcher = new ApplicationLauncher(kernel);
   kernel.register('applicationLauncher', launcher);
 
+  const dialogManager = new DialogManager(kernel);
+  kernel.register('dialogManager', dialogManager);
+
   const windowManager = new WindowManager(windowHost, (event) => {
     launcher.onWindowUiEvent(event);
   });
@@ -162,6 +167,9 @@ async function bootstrapSystem(): Promise<void> {
     desktopShell.syncOpenWindows(summaries);
 
     if (event.type === 'closed') {
+      // 若 picker 程序的視窗關閉，自動取消對應的 dialog
+      dialogManager.onPickerProcessTerminated(event.processAppId);
+
       const remainingWindows = windowManager.getWindowsByProcess(event.processAppId);
       if (remainingWindows.length === 0) {
         const proc = processManager.getByProcessAppId(event.processAppId);

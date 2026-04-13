@@ -31,6 +31,7 @@ type AppEntryManifest = {
     permissions?: string[];
     maxInstances?: number;
     autoStart?: boolean;
+    hidden?: boolean;
 };
 
 /** 舊格式：單一應用程式清單（向下相容） */
@@ -58,6 +59,7 @@ type RegisteredApplication = Application & {
     icon?: string;
     runtimeType: AppType;
     autoStart: boolean;
+    hidden: boolean;
 };
 
 // ── Catalog Loader ──────────────────────────────────────────
@@ -168,6 +170,7 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
         mainPath: `${basePath}/${entry.main}`,
         runtimeType,
         autoStart: entry.autoStart ?? defaultAutoStart(runtimeType),
+        hidden: entry.hidden === true,
     };
 }
 
@@ -186,6 +189,7 @@ function legacyToRegisteredApp(manifest: LegacyManifest, basePath: string): Regi
         mainPath: `${basePath}/${manifest.main}`,
         runtimeType,
         autoStart: defaultAutoStart(runtimeType),
+        hidden: false,
     };
 }
 

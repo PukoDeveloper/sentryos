@@ -43,6 +43,8 @@ class WindowManager {
     private windowChangeListener?: (event: WindowLifecycleEvent) => void;
     private contextMenuEl: HTMLElement | null = null;
     private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
+    /** 被 modal 鎖定的視窗 → 遮罩元素 */
+    private readonly blockedOverlays = new Map<string, HTMLElement>();
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -432,6 +434,32 @@ class WindowManager {
 
     getWindowsByProcess(processAppId: string): string[] {
         return Array.from(this.processWindows.get(processAppId) ?? []);
+    }
+
+    /**
+     * 鎖定/解鎖視窗互動（用於 modal dialog）。
+     * 鎖定時在視窗上疊加半透明遮罩，阻止所有滑鼠事件。
+     */
+    setWindowBlocked(windowId: string, blocked: boolean): void {
+        const descriptor = this.windows.get(windowId);
+        if (!descriptor) return;
+
+        if (blocked) {
+            if (this.blockedOverlays.has(windowId)) return;
+            const overlay = document.createElement('div');
+            overlay.className = 'window-modal-overlay';
+            overlay.style.cssText = 'position:absolute;inset:0;z-index:9999;background:rgba(0,0,0,0.25);cursor:not-allowed;';
+            descriptor.root.appendChild(overlay);
+            descriptor.root.classList.add('is-blocked');
+            this.blockedOverlays.set(windowId, overlay);
+        } else {
+            const overlay = this.blockedOverlays.get(windowId);
+            if (overlay) {
+                overlay.remove();
+                this.blockedOverlays.delete(windowId);
+            }
+            descriptor.root.classList.remove('is-blocked');
+        }
     }
 
     /** 取得目前擁有焦點的視窗所屬 processAppId，若無焦點視窗回傳 null */

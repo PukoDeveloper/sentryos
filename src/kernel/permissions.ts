@@ -75,6 +75,10 @@ export const Permissions = {
   // Registry
   REGISTRY_READ: 'registry.read',
   REGISTRY_WRITE: 'registry.write',
+
+  // Dialog
+  DIALOG_OPEN: 'dialog.open',
+  DIALOG_RESOLVE: 'dialog.resolve',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
@@ -143,6 +147,9 @@ export const USER_DEFAULT_PERMISSIONS: string[] = [
 
   // 註冊表（唯讀）
   Permissions.REGISTRY_READ,
+
+  // 對話框
+  Permissions.DIALOG_OPEN,
 
   // 權限：建立子應用權限槽（供 DesktopShell 啟動使用）
   Permissions.NEW_APP,
