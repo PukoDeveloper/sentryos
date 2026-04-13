@@ -32,14 +32,17 @@ function saveDocument() {
     return;
   }
 
-  // 若檔名變更，先刪除舊檔
-  if (state.currentKey && state.currentKey !== filename) {
+  // 存檔路徑：優先用 currentKey（含資料夾），否則用 filename
+  var savePath = state.currentKey || filename;
+
+  // 若檔名變更（且有舊 key），先刪除舊檔
+  if (state.currentKey && state.currentKey !== savePath) {
     OS.deleteFile('user:' + state.currentKey);
   }
 
-  var result = OS.writeFile('user:' + filename, state.currentContent, { overwrite: true });
+  var result = OS.writeFile('user:' + savePath, state.currentContent, { overwrite: true });
   if (result.success) {
-    state.currentKey = filename;
+    state.currentKey = savePath;
     state.dirty = false;
     OS.notify('已儲存', filename, 'success');
   } else {
@@ -285,30 +288,47 @@ function renderEditor(s, self) {
 // 從檔案管理器以預設程式開啟時觸發
 function onFileOpen(file) {
   if (!file || !file.key) return;
-  // 從完整 key 中提取檔名（去除命名空間前綴）
-  var filename = file.key;
-  var slashIdx = filename.indexOf('/');
-  if (slashIdx >= 0) filename = filename.slice(slashIdx + 1);
-
-  // 嘗試讀取檔案內容（使用跨應用路徑）
-  var path = file.tier + ':@' + file.key;
-  var result = OS.readFile(path);
-  if (!result.success) {
-    // 若跨應用路徑失敗，嘗試直接路徑
-    result = OS.readFile(file.tier + ':' + filename);
-  }
 
   var content = '';
-  if (result.success && result.data) {
-    var raw = result.data.data;
-    if (raw && typeof raw === 'object' && raw.content !== undefined) {
-      content = String(raw.content);
-    } else {
-      content = raw != null ? String(raw) : '';
+  var filename = file.key;
+
+  if (file.tier === 'user') {
+    // user 層是共享空間，直接用 key 讀取
+    var result = OS.readFile('user:' + file.key);
+    if (result.success && result.data) {
+      var raw = result.data.data;
+      if (raw && typeof raw === 'object' && raw.content !== undefined) {
+        content = String(raw.content);
+      } else {
+        content = raw != null ? String(raw) : '';
+      }
     }
+    state.currentKey = file.key;  // 保留完整路徑（含資料夾），存檔時寫回原位
+
+    // 提取顯示用檔名（取最後一段）
+    var lastSlash = filename.lastIndexOf('/');
+    if (lastSlash >= 0) filename = filename.slice(lastSlash + 1);
+  } else {
+    // 非 user 層，使用跨應用路徑讀取
+    var slashIdx = filename.indexOf('/');
+    if (slashIdx >= 0) filename = filename.slice(slashIdx + 1);
+
+    var path = file.tier + ':@' + file.key;
+    var result = OS.readFile(path);
+    if (!result.success) {
+      result = OS.readFile(file.tier + ':' + filename);
+    }
+    if (result.success && result.data) {
+      var raw = result.data.data;
+      if (raw && typeof raw === 'object' && raw.content !== undefined) {
+        content = String(raw.content);
+      } else {
+        content = raw != null ? String(raw) : '';
+      }
+    }
+    state.currentKey = null;  // 非 user 層不繫結
   }
 
-  state.currentKey = null; // 外部檔案，不繫結 key
   state.currentFilename = filename;
   state.currentContent = content;
   state.dirty = false;
