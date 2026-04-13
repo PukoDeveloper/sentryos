@@ -21,9 +21,12 @@ class ApplicationManager {
     private applications: Map<string, Application> = new Map();
     private counter = 0;
 
-    /** 在開機或安裝時呼叫，將應用程式定義登錄進系統 */
-    register(app: Omit<Application, 'appId'>): string {
-        const appId = `${ID_PREFIX_APP_DEF}${Date.now()}_${this.counter++}`;
+    /**
+     * 在開機或安裝時呼叫，將應用程式定義登錄進系統。
+     * @param stableId 若提供，則以此作為 appId（適用於 manifest 中明確定義 id 的應用程式）
+     */
+    register(app: Omit<Application, 'appId'>, stableId?: string): string {
+        const appId = stableId ?? `${ID_PREFIX_APP_DEF}${Date.now()}_${this.counter++}`;
         this.applications.set(appId, { ...app, appId });
         return appId;
     }

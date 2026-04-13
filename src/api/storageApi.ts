@@ -107,7 +107,7 @@ export function registerStorageApi(kernel: Kernel): void {
         const err = checkCrossApp(resolved);
         if (err) return { success: false, error: err };
 
-        const result = fileSystem.write(appId, resolved.tier, resolved.key, data as any, options);
+        const result = fileSystem.write(appId, resolved.tier, resolved.key, data as any, { ...options, ownerLabel: storageId });
         if (result.success && result.data) {
           result.data = {
             ...result.data,

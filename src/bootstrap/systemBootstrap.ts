@@ -308,7 +308,7 @@ function registerApplications(appManager: ApplicationManager, apps: RegisteredAp
       version: app.version,
       permissions: app.permissions,
       maxInstances: app.maxInstances,
-    });
+    }, app.manifestId);
 
     // Write appId back to the original RegisteredApplication so that
     // catalogApps, boot loops, and API lookups all reference the correct ID.
@@ -352,39 +352,41 @@ const FILE_TYPE_MAP: Record<string, { handler: string; mime?: string }> = {
 
 function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplication[]): void {
   const registry = kernel.resolve('systemRegistry');
+  const appManager = kernel.resolve('appManager');
 
   // 嘗試從 sys 層還原先前保存的設定
   const restored = registry.restore();
 
   if (restored) {
-    // 已還原使用者自訂設定，不覆蓋
-    return;
+    // 檢查還原的 ID 是否仍然有效（舊版本可能存了開機時動態產生的 volatile ID）
+    const roles = registry.getAllRoles();
+    const hasStaleRoles = Object.values(roles).some(id => id !== BUILTIN_KERNEL_CONSOLE && !appManager.get(id));
+    const hasStaleFileTypes = registry.getAllFileTypeHandlers().some(ft => !appManager.get(ft.appDefId));
+
+    if (!hasStaleRoles && !hasStaleFileTypes) {
+      // 所有 ID 皆有效，保留使用者自訂設定
+      return;
+    }
+    // 包含失效的 volatile ID，清除後重新建立
   }
 
   // Terminal 特殊處理：使用 builtin id
   registry.setDefaultApp('terminal', BUILTIN_KERNEL_CONSOLE);
 
-  // 建立 manifestId → appDefId 對照表
-  const idToAppDef = new Map<string, string>();
-  for (const app of catalogApps) {
-    if (app.manifestId && app.appId) {
-      idToAppDef.set(app.manifestId, app.appId);
-    }
-  }
+  // 現在 appDefId 即為 manifestId，可直接使用
+  const knownManifestIds = new Set(catalogApps.map(a => a.manifestId).filter(Boolean));
 
   // 設定角色預設值
   for (const [manifestId, role] of Object.entries(ROLE_MAP)) {
-    const appDefId = idToAppDef.get(manifestId);
-    if (appDefId) {
-      registry.setDefaultApp(role, appDefId);
+    if (knownManifestIds.has(manifestId)) {
+      registry.setDefaultApp(role, manifestId);
     }
   }
 
   // 設定檔案類型預設值
   for (const [ext, { handler, mime }] of Object.entries(FILE_TYPE_MAP)) {
-    const appDefId = idToAppDef.get(handler);
-    if (appDefId) {
-      registry.setFileTypeHandler(ext, appDefId, mime);
+    if (knownManifestIds.has(handler)) {
+      registry.setFileTypeHandler(ext, handler, mime);
     }
   }
 
