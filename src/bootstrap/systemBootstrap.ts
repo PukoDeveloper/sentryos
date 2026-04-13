@@ -102,7 +102,7 @@ async function bootstrapSystem(): Promise<void> {
     packageName: 'system',
     entryPath: '',
     mainPath: '',
-    icon: '🖥',
+    icon: '/default-app-icon.svg',
     runtimeType: 'Console',
     autoStart: false,
     hidden: false,

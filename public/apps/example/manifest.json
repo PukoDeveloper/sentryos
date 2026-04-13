@@ -23,6 +23,7 @@
             "id": "example-storage",
             "name": "儲存空間範例",
             "main": "storage-demo.js",
+            "icon": "🛢️",
             "type": "Window",
             "permissions": [
                 "window.create",
