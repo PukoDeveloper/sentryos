@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .VSCodeCounter
 
+# Plugins (installed separately)
+public/plugins/*.js
+
 # Editor directories and files
 .vscode/*
 

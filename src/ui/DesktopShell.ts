@@ -1286,4 +1286,4 @@ class DesktopShell {
   }
 }
 
-export { DesktopShell, type DesktopOverlayRegistration, type ThemeSettings };
+export { DesktopShell, type DesktopOverlayRegistration, type ThemeSettings, type TaskbarMode };
