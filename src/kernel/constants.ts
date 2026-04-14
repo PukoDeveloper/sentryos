@@ -40,6 +40,7 @@ export const ID_PREFIX_SYSTEM = 'sys_';
 export const ID_PREFIX_USER = 'user_';
 export const ID_PREFIX_APP_INSTANCE = 'app_';
 export const ID_PREFIX_APP_DEF = 'appdef_';
+export const ID_PREFIX_PLUGIN = 'plugin_';
 
 // ── Application Types ───────────────────────────────────────
 export type AppType = 'Service' | 'Window' | 'Console' | 'Library';

@@ -17,6 +17,7 @@ import type { RegisteredApplication } from '../application/ApplicationCatalog';
 import type { NetworkAdapter } from '../network/NetworkAdapter';
 import type { SystemRegistry } from '../registry/SystemRegistry';
 import type { DialogManager } from '../dialog/DialogManager';
+import type { PluginManager } from '../plugin/PluginManager';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -36,6 +37,7 @@ export interface ServiceMap {
   networkManager: NetworkAdapter;
   systemRegistry: SystemRegistry;
   dialogManager: DialogManager;
+  pluginManager: PluginManager;
 }
 
 export interface ValueMap {

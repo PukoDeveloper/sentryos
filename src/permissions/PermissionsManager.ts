@@ -68,6 +68,24 @@ class PermissionsManager {
         this.monitor?.recordPermissionCheck(appId, permission, granted);
         return granted;
     }
+    /**
+     * 以指定的 appId 直接註冊權限實體（用於插件等內部機制）。
+     * 需要 MANAGE_PERMISSIONS 權限。
+     */
+    registerAppId(fromAppId: string, appId: string, permissions: string[]): PermissionResult {
+        if (!this.inited) {
+            return { success: false, error: 'NotInitialized' };
+        }
+        if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
+            return { success: false, error: 'PermissionDenied' };
+        }
+        if (this.appPermissions[appId]) {
+            return { success: false, error: 'UnknownError' };
+        }
+        const allowedPermissions = permissions.filter(p => this.has(fromAppId, p));
+        this.appPermissions[appId] = new Set(allowedPermissions);
+        return { success: true, data: appId };
+    }
     /** 檢查應用程式是否持有指定命名空間下的任一權限 */
     hasAnyUnder(appId: string, namespace: string): boolean {
         const perms = this.appPermissions[appId];

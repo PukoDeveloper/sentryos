@@ -71,6 +71,14 @@ class UiComponentRegistry {
     hasRenderer(type: string): boolean {
         return this.renderers.has(type);
     }
+
+    /** 反註冊一個 UI 元件 */
+    unregister(type: string): boolean {
+        const existed = this.renderers.has(type);
+        this.renderers.delete(type);
+        this.apiBuilders.delete(type);
+        return existed;
+    }
 }
 
 export const uiComponentRegistry = new UiComponentRegistry();
