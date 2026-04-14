@@ -43,6 +43,7 @@ class WindowManager {
     private windowChangeListener?: (event: WindowLifecycleEvent) => void;
     private contextMenuEl: HTMLElement | null = null;
     private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
+    private maximizedTaskbarHeight = MAXIMIZED_TASKBAR_HEIGHT;
     /** 被 modal 鎖定的視窗 → 遮罩元素 */
     private readonly blockedOverlays = new Map<string, HTMLElement>();
 
@@ -53,6 +54,22 @@ class WindowManager {
 
     setWindowChangeListener(listener: (event: WindowLifecycleEvent) => void): void {
         this.windowChangeListener = listener;
+    }
+
+    /**
+     * 設定最大化視窗底部預留的 taskbar 高度。
+     * 漂浮模式下傳 0 讓視窗完全填充螢幕。
+     * 若 reflow 為 true，會立刻重新佈局所有已最大化的視窗。
+     */
+    setMaximizedTaskbarHeight(height: number, reflow = true): void {
+        this.maximizedTaskbarHeight = height;
+        if (reflow) {
+            for (const descriptor of this.windows.values()) {
+                if (descriptor.state === 'maximized') {
+                    this.applyWindowLayout(descriptor);
+                }
+            }
+        }
     }
 
     createWindow(context: WindowProcessContext, options: WindowInitOptions): WindowSystemResult<string> {
@@ -804,7 +821,7 @@ class WindowManager {
             descriptor.root.style.left = `${MAXIMIZED_WINDOW_MARGIN}px`;
             descriptor.root.style.top = `${MAXIMIZED_WINDOW_MARGIN}px`;
             descriptor.root.style.width = `calc(100% - ${MAXIMIZED_WINDOW_MARGIN * 2}px)`;
-            descriptor.root.style.height = `calc(100% - ${MAXIMIZED_TASKBAR_HEIGHT}px)`;
+            descriptor.root.style.height = `calc(100% - ${this.maximizedTaskbarHeight}px)`;
             descriptor.frame.style.borderRadius = '0';
         } else {
             descriptor.frame.style.borderRadius = '';

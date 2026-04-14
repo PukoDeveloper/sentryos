@@ -22,6 +22,8 @@ type ThemeSettings = {
   startMenuGroupByPackage?: boolean;
 };
 
+type TaskbarMode = 'docked' | 'floating' | 'floating-autohide';
+
 class DesktopShell {
   private root: HTMLDivElement | null = null;
   private overlayLayer: HTMLDivElement | null = null;
@@ -56,6 +58,11 @@ class DesktopShell {
   private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
   private pinnedAppIds: string[] = [];
   private expandedPackage: string | null = null;
+  private taskbarMode: TaskbarMode = 'docked';
+  private taskbarTrigger: HTMLDivElement | null = null;
+  private taskbarVisible = true;
+  private taskbarHideTimer: number | null = null;
+  private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
 
   /** Return a stable identifier for an app that survives page refreshes */
   private stableId(app: RegisteredApplication): string {
@@ -93,6 +100,10 @@ class DesktopShell {
 
     const taskbar = document.createElement('div');
     taskbar.className = 'desktop-taskbar';
+
+    // Hover trigger zone for auto-hide floating taskbar
+    const taskbarTrigger = document.createElement('div');
+    taskbarTrigger.className = 'desktop-taskbar-trigger';
 
     const startButton = document.createElement('button');
     startButton.className = 'desktop-taskbar-start';
@@ -191,6 +202,7 @@ class DesktopShell {
     root.appendChild(windowLayer);
     root.appendChild(startPanel);
     root.appendChild(taskbar);
+    root.appendChild(taskbarTrigger);
     appRoot.appendChild(root);
 
     this.root = root;
@@ -199,6 +211,7 @@ class DesktopShell {
     this.wallpaperLayer = wallpaperLayer;
     this.wallpaperTint = wallpaperTint;
     this.taskbarEl = taskbar;
+    this.taskbarTrigger = taskbarTrigger;
     this.startButtonEl = startButton;
     this.taskbarAppList = appList;
     this.startPanel = startPanel;
@@ -218,6 +231,11 @@ class DesktopShell {
     // ── Tab switching ──
     folderTab.addEventListener('click', () => this.setActiveStartTab('folders', folderTab, searchTab, folderPane, searchPane));
     searchTab.addEventListener('click', () => this.setActiveStartTab('search', searchTab, folderTab, searchPane, folderPane));
+
+    // ── Floating taskbar hover events ──
+    taskbarTrigger.addEventListener('mouseenter', () => this.showFloatingTaskbar());
+    taskbar.addEventListener('mouseenter', () => this.showFloatingTaskbar());
+    taskbar.addEventListener('mouseleave', () => this.scheduleHideFloatingTaskbar());
 
     this.loadFolders();
     this.renderTaskbar();
@@ -280,6 +298,10 @@ class DesktopShell {
 
     this.closeGroupPopup();
     this.removeStartOutsideClick();
+    if (this.taskbarHideTimer !== null) {
+      window.clearTimeout(this.taskbarHideTimer);
+      this.taskbarHideTimer = null;
+    }
     this.root?.remove();
     this.root = null;
     this.overlayLayer = null;
@@ -287,6 +309,7 @@ class DesktopShell {
     this.wallpaperLayer = null;
     this.wallpaperTint = null;
     this.taskbarEl = null;
+    this.taskbarTrigger = null;
     this.startButtonEl = null;
     this.taskbarAppList = null;
     this.startPanel = null;
@@ -336,6 +359,74 @@ class DesktopShell {
 
   getTheme(): ThemeSettings {
     return { ...this.currentTheme };
+  }
+
+  // ── Floating taskbar ──────────────────────────────────────
+
+  setTaskbarMode(mode: TaskbarMode): void {
+    if (mode === this.taskbarMode) return;
+    this.taskbarMode = mode;
+
+    if (!this.taskbarEl || !this.taskbarTrigger) return;
+
+    // Reset classes
+    this.taskbarEl.classList.remove('is-floating', 'is-auto-hide', 'is-taskbar-visible');
+    this.taskbarTrigger.style.display = 'none';
+
+    if (this.taskbarHideTimer !== null) {
+      window.clearTimeout(this.taskbarHideTimer);
+      this.taskbarHideTimer = null;
+    }
+
+    if (mode === 'floating') {
+      this.taskbarEl.classList.add('is-floating');
+      this.taskbarVisible = true;
+    } else if (mode === 'floating-autohide') {
+      this.taskbarEl.classList.add('is-floating', 'is-auto-hide');
+      this.taskbarTrigger.style.display = 'block';
+      this.taskbarVisible = false;
+    }
+    // 'docked' — default, no extra classes
+
+    this.taskbarModeChangeHandler?.(mode);
+  }
+
+  getTaskbarMode(): TaskbarMode {
+    return this.taskbarMode;
+  }
+
+  onTaskbarModeChange(handler: (mode: TaskbarMode) => void): void {
+    this.taskbarModeChangeHandler = handler;
+  }
+
+  private showFloatingTaskbar(): void {
+    if (this.taskbarMode !== 'floating-autohide' || !this.taskbarEl) return;
+
+    if (this.taskbarHideTimer !== null) {
+      window.clearTimeout(this.taskbarHideTimer);
+      this.taskbarHideTimer = null;
+    }
+
+    if (!this.taskbarVisible) {
+      this.taskbarVisible = true;
+      this.taskbarEl.classList.add('is-taskbar-visible');
+    }
+  }
+
+  private scheduleHideFloatingTaskbar(): void {
+    if (this.taskbarMode !== 'floating-autohide' || !this.taskbarEl) return;
+
+    // 短暫延遲避免滑鼠快速移出時閃爍
+    if (this.taskbarHideTimer !== null) {
+      window.clearTimeout(this.taskbarHideTimer);
+    }
+    this.taskbarHideTimer = window.setTimeout(() => {
+      this.taskbarHideTimer = null;
+      // 若開始選單正在顯示，不隱藏 taskbar
+      if (this.startPanel && !this.startPanel.classList.contains('is-hidden')) return;
+      this.taskbarVisible = false;
+      this.taskbarEl?.classList.remove('is-taskbar-visible');
+    }, 400);
   }
 
   private renderTaskbar(): void {

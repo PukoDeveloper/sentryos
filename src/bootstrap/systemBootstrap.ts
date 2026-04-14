@@ -154,6 +154,12 @@ async function bootstrapSystem(): Promise<void> {
   });
   kernel.register('windowManager', windowManager);
 
+  // Wire floating taskbar mode to window manager
+  desktopShell.onTaskbarModeChange((mode) => {
+    const height = mode === 'docked' ? 96 : 0;
+    windowManager.setMaximizedTaskbarHeight(height);
+  });
+
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
 
