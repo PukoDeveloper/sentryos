@@ -1,6 +1,6 @@
 var styles = imports('styles.js');
 
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -35,19 +35,19 @@ var app = UI.createApp({
   state: {},
   render: function (state, self) {
     // ── 取得快照 ──
-    var snapResult = OS.snapshot();
+    var snapResult = OS.monitor.snapshot();
     var snap = (snapResult.success && snapResult.data) ? snapResult.data : {};
 
     // ── 事件統計 ──
-    var evtResult = OS.eventStats();
+    var evtResult = OS.monitor.eventStats();
     var evtData = (evtResult.success && evtResult.data) ? evtResult.data : {};
 
     // ── API 統計 ──
-    var apiResult = OS.apiStats();
+    var apiResult = OS.monitor.apiStats();
     var apiData = (apiResult.success && apiResult.data) ? apiResult.data : {};
 
     // ── 權限統計 ──
-    var permResult = OS.permissionStats();
+    var permResult = OS.monitor.permissionStats();
     var permData = (permResult.success && permResult.data) ? permResult.data : {};
 
     return UI.column([

@@ -21,7 +21,7 @@ function traverseObject(obj, depth = 0) {
   }
 }
 
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -31,7 +31,7 @@ var app = UI.createApp({
     width: 800,
     height: 600,
     render: function (state, self) {
-        return OS["code_editor"]({id: 'editor', language: 'javascript', value: '// Developer Tools\n\nconsole.log("Hello, SentryOS!");'});
+        return OS.ui.code_editor({id: 'editor', language: 'javascript', value: '// Developer Tools\n\nconsole.log("Hello, SentryOS!");'});
     }
 })
 

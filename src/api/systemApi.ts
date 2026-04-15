@@ -18,5 +18,5 @@ export function registerSystemApi(kernel: Kernel): void {
       setTimeout(() => launcher.terminateApplication(target.processAppId, reason), 0);
       return { success: true, data: targetPid };
     },
-  }), ['process']);
+  }), ['process'], 'system');
 }

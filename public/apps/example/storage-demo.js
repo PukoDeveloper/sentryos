@@ -1,6 +1,6 @@
 var styles = imports('styles.js');
 
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -48,7 +48,7 @@ var app = UI.createApp({
           UI.row([
             UI.button('寫入', {
               onClick: function () {
-                var result = OS.writeFile(fileName, fileContent);
+                var result = OS.storage.writeFile(fileName, fileContent);
                 statusMsg = result.success ? '✓ 已寫入 ' + fileName : '✗ ' + (result.error || '寫入失敗');
                 self.patch('status-text', { text: statusMsg });
               },
@@ -56,7 +56,7 @@ var app = UI.createApp({
             }),
             UI.button('讀取', {
               onClick: function () {
-                var result = OS.readFile(fileName);
+                var result = OS.storage.readFile(fileName);
                 if (result.success && result.data) {
                   statusMsg = '內容: ' + JSON.stringify(result.data.data);
                 } else {
@@ -68,7 +68,7 @@ var app = UI.createApp({
             }),
             UI.button('刪除', {
               onClick: function () {
-                var result = OS.deleteFile(fileName);
+                var result = OS.storage.deleteFile(fileName);
                 statusMsg = result.success ? '✓ 已刪除' : '✗ ' + (result.error || '刪除失敗');
                 self.patch('status-text', { text: statusMsg });
               },
@@ -90,7 +90,7 @@ var app = UI.createApp({
           UI.row([
             UI.button('列出檔案', {
               onClick: function () {
-                var result = OS.listFiles();
+                var result = OS.storage.listFiles();
                 if (result.success && result.data) {
                   var names = result.data.map(function (f) { return f.key; });
                   statusMsg = '檔案: ' + (names.length > 0 ? names.join(', ') : '（空）');
@@ -103,7 +103,7 @@ var app = UI.createApp({
             }),
             UI.button('儲存用量', {
               onClick: function () {
-                var result = OS.storageUsage();
+                var result = OS.storage.storageUsage();
                 if (result.success && result.data) {
                   var d = result.data;
                   statusMsg = '使用: ' + d.used + ' / ' + d.quota + ' 項';

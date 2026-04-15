@@ -14,22 +14,22 @@ export function registerConsoleApi(kernel: Kernel): void {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.appendLine(String(text));
-        return true;
+        return { success: true, data: null };
       },
       write: (text: unknown) => {
         if (!permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.appendText(String(text));
-        return true;
+        return { success: true, data: null };
       },
       clear: () => {
         if (!permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
           return { success: false, error: 'PermissionDenied' };
         }
         if (controller) controller.clear();
-        return true;
+        return { success: true, data: null };
       },
     };
-  }, ['console']);
+  }, ['console'], 'console');
 }

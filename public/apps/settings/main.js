@@ -1,4 +1,4 @@
-﻿var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+﻿var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -59,7 +59,7 @@ var collapsed = {
 };
 
 // Load saved settings
-var saved = OS.loadSavedTheme();
+var saved = OS.settings.loadSavedTheme();
 if (saved.success && saved.data) {
   var d = saved.data;
   for (var i = 0; i < wallpapers.length; i++) {
@@ -214,7 +214,7 @@ function buildThemeObject() {
 }
 
 function liveApply() {
-  OS.applyTheme(buildThemeObject());
+  OS.settings.applyTheme(buildThemeObject());
 }
 
 function collapsible(key, title, renderBody, self) {
@@ -254,7 +254,7 @@ var pages = [
 
 // ── Page renderers ───────────────────────────────────────────
 function renderHomePage(self) {
-  var info = OS.sysinfo();
+  var info = OS.settings.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([
@@ -537,7 +537,7 @@ function renderSaveRow(self) {
     UI.button('儲存設定', {
       id: 'btn-save',
       onClick: function () {
-        var result = OS.saveTheme(buildThemeObject());
+        var result = OS.settings.saveTheme(buildThemeObject());
         if (result.success) {
           self.patch('btn-save', { text: '✓ 已儲存' });
           setTimeout(function () {
@@ -563,7 +563,7 @@ function renderSaveRow(self) {
 var notifSettings = { doNotDisturb: false, defaultDuration: 4000, maxVisible: 5 };
 
 function loadNotifSettings() {
-  var result = OS.getNotificationSettings();
+  var result = OS.settings.getNotificationSettings();
   if (result.success && result.data) {
     notifSettings = result.data;
   }
@@ -605,7 +605,7 @@ function renderNotificationsPage(self) {
         UI.button(notifSettings.doNotDisturb ? '🔕 已開啟' : '🔔 已關閉', {
           onClick: function () {
             notifSettings.doNotDisturb = !notifSettings.doNotDisturb;
-            OS.setNotificationSettings(notifSettings);
+            OS.settings.setNotificationSettings(notifSettings);
             self.rerender();
           },
           style: {
@@ -635,7 +635,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.defaultDuration = opt.value;
-                OS.setNotificationSettings(notifSettings);
+                OS.settings.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -667,7 +667,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.maxVisible = opt.value;
-                OS.setNotificationSettings(notifSettings);
+                OS.settings.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -695,7 +695,7 @@ function renderNotificationsPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button('發送測試', {
           onClick: function () {
-            OS.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
+            OS.notification.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
           },
           style: {
             padding: '8px 18px',
@@ -717,9 +717,9 @@ function renderNotificationsPage(self) {
 var appsSelectedApp = null;
 
 function renderAppsPage(self) {
-  var appsResult = OS.getApps();
+  var appsResult = OS.settings.getApps();
   var apps = (appsResult.success && appsResult.data) ? appsResult.data : [];
-  var procsResult = OS.getAppProcesses();
+  var procsResult = OS.settings.getAppProcesses();
   var procs = (procsResult.success && procsResult.data) ? procsResult.data : [];
 
   // 每個 app 的執行中程序數
@@ -925,14 +925,14 @@ var defaultsNewApp = '';
 
 function renderDefaultsPage(self) {
   // 取得所有檔案類型關聯（陣列 [{ extension, appDefId, mimeType }]）
-  var handlersResult = OS.getAllFileTypeHandlers();
+  var handlersResult = OS.registry.getAllFileTypeHandlers();
   var handlers = (handlersResult.success && handlersResult.data) ? handlersResult.data : [];
   // 過濾掉空的 appDefId
   handlers = handlers.filter(function (h) { return h.appDefId; });
   handlers.sort(function (a, b) { return a.extension.localeCompare(b.extension); });
 
   // 取得所有可選應用程式（僅 Window / Console 類型）
-  var appsResult = OS.getApps();
+  var appsResult = OS.settings.getApps();
   var allApps = (appsResult.success && appsResult.data) ? appsResult.data : [];
   var launchableApps = allApps.filter(function (a) { return a.runtimeType === 'Window' || a.runtimeType === 'Console'; });
 
@@ -955,7 +955,7 @@ function renderDefaultsPage(self) {
           ], { flex: '1', gap: '2px' }),
           UI.button('移除', {
             onClick: function () {
-              OS.removeFileTypeHandler(h.extension);
+              OS.registry.removeFileTypeHandler(h.extension);
               self.rerender();
             },
             style: {
@@ -1007,15 +1007,15 @@ function renderDefaultsPage(self) {
             onClick: function () {
               var ext = defaultsNewExt.trim().toLowerCase();
               if (!ext || ext.indexOf('.') !== 0) {
-                OS.notify('格式錯誤', '副檔名需以 . 開頭，例如 .txt', 'warning');
+                OS.notification.notify('格式錯誤', '副檔名需以 . 開頭，例如 .txt', 'warning');
                 return;
               }
               if (!defaultsNewApp) {
-                OS.notify('請選擇應用程式', '請從下拉選單中選擇一個應用程式', 'warning');
+                OS.notification.notify('請選擇應用程式', '請從下拉選單中選擇一個應用程式', 'warning');
                 return;
               }
-              OS.setFileTypeHandler(ext, defaultsNewApp);
-              OS.notify('已設定', ext + ' 將使用所選應用程式開啟', 'success');
+              OS.registry.setFileTypeHandler(ext, defaultsNewApp);
+              OS.notification.notify('已設定', ext + ' 將使用所選應用程式開啟', 'success');
               defaultsNewExt = '';
               defaultsNewApp = '';
               self.rerender();
@@ -1060,8 +1060,8 @@ var networkNewPattern = '';
 var networkNewDesc = '';
 
 function loadNetworkData() {
-  var statusResult = OS.getStatus();
-  var listResult = OS.getAllowlist();
+  var statusResult = OS.network.getStatus();
+  var listResult = OS.network.getAllowlist();
   return {
     status: (statusResult.success && statusResult.data) ? statusResult.data : { enabled: true, allowlistCount: 0, totalRequests: 0, blockedRequests: 0 },
     allowlist: (listResult.success && listResult.data) ? listResult.data : [],
@@ -1088,7 +1088,7 @@ function renderNetworkPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button(status.enabled ? '🌐 已啟用' : '🚫 已停用', {
           onClick: function () {
-            OS.setEnabled(!status.enabled);
+            OS.network.setEnabled(!status.enabled);
             self.rerender();
           },
           style: {
@@ -1147,7 +1147,7 @@ function renderNetworkPage(self) {
             onClick: function () {
               var pat = networkNewPattern.trim();
               if (!pat) {
-                OS.notify('新增失敗', '請輸入網域規則', 'warning');
+                OS.notification.notify('新增失敗', '請輸入網域規則', 'warning');
                 return;
               }
               // 驗證格式：* | *.domain.tld | sub.domain.tld
@@ -1157,16 +1157,16 @@ function renderNetworkPage(self) {
               var domainRegex = new RegExp('^(\\*|\\*\\.' + label + '(\\.' + label + ')*\\.' + tld + '|' + label + '(\\.' + label + ')*\\.' + tld + ')$');
               var valid = domainRegex.test(pat);
               if (!valid) {
-                OS.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
+                OS.notification.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
                 return;
               }
-              var result = OS.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
+              var result = OS.network.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
               if (result.success) {
-                OS.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
+                OS.notification.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
                 networkNewPattern = '';
                 networkNewDesc = '';
               } else {
-                OS.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
+                OS.notification.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
               }
               self.rerender();
             },
@@ -1200,7 +1200,7 @@ function renderNetworkPage(self) {
             ], { flex: '1', gap: '1px' }),
             UI.button('移除', {
               onClick: function () {
-                OS.removeAllowlistEntry(entry.pattern);
+                OS.network.removeAllowlistEntry(entry.pattern);
                 self.rerender();
               },
               style: {
@@ -1254,7 +1254,7 @@ function renderAccessibilityPage(self) {
 
 // ── 關於頁面 ─────────────────────────────────────────────────
 function renderAboutPage(self) {
-  var info = OS.sysinfo();
+  var info = OS.settings.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([

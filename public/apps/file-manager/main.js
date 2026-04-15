@@ -1,4 +1,4 @@
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -27,12 +27,12 @@ var pendingContextTarget = null;  // { type: 'file'|'folder', entry?, namespace?
 
 // ── Helpers ──────────────────────────────────────────────────
 function loadUsage() {
-  var result = OS.storageUsage();
+  var result = OS.storage.storageUsage();
   state.usage = result.success ? result.data : null;
 }
 
 function loadEntries() {
-  var result = OS.listAllFiles(state.currentTier);
+  var result = OS.storage.listAllFiles(state.currentTier);
   if (!result.success) { state.entries = []; state.namespaces = []; return; }
 
   var all = result.data || [];
@@ -102,7 +102,7 @@ function formatData(data) {
 
 function deleteEntry(entry) {
   if (state.currentTier === 'sys') {
-    OS.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
+    OS.notification.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
     return;
   }
   var tier = state.currentTier;
@@ -120,11 +120,11 @@ function deleteEntry(entry) {
     var filename = slashIdx > 0 ? entry.key.slice(slashIdx + 1) : entry.key;
     path = tier + ':@' + ns + '/' + filename;
   }
-  var result = OS.deleteFile(path);
+  var result = OS.storage.deleteFile(path);
   if (result.success) {
-    OS.notify('已刪除', entry.key, 'info');
+    OS.notification.notify('已刪除', entry.key, 'info');
   } else {
-    OS.notify('刪除失敗', result.error || '未知錯誤', 'error');
+    OS.notification.notify('刪除失敗', result.error || '未知錯誤', 'error');
   }
 }
 
@@ -137,11 +137,11 @@ function getFileExtension(key) {
 function renameEntry(entry, newName) {
   newName = (newName || '').trim();
   if (!newName) {
-    OS.notify('重新命名失敗', '請輸入新名稱', 'warning');
+    OS.notification.notify('重新命名失敗', '請輸入新名稱', 'warning');
     return false;
   }
   if (state.currentTier === 'sys') {
-    OS.notify('無法重新命名', '系統層檔案不可從此處重新命名', 'warning');
+    OS.notification.notify('無法重新命名', '系統層檔案不可從此處重新命名', 'warning');
     return false;
   }
   var tier = state.currentTier;
@@ -166,38 +166,38 @@ function renameEntry(entry, newName) {
   }
 
   // 讀取舊檔案內容
-  var readResult = OS.readFile(oldPath);
+  var readResult = OS.storage.readFile(oldPath);
   if (!readResult.success) {
-    OS.notify('重新命名失敗', '無法讀取原始檔案: ' + (readResult.error || '未知錯誤'), 'error');
+    OS.notification.notify('重新命名失敗', '無法讀取原始檔案: ' + (readResult.error || '未知錯誤'), 'error');
     return false;
   }
 
   // 寫入新檔案
-  var writeResult = OS.writeFile(newPath, readResult.data.data, { overwrite: false });
+  var writeResult = OS.storage.writeFile(newPath, readResult.data.data, { overwrite: false });
   if (!writeResult.success) {
     if (writeResult.error === 'AlreadyExists') {
-      OS.notify('重新命名失敗', '「' + newName + '」已存在', 'warning');
+      OS.notification.notify('重新命名失敗', '「' + newName + '」已存在', 'warning');
     } else {
-      OS.notify('重新命名失敗', writeResult.error || '未知錯誤', 'error');
+      OS.notification.notify('重新命名失敗', writeResult.error || '未知錯誤', 'error');
     }
     return false;
   }
 
   // 刪除舊檔案
-  OS.deleteFile(oldPath);
-  OS.notify('已重新命名', entry.key + ' → ' + newName, 'info');
+  OS.storage.deleteFile(oldPath);
+  OS.notification.notify('已重新命名', entry.key + ' → ' + newName, 'info');
   return true;
 }
 
 function openWithDefaultApp(entry) {
   var ext = getFileExtension(entry.key);
   if (!ext) {
-    OS.notify('無法開啟', '無法判斷檔案類型', 'warning');
+    OS.notification.notify('無法開啟', '無法判斷檔案類型', 'warning');
     return;
   }
-  var handler = OS.getFileTypeHandler(ext);
+  var handler = OS.registry.getFileTypeHandler(ext);
   if (!handler.success || !handler.data) {
-    OS.notify('無法開啟', '沒有設定 ' + ext + ' 的預設應用程式', 'warning');
+    OS.notification.notify('無法開啟', '沒有設定 ' + ext + ' 的預設應用程式', 'warning');
     return;
   }
   var fileInfo = {
@@ -206,15 +206,15 @@ function openWithDefaultApp(entry) {
     extension: ext,
     mimeType: handler.data.mimeType || '',
   };
-  var result = OS.launch(handler.data.appDefId, fileInfo);
+  var result = OS.shell.launch(handler.data.appDefId, fileInfo);
   if (!result.success) {
-    OS.notify('啟動失敗', result.error || '未知錯誤', 'error');
+    OS.notification.notify('啟動失敗', result.error || '未知錯誤', 'error');
   }
 }
 
 function deleteFolder(nsName) {
   if (state.currentTier === 'sys') {
-    OS.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
+    OS.notification.notify('無法刪除', '系統層檔案不可從此處刪除', 'warning');
     return;
   }
   var prefix = nsName + '/';
@@ -225,9 +225,9 @@ function deleteFolder(nsName) {
     count++;
   }
   if (count > 0) {
-    OS.notify('已刪除資料夾', nsName + ' (' + count + ' 個檔案)', 'info');
+    OS.notification.notify('已刪除資料夾', nsName + ' (' + count + ' 個檔案)', 'info');
   } else {
-    OS.notify('刪除失敗', '資料夾為空或不存在', 'warning');
+    OS.notification.notify('刪除失敗', '資料夾為空或不存在', 'warning');
   }
 }
 
@@ -236,28 +236,28 @@ function deleteFolder(nsName) {
 function createFolder(name) {
   name = (name || '').trim();
   if (!name) {
-    OS.notify('建立失敗', '請輸入資料夾名稱', 'warning');
+    OS.notification.notify('建立失敗', '請輸入資料夾名稱', 'warning');
     return false;
   }
   // user 層是共享空間，資料夾即前綴路徑
   var path = 'user:' + name + '/.folder';
-  var result = OS.writeFile(path, null, { overwrite: false });
+  var result = OS.storage.writeFile(path, null, { overwrite: false });
   if (!result.success) {
     if (result.error === 'AlreadyExists') {
-      OS.notify('建立失敗', '資料夾「' + name + '」已存在', 'warning');
+      OS.notification.notify('建立失敗', '資料夾「' + name + '」已存在', 'warning');
     } else {
-      OS.notify('建立失敗', result.error || '未知錯誤', 'error');
+      OS.notification.notify('建立失敗', result.error || '未知錯誤', 'error');
     }
     return false;
   }
-  OS.notify('已建立', '資料夾「' + name + '」', 'info');
+  OS.notification.notify('已建立', '資料夾「' + name + '」', 'info');
   return true;
 }
 
 function createFile(name, content) {
   name = (name || '').trim();
   if (!name) {
-    OS.notify('建立失敗', '請輸入檔案名稱', 'warning');
+    OS.notification.notify('建立失敗', '請輸入檔案名稱', 'warning');
     return false;
   }
   var ns = state.currentNamespace;
@@ -270,16 +270,16 @@ function createFile(name, content) {
     path = 'user:' + name;
   }
   var data = content || '';
-  var result = OS.writeFile(path, data, { overwrite: false });
+  var result = OS.storage.writeFile(path, data, { overwrite: false });
   if (!result.success) {
     if (result.error === 'AlreadyExists') {
-      OS.notify('建立失敗', '檔案「' + name + '」已存在', 'warning');
+      OS.notification.notify('建立失敗', '檔案「' + name + '」已存在', 'warning');
     } else {
-      OS.notify('建立失敗', result.error || '未知錯誤', 'error');
+      OS.notification.notify('建立失敗', result.error || '未知錯誤', 'error');
     }
     return false;
   }
-  OS.notify('已建立', '檔案「' + name + '」', 'info');
+  OS.notification.notify('已建立', '檔案「' + name + '」', 'info');
   return true;
 }
 
@@ -705,7 +705,7 @@ function renderNamespaceList(s, self) {
             menuItems.push({ separator: true });
             menuItems.push({ id: 'delete-folder', label: '🗑 刪除資料夾', danger: true });
           }
-          OS.showContextMenu(app.windowId, 'ctx-folder-' + ns.name, event.x || 100, event.y || 100, menuItems);
+          OS.ui.showContextMenu(app.windowId, 'ctx-folder-' + ns.name, event.x || 100, event.y || 100, menuItems);
         },
         style: {
           alignItems: 'center',
@@ -760,7 +760,7 @@ function renderFileList(entries, s, self) {
             menuItems.push({ separator: true });
             menuItems.push({ id: 'delete', label: '🗑 刪除', danger: true });
           }
-          OS.showContextMenu(app.windowId, 'ctx-file-' + entry.key, event.x || 100, event.y || 100, menuItems);
+          OS.ui.showContextMenu(app.windowId, 'ctx-file-' + entry.key, event.x || 100, event.y || 100, menuItems);
         },
         style: {
           alignItems: 'center',
@@ -828,7 +828,7 @@ function renderDetail(s, self) {
   // 「以預設應用程式開啟」按鈕（僅當檔案有副檔名且有對應處理程式時顯示）
   var ext = getFileExtension(entry.key);
   if (ext) {
-    var handlerResult = OS.getFileTypeHandler(ext);
+    var handlerResult = OS.registry.getFileTypeHandler(ext);
     if (handlerResult.success && handlerResult.data) {
       actionButtons.push(UI.button('📂 以預設應用程式開啟', {
         onClick: function () {

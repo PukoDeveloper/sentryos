@@ -6,7 +6,7 @@
 // 若權限不足將在 globalThis.UI 上提供錯誤訊息而非正常 API。
 (function () {
   // ── 前置權限檢查 ──────────────────────────────────────────
-  if (typeof OS === 'undefined' || typeof OS.createWindow !== 'function') {
+  if (typeof OS === 'undefined' || !OS.ui || typeof OS.ui.createWindow !== 'function') {
     globalThis.UI = {
       _error: 'stdlib/UI Utils: ui API not available. Ensure the app has "window.create" permission and is of type "Window".',
       createApp: function () {
@@ -69,7 +69,7 @@
     if (options.alwaysOnTop !== undefined) winOptions.alwaysOnTop = options.alwaysOnTop;
     if (options.resizable !== undefined) winOptions.resizable = options.resizable;
 
-    var win = OS.createWindow(winOptions);
+    var win = OS.ui.createWindow(winOptions);
     if (!win.success) return null;
     var windowId = win.data;
 
@@ -78,33 +78,33 @@
       state: state,
       // 精確更新單一節點 (不重建整棵樹)
       patch: function (nodeId, patch) {
-        return OS.update(windowId, nodeId, patch);
+        return OS.ui.update(windowId, nodeId, patch);
       },
       remove: function (nodeId) {
-        return OS.remove(windowId, nodeId);
+        return OS.ui.remove(windowId, nodeId);
       },
       append: function (parentId, nodes) {
-        return OS.append(windowId, parentId, Array.isArray(nodes) ? nodes : [nodes]);
+        return OS.ui.append(windowId, parentId, Array.isArray(nodes) ? nodes : [nodes]);
       },
       // 完整重繪 (適用於需要大幅度改變 UI 結構的場景，如切換分頁)
       rerender: function () {
         handlers = {};
         handlerCounter = 0;
         var tree = options.render(state, app);
-        OS.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+        OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
       },
       // 顯示系統右鍵選單
       showContextMenu: function (controlId, x, y, items) {
-        return OS.showContextMenu(windowId, controlId, x, y, items);
+        return OS.ui.showContextMenu(windowId, controlId, x, y, items);
       },
       closeContextMenu: function () {
-        return OS.closeContextMenu();
+        return OS.ui.closeContextMenu();
       },
     };
 
     // 初始繪製 (僅此一次)
     var tree = options.render(state, app);
-    OS.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+    OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
     return app;
   }
 
@@ -124,7 +124,7 @@
       } else {
         if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
       }
-      return OS.stack(children, s, id, events);
+      return OS.ui.stack(children, s, id, events);
     },
     row: function (children, styleOrOptions, id) {
       var s = { flexDirection: 'row', gap: '8px' };
@@ -137,7 +137,7 @@
       } else {
         if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
       }
-      return OS.stack(children, s, id, events);
+      return OS.ui.stack(children, s, id, events);
     },
     box: function (children, styleOrOptions, id) {
       var events;
@@ -145,9 +145,9 @@
         var opts = styleOrOptions;
         id = opts.id || id || allocId();
         events = bindEvents(id, opts);
-        return OS.panel(children, opts.style, id, events);
+        return OS.ui.panel(children, opts.style, id, events);
       }
-      return OS.panel(children, styleOrOptions, id);
+      return OS.ui.panel(children, styleOrOptions, id);
     },
 
     // 基本顯示
@@ -156,9 +156,9 @@
         var opts = styleOrOptions;
         id = opts.id || id || allocId();
         var events = bindEvents(id, opts);
-        return OS.label(text, opts.style, id, events);
+        return OS.ui.label(text, opts.style, id, events);
       }
-      return OS.label(text, styleOrOptions, id);
+      return OS.ui.label(text, styleOrOptions, id);
     },
     heading: function (text, styleOrOptions, id) {
       var s = { fontSize: '18px', fontWeight: 'bold' };
@@ -167,10 +167,10 @@
         if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
         id = opts.id || id || allocId();
         var events = bindEvents(id, opts);
-        return OS.label(text, s, id, events);
+        return OS.ui.label(text, s, id, events);
       }
       if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
-      return OS.label(text, s, id);
+      return OS.ui.label(text, s, id);
     },
     subheading: function (text, styleOrOptions, id) {
       var s = { fontSize: '14px', fontWeight: 'bold', color: 'rgba(216,232,255,0.7)' };
@@ -179,10 +179,10 @@
         if (opts.style) for (var k in opts.style) s[k] = opts.style[k];
         id = opts.id || id || allocId();
         var events = bindEvents(id, opts);
-        return OS.label(text, s, id, events);
+        return OS.ui.label(text, s, id, events);
       }
       if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
-      return OS.label(text, s, id);
+      return OS.ui.label(text, s, id);
     },
 
     // 互動元件 (自動綁定回呼)
@@ -199,7 +199,7 @@
           if (event.type === 'contextmenu' && options.onContextMenu) options.onContextMenu(event);
         };
       }
-      var node = OS.button(text, options.style, id);
+      var node = OS.ui.button(text, options.style, id);
       if (extraEvents.length > 0) node.events = extraEvents;
       return node;
     },
@@ -212,7 +212,7 @@
           if (event.type === 'submit' && options.onSubmit) options.onSubmit(event.value, event);
         };
       }
-      return OS.input(options.value, options.placeholder, options.style, id);
+      return OS.ui.input(options.value, options.placeholder, options.style, id);
     },
     textarea: function (options) {
       options = options || {};
@@ -222,7 +222,7 @@
           if (event.type === 'change') options.onChange(event.value, event);
         };
       }
-      return OS.textarea(options.value, options.placeholder, options.rows, options.style, id);
+      return OS.ui.textarea(options.value, options.placeholder, options.rows, options.style, id);
     },
     checkbox: function (options) {
       options = options || {};
@@ -230,7 +230,7 @@
       if (options.onChange) {
         handlers[id] = function (event) { options.onChange(event.value, event); };
       }
-      return OS.checkbox(options.checked, options.label, options.style, id);
+      return OS.ui.checkbox(options.checked, options.label, options.style, id);
     },
     select: function (options) {
       options = options || {};
@@ -238,20 +238,20 @@
       if (options.onChange) {
         handlers[id] = function (event) { options.onChange(event.value, event); };
       }
-      return OS.select(options.options || [], options.value, options.style, id);
+      return OS.ui.select(options.options || [], options.value, options.style, id);
     },
 
     // 顯示元件
     image: function (src, options) {
       options = options || {};
-      return OS.image(src, options.alt, options.style, options.id);
+      return OS.ui.image(src, options.alt, options.style, options.id);
     },
     separator: function (style, id) {
-      return OS.separator(style, id);
+      return OS.ui.separator(style, id);
     },
     progress: function (value, options) {
       options = options || {};
-      return OS.progress(value, options.color, options.style, options.id);
+      return OS.ui.progress(value, options.color, options.style, options.id);
     },
     list: function (children, styleOrOptions, id) {
       var events;
@@ -259,9 +259,9 @@
         var opts = styleOrOptions;
         id = opts.id || id || allocId();
         events = bindEvents(id, opts);
-        return OS.list(children, opts.style, id, events);
+        return OS.ui.list(children, opts.style, id, events);
       }
-      return OS.list(children, styleOrOptions, id);
+      return OS.ui.list(children, styleOrOptions, id);
     },
 
     // 複合元件
@@ -281,7 +281,7 @@
       } else {
         if (styleOrOptions) for (var k in styleOrOptions) s[k] = styleOrOptions[k];
       }
-      return OS.panel(children, s, id, events);
+      return OS.ui.panel(children, s, id, events);
     },
     badge: function (text, style) {
       var s = {
@@ -291,7 +291,7 @@
         background: 'rgba(255,255,255,0.05)',
       };
       if (style) for (var k in style) s[k] = style[k];
-      return OS.label(text, s);
+      return OS.ui.label(text, s);
     },
   };
 })();

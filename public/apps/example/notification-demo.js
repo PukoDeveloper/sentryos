@@ -1,6 +1,6 @@
 var styles = imports('styles.js');
 
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -83,7 +83,7 @@ var app = UI.createApp({
         UI.row([
           UI.button('發送通知', {
             onClick: function () {
-              var result = OS.notify(customTitle, customBody, currentType);
+              var result = OS.notification.notify(customTitle, customBody, currentType);
               if (result.success && result.data) {
                 lastNotifId = result.data;
                 sentCount++;
@@ -103,7 +103,7 @@ var app = UI.createApp({
           UI.button('關閉最後通知', {
             onClick: function () {
               if (lastNotifId) {
-                OS.dismiss(lastNotifId);
+                OS.notification.dismiss(lastNotifId);
                 self.patch('last-id', { text: '已關閉: ' + lastNotifId });
                 lastNotifId = '';
               }
@@ -128,7 +128,7 @@ var app = UI.createApp({
           UI.row(notifTypes.map(function (t) {
             return UI.button(t, {
               onClick: function () {
-                var result = OS.notify(t + ' 通知', '快速測試 ' + t + ' 類型', t);
+                var result = OS.notification.notify(t + ' 通知', '快速測試 ' + t + ' 類型', t);
                 if (result.success) {
                   sentCount++;
                   if (result.data) lastNotifId = result.data;

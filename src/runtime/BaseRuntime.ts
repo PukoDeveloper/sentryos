@@ -185,7 +185,7 @@ abstract class BaseRuntime implements IRuntime {
                     health
                 });
             }
-        }), ['service']);
+        }), ['service'], 'service');
 
         this.registerApi('windowApi', ({ pid, process }) => ({
             postUiEvent: (name: string, payload?: unknown) =>
@@ -194,7 +194,7 @@ abstract class BaseRuntime implements IRuntime {
                     name,
                     payload
                 })
-        }), ['window']);
+        }), ['window'], 'window');
 
         this.registerApi('consoleApi', ({ pid, process }) => ({
             writeLine: (text: unknown) => {
