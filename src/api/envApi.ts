@@ -78,5 +78,5 @@ export function registerEnvApi(kernel: Kernel): void {
       });
       return { success: true };
     },
-  }), ['env']);
+  }), ['env'], 'env');
 }

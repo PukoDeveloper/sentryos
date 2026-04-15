@@ -1,6 +1,6 @@
 var styles = imports('styles.js');
 
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -22,12 +22,12 @@ var app = UI.createApp({
   state: {},
   render: function (state, self) {
     // 取得所有變數
-    var allVarsResult = OS.getAllVariables();
+    var allVarsResult = OS.env.getAllVariables();
     var allVars = (allVarsResult.success && allVarsResult.data) ? allVarsResult.data : {};
     var varEntries = Object.keys(allVars);
 
     // 取得已載入函式庫
-    var libsResult = OS.listLibraries();
+    var libsResult = OS.env.listLibraries();
     var libs = (libsResult.success && libsResult.data) ? libsResult.data : [];
 
     return UI.column([
@@ -61,7 +61,7 @@ var app = UI.createApp({
           UI.row([
             UI.button('設定', {
               onClick: function () {
-                var result = OS.setVariable(varKey, varValue);
+                var result = OS.env.setVariable(varKey, varValue);
                 statusMsg = result.success ? '✓ 已設定 ' + varKey + '=' + varValue : '✗ ' + (result.error || '設定失敗');
                 self.patch('env-status', { text: statusMsg });
                 self.rerender();
@@ -70,7 +70,7 @@ var app = UI.createApp({
             }),
             UI.button('讀取', {
               onClick: function () {
-                var result = OS.getVariable(varKey);
+                var result = OS.env.getVariable(varKey);
                 if (result.success) {
                   statusMsg = varKey + ' = ' + (result.data !== undefined ? JSON.stringify(result.data) : '（未定義）');
                 } else {
@@ -82,7 +82,7 @@ var app = UI.createApp({
             }),
             UI.button('刪除', {
               onClick: function () {
-                var result = OS.removeVariable(varKey);
+                var result = OS.env.removeVariable(varKey);
                 statusMsg = result.success ? '✓ 已刪除 ' + varKey : '✗ ' + (result.error || '刪除失敗');
                 self.patch('env-status', { text: statusMsg });
                 self.rerender();

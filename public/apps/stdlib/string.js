@@ -47,10 +47,10 @@ globalThis.StringUtils = {
 
 // ── Register CLI commands ─────────────────────────────────────
 
-OS.registerCommand('reverse', 'Reverse a string', 'reverse <text>');
-OS.registerCommand('capitalize', 'Capitalize first letter', 'capitalize <text>');
-OS.registerCommand('wordcount', 'Count words in text', 'wordcount <text...>');
-OS.registerCommand('repeat', 'Repeat a string N times', 'repeat <text> <n>');
+OS.env.registerCommand('reverse', 'Reverse a string', 'reverse <text>');
+OS.env.registerCommand('capitalize', 'Capitalize first letter', 'capitalize <text>');
+OS.env.registerCommand('wordcount', 'Count words in text', 'wordcount <text...>');
+OS.env.registerCommand('repeat', 'Repeat a string N times', 'repeat <text> <n>');
 
 globalThis.__commands = globalThis.__commands || {};
 

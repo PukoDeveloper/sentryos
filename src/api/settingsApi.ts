@@ -1,9 +1,12 @@
 import type { Kernel } from '../kernel/Kernel';
-import type { ThemeSettings } from '../ui/DesktopShell';
+import type { ThemeSettings, TaskbarMode } from '../ui/DesktopShell';
 import { Permissions } from '../kernel/constants';
+
+const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const;
 
 const SETTINGS_KEY = 'system-theme';
 const NOTIFICATION_SETTINGS_KEY = 'notification-settings';
+const LANGUAGE_SETTINGS_KEY = 'system-language';
 const SETTINGS_TIER = 'sys' as const;
 
 export function registerSettingsApi(kernel: Kernel): void {
@@ -15,6 +18,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   const windowManager = kernel.resolve('windowManager');
   const environmentManager = kernel.resolve('environmentManager');
   const notificationManager = kernel.resolve('notificationManager');
+  const languageManager = kernel.resolve('languageManager');
   const systemAppId = kernel.get('systemAppId');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
@@ -36,6 +40,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
@@ -52,6 +57,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
@@ -171,7 +177,39 @@ export function registerSettingsApi(kernel: Kernel): void {
         })),
       };
     },
-  }), ['settings']);
+
+    // ── Language Settings ─────────────────────────────────────
+    getLanguage: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return {
+        success: true,
+        data: {
+          current: languageManager.getCurrentLocale(),
+          supported: languageManager.getSupportedLocales(),
+        },
+      };
+    },
+    setLanguage: (locale: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof locale !== 'string') {
+        return { success: false, error: 'InvalidLocale' };
+      }
+      const changed = languageManager.setLocale(locale);
+      if (!changed) {
+        return { success: true, data: false };
+      }
+      // 同步桌面外殼語系
+      desktopShell.setLocale(locale, (key: string) => languageManager.t('desktop', key));
+      // 持久化語言設定
+      fileSystem.write(systemAppId, SETTINGS_TIER, LANGUAGE_SETTINGS_KEY,
+        languageManager.exportSettings(), { overwrite: true });
+      return { success: true, data: true };
+    },
+  }), ['settings'], 'settings');
 
   // Load saved theme on boot
   const saved = fileSystem.read(systemAppId, SETTINGS_TIER, SETTINGS_KEY);
@@ -187,4 +225,12 @@ export function registerSettingsApi(kernel: Kernel): void {
     if (typeof ns.defaultDuration === 'number') notificationManager.defaultDuration = ns.defaultDuration;
     if (typeof ns.maxVisible === 'number') notificationManager.maxVisible = ns.maxVisible;
   }
+
+  // Load saved language settings on boot
+  const langSaved = fileSystem.read(systemAppId, SETTINGS_TIER, LANGUAGE_SETTINGS_KEY);
+  if (langSaved.success && langSaved.data && typeof langSaved.data.data === 'object') {
+    languageManager.importSettings(langSaved.data.data as { locale?: string });
+  }
+  // Apply loaded language to desktop shell
+  desktopShell.setLocale(languageManager.getCurrentLocale(), (key: string) => languageManager.t('desktop', key));
 }

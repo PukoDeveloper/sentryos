@@ -17,12 +17,13 @@ type ThemeSettings = {
   accentPrimary?: string;
   accentSecondary?: string;
   taskbarOpacity?: number;
+  taskbarMode?: TaskbarMode;
   startMenuWidth?: number;
   startMenuHeight?: number;
   startMenuGroupByPackage?: boolean;
 };
 
-type TaskbarMode = 'docked' | 'floating' | 'floating-autohide';
+type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
 
 class DesktopShell {
   private root: HTMLDivElement | null = null;
@@ -37,6 +38,9 @@ class DesktopShell {
   private startSearchInput: HTMLInputElement | null = null;
   private startSearchList: HTMLDivElement | null = null;
   private startFolderList: HTMLDivElement | null = null;
+  private folderTabEl: HTMLButtonElement | null = null;
+  private searchTabEl: HTMLButtonElement | null = null;
+  private addFolderBtnEl: HTMLButtonElement | null = null;
   private allApps: RegisteredApplication[] = [];
   private openedWindows = new Map<string, WindowInfo>();
   private lastTaskbarFingerprint = '';
@@ -60,9 +64,18 @@ class DesktopShell {
   private expandedPackage: string | null = null;
   private taskbarMode: TaskbarMode = 'docked';
   private taskbarTrigger: HTMLDivElement | null = null;
-  private taskbarVisible = true;
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
+  private locale: string = 'zh-TW';
+  private translator: ((key: string) => string) | null = null;
+  private compactExpanded = false;
+  private compactDragging = false;
+  private compactDragOffset = { x: 0, y: 0 };
+
+  /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
+  private t(key: string): string {
+    return this.translator ? this.translator(key) : key;
+  }
 
   /** Return a stable identifier for an app that survives page refreshes */
   private stableId(app: RegisteredApplication): string {
@@ -101,7 +114,7 @@ class DesktopShell {
     const taskbar = document.createElement('div');
     taskbar.className = 'desktop-taskbar';
 
-    // Hover trigger zone for auto-hide floating taskbar
+    // Compact mode floating handle
     const taskbarTrigger = document.createElement('div');
     taskbarTrigger.className = 'desktop-taskbar-trigger';
 
@@ -120,12 +133,12 @@ class DesktopShell {
     const folderTab = document.createElement('button');
     folderTab.type = 'button';
     folderTab.className = 'desktop-start-tab is-active';
-    folderTab.textContent = '資料夾';
+    folderTab.textContent = this.t('tab.folders');
 
     const searchTab = document.createElement('button');
     searchTab.type = 'button';
     searchTab.className = 'desktop-start-tab';
-    searchTab.textContent = '搜尋';
+    searchTab.textContent = this.t('tab.search');
 
     tabBar.appendChild(folderTab);
     tabBar.appendChild(searchTab);
@@ -140,9 +153,9 @@ class DesktopShell {
     const addFolderBtn = document.createElement('button');
     addFolderBtn.type = 'button';
     addFolderBtn.className = 'desktop-start-folder-add';
-    addFolderBtn.textContent = '+ 新增資料夾';
+    addFolderBtn.textContent = this.t('btn.addFolder');
     addFolderBtn.addEventListener('click', () => {
-      this.addFolder('新資料夾');
+      this.addFolder(this.t('folder.default'));
     });
     folderToolbar.appendChild(addFolderBtn);
 
@@ -175,7 +188,7 @@ class DesktopShell {
     const startSearchInput = document.createElement('input');
     startSearchInput.className = 'desktop-start-search';
     startSearchInput.type = 'search';
-    startSearchInput.placeholder = '搜尋應用程式';
+    startSearchInput.placeholder = this.t('search.placeholder');
 
     const startSearchList = document.createElement('div');
     startSearchList.className = 'desktop-start-list';
@@ -218,6 +231,9 @@ class DesktopShell {
     this.startSearchInput = startSearchInput;
     this.startSearchList = startSearchList;
     this.startFolderList = startFolderList;
+    this.folderTabEl = folderTab;
+    this.searchTabEl = searchTab;
+    this.addFolderBtnEl = addFolderBtn;
     this.clockLabel = clock;
 
     startButton.addEventListener('click', () => {
@@ -232,10 +248,12 @@ class DesktopShell {
     folderTab.addEventListener('click', () => this.setActiveStartTab('folders', folderTab, searchTab, folderPane, searchPane));
     searchTab.addEventListener('click', () => this.setActiveStartTab('search', searchTab, folderTab, searchPane, folderPane));
 
-    // ── Floating taskbar hover events ──
-    taskbarTrigger.addEventListener('mouseenter', () => this.showFloatingTaskbar());
-    taskbar.addEventListener('mouseenter', () => this.showFloatingTaskbar());
-    taskbar.addEventListener('mouseleave', () => this.scheduleHideFloatingTaskbar());
+    // ── Compact mode: draggable handle + click to expand/collapse ──
+    taskbarTrigger.addEventListener('click', () => {
+      if (this.compactDragging) return;
+      this.toggleCompactExpand();
+    });
+    taskbarTrigger.addEventListener('mousedown', (e) => this.onCompactDragStart(e));
 
     this.loadFolders();
     this.renderTaskbar();
@@ -348,6 +366,9 @@ class DesktopShell {
       const h = Math.max(300, Math.min(800, theme.startMenuHeight));
       this.startPanel.style.setProperty('--start-menu-height', `${h}px`);
     }
+    if (theme.taskbarMode !== undefined) {
+      this.setTaskbarMode(theme.taskbarMode);
+    }
     if (theme.startMenuGroupByPackage !== undefined) {
       this.expandedPackage = null;
     }
@@ -370,21 +391,24 @@ class DesktopShell {
     if (!this.taskbarEl || !this.taskbarTrigger) return;
 
     // Reset classes
-    this.taskbarEl.classList.remove('is-floating', 'is-auto-hide', 'is-taskbar-visible');
+    this.taskbarEl.classList.remove('is-fullwidth', 'is-floating', 'is-compact', 'is-compact-expanded');
     this.taskbarTrigger.style.display = 'none';
+    this.taskbarTrigger.style.removeProperty('left');
+    this.taskbarTrigger.style.removeProperty('top');
+    this.taskbarTrigger.style.removeProperty('right');
+    this.taskbarTrigger.style.removeProperty('bottom');
+    this.compactExpanded = false;
 
     if (this.taskbarHideTimer !== null) {
       window.clearTimeout(this.taskbarHideTimer);
       this.taskbarHideTimer = null;
     }
 
-    if (mode === 'floating') {
-      this.taskbarEl.classList.add('is-floating');
-      this.taskbarVisible = true;
-    } else if (mode === 'floating-autohide') {
-      this.taskbarEl.classList.add('is-floating', 'is-auto-hide');
-      this.taskbarTrigger.style.display = 'block';
-      this.taskbarVisible = false;
+    if (mode === 'fullwidth') {
+      this.taskbarEl.classList.add('is-fullwidth');
+    } else if (mode === 'floating-compact') {
+      this.taskbarEl.classList.add('is-floating', 'is-compact');
+      this.taskbarTrigger.style.display = 'flex';
     }
     // 'docked' — default, no extra classes
 
@@ -399,34 +423,59 @@ class DesktopShell {
     this.taskbarModeChangeHandler = handler;
   }
 
-  private showFloatingTaskbar(): void {
-    if (this.taskbarMode !== 'floating-autohide' || !this.taskbarEl) return;
-
-    if (this.taskbarHideTimer !== null) {
-      window.clearTimeout(this.taskbarHideTimer);
-      this.taskbarHideTimer = null;
-    }
-
-    if (!this.taskbarVisible) {
-      this.taskbarVisible = true;
-      this.taskbarEl.classList.add('is-taskbar-visible');
-    }
+  setLocale(locale: string, translator?: (key: string) => string): void {
+    this.locale = locale;
+    if (translator) this.translator = translator;
+    this.updateLocaleStrings();
+    this.updateClock();
+    this.renderStartMenu();
+    this.renderFoldersTab();
   }
 
-  private scheduleHideFloatingTaskbar(): void {
-    if (this.taskbarMode !== 'floating-autohide' || !this.taskbarEl) return;
+  private updateLocaleStrings(): void {
+    if (this.folderTabEl) this.folderTabEl.textContent = this.t('tab.folders');
+    if (this.searchTabEl) this.searchTabEl.textContent = this.t('tab.search');
+    if (this.addFolderBtnEl) this.addFolderBtnEl.textContent = this.t('btn.addFolder');
+    if (this.startSearchInput) this.startSearchInput.placeholder = this.t('search.placeholder');
+  }
 
-    // 短暫延遲避免滑鼠快速移出時閃爍
-    if (this.taskbarHideTimer !== null) {
-      window.clearTimeout(this.taskbarHideTimer);
-    }
-    this.taskbarHideTimer = window.setTimeout(() => {
-      this.taskbarHideTimer = null;
-      // 若開始選單正在顯示，不隱藏 taskbar
-      if (this.startPanel && !this.startPanel.classList.contains('is-hidden')) return;
-      this.taskbarVisible = false;
-      this.taskbarEl?.classList.remove('is-taskbar-visible');
-    }, 400);
+  private toggleCompactExpand(): void {
+    if (this.taskbarMode !== 'floating-compact' || !this.taskbarEl) return;
+    this.compactExpanded = !this.compactExpanded;
+    this.taskbarEl.classList.toggle('is-compact-expanded', this.compactExpanded);
+  }
+
+  private onCompactDragStart(e: MouseEvent): void {
+    if (this.taskbarMode !== 'floating-compact' || !this.taskbarTrigger) return;
+    const rect = this.taskbarTrigger.getBoundingClientRect();
+    this.compactDragging = false;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    this.compactDragOffset.x = e.clientX - rect.left;
+    this.compactDragOffset.y = e.clientY - rect.top;
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!this.compactDragging && Math.abs(dx) + Math.abs(dy) < 5) return;
+      this.compactDragging = true;
+      const trigger = this.taskbarTrigger!;
+      // Clear auto-positioning so inline left/top take effect
+      trigger.style.right = 'auto';
+      trigger.style.bottom = 'auto';
+      trigger.style.left = `${Math.max(0, Math.min(window.innerWidth - 52, ev.clientX - this.compactDragOffset.x))}px`;
+      trigger.style.top = `${Math.max(0, Math.min(window.innerHeight - 52, ev.clientY - this.compactDragOffset.y))}px`;
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      // Reset dragging flag after a tick so click handler can check it
+      setTimeout(() => { this.compactDragging = false; }, 0);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }
 
   private renderTaskbar(): void {
@@ -827,12 +876,12 @@ class DesktopShell {
 
     if (!this.pinnedAppIds.includes(sid)) {
       items.push({
-        label: '📌 釘選到選單',
+        label: this.t('ctx.pin'),
         action: () => this.pinApp(sid),
       });
     } else {
       items.push({
-        label: '📌 從選單取消釘選',
+        label: this.t('ctx.unpin'),
         action: () => this.unpinApp(sid),
       });
     }
@@ -855,7 +904,7 @@ class DesktopShell {
     const y = e.clientY - (rootRect?.top ?? 0);
 
     const items: { label: string; action: () => void }[] = [
-      { label: '📌 從選單取消釘選', action: () => this.unpinApp(sid) },
+      { label: this.t('ctx.unpin'), action: () => this.unpinApp(sid) },
     ];
 
     for (const folder of this.folders) {
@@ -880,7 +929,7 @@ class DesktopShell {
 
     this.showContextMenu(x, y, [
       {
-        label: '✎ 重新命名',
+        label: this.t('ctx.rename'),
         action: () => {
           this.openFolderName = folderName;
           this.editingFolderName = folderName;
@@ -888,7 +937,7 @@ class DesktopShell {
         },
       },
       {
-        label: '🗑 刪除資料夾',
+        label: this.t('ctx.deleteFolder'),
         action: () => this.removeFolder(folderName),
       },
     ]);
@@ -926,7 +975,7 @@ class DesktopShell {
     if (this.folders.length === 0 && this.pinnedAppIds.length === 0) {
       const hint = document.createElement('div');
       hint.className = 'desktop-start-folder-empty';
-      hint.textContent = '在搜尋中右鍵點擊應用程式以新增到選單';
+      hint.textContent = this.t('hint.addFromSearch');
       this.startFolderList.appendChild(hint);
       return;
     }
@@ -1009,7 +1058,7 @@ class DesktopShell {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.className = 'desktop-start-folder-back-btn';
-    backBtn.textContent = '← 返回';
+    backBtn.textContent = this.t('btn.back');
     backBtn.addEventListener('click', () => {
       this.openFolderName = null;
       this.editingFolderName = null;
@@ -1067,7 +1116,7 @@ class DesktopShell {
       renameBtn.type = 'button';
       renameBtn.className = 'desktop-start-folder-rename-btn';
       renameBtn.textContent = '✎';
-      renameBtn.title = '重新命名';
+      renameBtn.title = this.t('tooltip.rename');
       renameBtn.addEventListener('click', () => {
         this.editingFolderName = folder.name;
         this.renderFoldersTab();
@@ -1081,7 +1130,7 @@ class DesktopShell {
     if (folder.appIds.length === 0) {
       const hint = document.createElement('div');
       hint.className = 'desktop-start-folder-empty';
-      hint.textContent = '從搜尋拖曳應用程式到此資料夾';
+      hint.textContent = this.t('hint.dragApp');
       this.startFolderList.appendChild(hint);
     } else {
       for (const sid of folder.appIds) {
@@ -1097,7 +1146,7 @@ class DesktopShell {
         removeBtn.type = 'button';
         removeBtn.className = 'desktop-start-folder-remove-app';
         removeBtn.textContent = '✕';
-        removeBtn.title = '從資料夾移除';
+        removeBtn.title = this.t('tooltip.removeFromFolder');
         removeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.removeAppFromFolder(folder.name, sid);
@@ -1269,7 +1318,7 @@ class DesktopShell {
     }
 
     const now = new Date();
-    this.clockLabel.textContent = now.toLocaleTimeString('zh-TW', {
+    this.clockLabel.textContent = now.toLocaleTimeString(this.locale, {
       hour: '2-digit',
       minute: '2-digit',
     });

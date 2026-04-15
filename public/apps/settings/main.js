@@ -1,4 +1,4 @@
-﻿var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+﻿var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -34,10 +34,17 @@ var opacitySteps = [
   { name: '不透明', value: 0.95 },
 ];
 
+var taskbarModes = [
+  { name: '固定', value: 'docked', desc: '工作列固定在底部' },
+  { name: '填滿', value: 'fullwidth', desc: '工作列填滿底部邊緣' },
+  { name: '精簡', value: 'floating-compact', desc: '最小化為可拖曳按鈕，點擊展開工作列' },
+];
+
 // ── State ────────────────────────────────────────────────────
 var selectedWallpaper = 0;
 var selectedAccent = 0;
 var selectedOpacity = 2;
+var selectedTaskbarMode = 0;
 var startMenuWidth = 380;
 var startMenuHeight = 480;
 var startMenuGroupByPackage = false;
@@ -52,7 +59,7 @@ var collapsed = {
 };
 
 // Load saved settings
-var saved = OS.loadSavedTheme();
+var saved = OS.settings.loadSavedTheme();
 if (saved.success && saved.data) {
   var d = saved.data;
   for (var i = 0; i < wallpapers.length; i++) {
@@ -63,6 +70,11 @@ if (saved.success && saved.data) {
   }
   for (var i = 0; i < opacitySteps.length; i++) {
     if (opacitySteps[i].value === d.taskbarOpacity) { selectedOpacity = i; break; }
+  }
+  if (typeof d.taskbarMode === 'string') {
+    for (var i = 0; i < taskbarModes.length; i++) {
+      if (taskbarModes[i].value === d.taskbarMode) { selectedTaskbarMode = i; break; }
+    }
   }
   if (typeof d.startMenuWidth === 'number') startMenuWidth = d.startMenuWidth;
   if (typeof d.startMenuHeight === 'number') startMenuHeight = d.startMenuHeight;
@@ -194,6 +206,7 @@ function buildThemeObject() {
     accentPrimary: accents[selectedAccent].primary,
     accentSecondary: accents[selectedAccent].secondary,
     taskbarOpacity: opacitySteps[selectedOpacity].value,
+    taskbarMode: taskbarModes[selectedTaskbarMode].value,
     startMenuWidth: startMenuWidth,
     startMenuHeight: startMenuHeight,
     startMenuGroupByPackage: startMenuGroupByPackage,
@@ -201,7 +214,7 @@ function buildThemeObject() {
 }
 
 function liveApply() {
-  OS.applyTheme(buildThemeObject());
+  OS.settings.applyTheme(buildThemeObject());
 }
 
 function collapsible(key, title, renderBody, self) {
@@ -235,13 +248,14 @@ var pages = [
   { id: 'storage', label: '💾  儲存空間' },
   { id: 'network', label: '🌐  網路' },
   { id: 'security', label: '🔒  安全性' },
+  { id: 'language', label: '🌐  語言' },
   { id: 'accessibility', label: '♿  無障礙' },
   { id: 'about', label: 'ℹ️  關於' },
 ];
 
 // ── Page renderers ───────────────────────────────────────────
 function renderHomePage(self) {
-  var info = OS.sysinfo();
+  var info = OS.settings.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([
@@ -257,6 +271,7 @@ function renderHomePage(self) {
       quickNavBtn('📦', '應用程式', 'apps', self),
       quickNavBtn('📂', '預設程式', 'defaults', self),
       quickNavBtn('💾', '儲存空間', 'storage', self),
+      quickNavBtn('🌐', '語言', 'language', self),
       quickNavBtn('🔒', '安全性', 'security', self),
       quickNavBtn('ℹ️', '關於', 'about', self),
     ], { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
@@ -314,7 +329,7 @@ function renderAppearancePage(self) {
     UI.box([], { height: '4px' }),
     collapsible('wallpaper', '桌面背景', renderWallpaperSection, self),
     collapsible('accent', '主題色', renderAccentSection, self),
-    collapsible('taskbar', '工作列透明度', renderTaskbarSection, self),
+    collapsible('taskbar', '工作列', renderTaskbarSection, self),
     collapsible('startmenu', '開始選單大小', renderStartMenuSection, self),
 
     UI.box([], { height: '8px' }),
@@ -361,6 +376,32 @@ function renderAccentSection(self) {
 }
 
 function renderTaskbarSection(self) {
+  // ── Mode selection ──
+  var modeItems = [];
+  for (var i = 0; i < taskbarModes.length; i++) {
+    (function (idx) {
+      var active = idx === selectedTaskbarMode;
+      modeItems.push(UI.button(taskbarModes[idx].name, {
+        onClick: function () {
+          selectedTaskbarMode = idx;
+          liveApply();
+          self.rerender();
+        },
+        style: {
+          padding: '10px 8px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: active ? 'bold' : 'normal',
+          background: active ? 'rgba(103,184,255,0.18)' : 'rgba(255,255,255,0.04)',
+          color: active ? '#67b8ff' : 'rgba(216,232,255,0.6)',
+          border: active ? '1px solid rgba(103,184,255,0.3)' : '1px solid transparent',
+          textAlign: 'center',
+        },
+      }));
+    })(i);
+  }
+
+  // ── Opacity selection ──
   var items = [];
   for (var i = 0; i < opacitySteps.length; i++) {
     (function (idx) {
@@ -377,7 +418,14 @@ function renderTaskbarSection(self) {
       }));
     })(i);
   }
-  return UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' });
+  return UI.column([
+    UI.text('顯示模式', sectionTitle),
+    UI.text(taskbarModes[selectedTaskbarMode].desc, { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
+    UI.box(modeItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box([], { height: '6px' }),
+    UI.text('透明度', sectionTitle),
+    UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }),
+  ], { gap: '6px' });
 }
 
 function renderStartMenuSection(self) {
@@ -471,6 +519,7 @@ function renderSaveRow(self) {
         selectedWallpaper = 0;
         selectedAccent = 0;
         selectedOpacity = 2;
+        selectedTaskbarMode = 0;
         startMenuWidth = 380;
         startMenuHeight = 480;
         startMenuGroupByPackage = false;
@@ -490,7 +539,7 @@ function renderSaveRow(self) {
     UI.button('儲存設定', {
       id: 'btn-save',
       onClick: function () {
-        var result = OS.saveTheme(buildThemeObject());
+        var result = OS.settings.saveTheme(buildThemeObject());
         if (result.success) {
           self.patch('btn-save', { text: '✓ 已儲存' });
           setTimeout(function () {
@@ -516,7 +565,7 @@ function renderSaveRow(self) {
 var notifSettings = { doNotDisturb: false, defaultDuration: 4000, maxVisible: 5 };
 
 function loadNotifSettings() {
-  var result = OS.getNotificationSettings();
+  var result = OS.settings.getNotificationSettings();
   if (result.success && result.data) {
     notifSettings = result.data;
   }
@@ -558,7 +607,7 @@ function renderNotificationsPage(self) {
         UI.button(notifSettings.doNotDisturb ? '🔕 已開啟' : '🔔 已關閉', {
           onClick: function () {
             notifSettings.doNotDisturb = !notifSettings.doNotDisturb;
-            OS.setNotificationSettings(notifSettings);
+            OS.settings.setNotificationSettings(notifSettings);
             self.rerender();
           },
           style: {
@@ -588,7 +637,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.defaultDuration = opt.value;
-                OS.setNotificationSettings(notifSettings);
+                OS.settings.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -620,7 +669,7 @@ function renderNotificationsPage(self) {
             return UI.button(opt.label, {
               onClick: function () {
                 notifSettings.maxVisible = opt.value;
-                OS.setNotificationSettings(notifSettings);
+                OS.settings.setNotificationSettings(notifSettings);
                 self.rerender();
               },
               style: {
@@ -648,7 +697,7 @@ function renderNotificationsPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button('發送測試', {
           onClick: function () {
-            OS.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
+            OS.notification.notify('測試通知', '這是一則來自系統設定的測試通知。', 'info');
           },
           style: {
             padding: '8px 18px',
@@ -670,9 +719,9 @@ function renderNotificationsPage(self) {
 var appsSelectedApp = null;
 
 function renderAppsPage(self) {
-  var appsResult = OS.getApps();
+  var appsResult = OS.settings.getApps();
   var apps = (appsResult.success && appsResult.data) ? appsResult.data : [];
-  var procsResult = OS.getAppProcesses();
+  var procsResult = OS.settings.getAppProcesses();
   var procs = (procsResult.success && procsResult.data) ? procsResult.data : [];
 
   // 每個 app 的執行中程序數
@@ -878,14 +927,14 @@ var defaultsNewApp = '';
 
 function renderDefaultsPage(self) {
   // 取得所有檔案類型關聯（陣列 [{ extension, appDefId, mimeType }]）
-  var handlersResult = OS.getAllFileTypeHandlers();
+  var handlersResult = OS.registry.getAllFileTypeHandlers();
   var handlers = (handlersResult.success && handlersResult.data) ? handlersResult.data : [];
   // 過濾掉空的 appDefId
   handlers = handlers.filter(function (h) { return h.appDefId; });
   handlers.sort(function (a, b) { return a.extension.localeCompare(b.extension); });
 
   // 取得所有可選應用程式（僅 Window / Console 類型）
-  var appsResult = OS.getApps();
+  var appsResult = OS.settings.getApps();
   var allApps = (appsResult.success && appsResult.data) ? appsResult.data : [];
   var launchableApps = allApps.filter(function (a) { return a.runtimeType === 'Window' || a.runtimeType === 'Console'; });
 
@@ -908,7 +957,7 @@ function renderDefaultsPage(self) {
           ], { flex: '1', gap: '2px' }),
           UI.button('移除', {
             onClick: function () {
-              OS.removeFileTypeHandler(h.extension);
+              OS.registry.removeFileTypeHandler(h.extension);
               self.rerender();
             },
             style: {
@@ -960,15 +1009,15 @@ function renderDefaultsPage(self) {
             onClick: function () {
               var ext = defaultsNewExt.trim().toLowerCase();
               if (!ext || ext.indexOf('.') !== 0) {
-                OS.notify('格式錯誤', '副檔名需以 . 開頭，例如 .txt', 'warning');
+                OS.notification.notify('格式錯誤', '副檔名需以 . 開頭，例如 .txt', 'warning');
                 return;
               }
               if (!defaultsNewApp) {
-                OS.notify('請選擇應用程式', '請從下拉選單中選擇一個應用程式', 'warning');
+                OS.notification.notify('請選擇應用程式', '請從下拉選單中選擇一個應用程式', 'warning');
                 return;
               }
-              OS.setFileTypeHandler(ext, defaultsNewApp);
-              OS.notify('已設定', ext + ' 將使用所選應用程式開啟', 'success');
+              OS.registry.setFileTypeHandler(ext, defaultsNewApp);
+              OS.notification.notify('已設定', ext + ' 將使用所選應用程式開啟', 'success');
               defaultsNewExt = '';
               defaultsNewApp = '';
               self.rerender();
@@ -1013,8 +1062,8 @@ var networkNewPattern = '';
 var networkNewDesc = '';
 
 function loadNetworkData() {
-  var statusResult = OS.getStatus();
-  var listResult = OS.getAllowlist();
+  var statusResult = OS.network.getStatus();
+  var listResult = OS.network.getAllowlist();
   return {
     status: (statusResult.success && statusResult.data) ? statusResult.data : { enabled: true, allowlistCount: 0, totalRequests: 0, blockedRequests: 0 },
     allowlist: (listResult.success && listResult.data) ? listResult.data : [],
@@ -1041,7 +1090,7 @@ function renderNetworkPage(self) {
         ], { flex: '1', gap: '2px' }),
         UI.button(status.enabled ? '🌐 已啟用' : '🚫 已停用', {
           onClick: function () {
-            OS.setEnabled(!status.enabled);
+            OS.network.setEnabled(!status.enabled);
             self.rerender();
           },
           style: {
@@ -1100,7 +1149,7 @@ function renderNetworkPage(self) {
             onClick: function () {
               var pat = networkNewPattern.trim();
               if (!pat) {
-                OS.notify('新增失敗', '請輸入網域規則', 'warning');
+                OS.notification.notify('新增失敗', '請輸入網域規則', 'warning');
                 return;
               }
               // 驗證格式：* | *.domain.tld | sub.domain.tld
@@ -1110,16 +1159,16 @@ function renderNetworkPage(self) {
               var domainRegex = new RegExp('^(\\*|\\*\\.' + label + '(\\.' + label + ')*\\.' + tld + '|' + label + '(\\.' + label + ')*\\.' + tld + ')$');
               var valid = domainRegex.test(pat);
               if (!valid) {
-                OS.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
+                OS.notification.notify('格式錯誤', '請輸入有效的網域，例如 example.com 或 *.example.com', 'error');
                 return;
               }
-              var result = OS.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
+              var result = OS.network.addAllowlistEntry(pat, networkNewDesc.trim() || undefined);
               if (result.success) {
-                OS.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
+                OS.notification.notify('已新增', '規則 ' + pat + ' 已加入允許清單', 'success');
                 networkNewPattern = '';
                 networkNewDesc = '';
               } else {
-                OS.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
+                OS.notification.notify('新增失敗', result.error === 'InvalidUrl' ? '此規則已存在或格式無效' : '發生未知錯誤', 'error');
               }
               self.rerender();
             },
@@ -1153,7 +1202,7 @@ function renderNetworkPage(self) {
             ], { flex: '1', gap: '1px' }),
             UI.button('移除', {
               onClick: function () {
-                OS.removeAllowlistEntry(entry.pattern);
+                OS.network.removeAllowlistEntry(entry.pattern);
                 self.rerender();
               },
               style: {
@@ -1207,7 +1256,7 @@ function renderAccessibilityPage(self) {
 
 // ── 關於頁面 ─────────────────────────────────────────────────
 function renderAboutPage(self) {
-  var info = OS.sysinfo();
+  var info = OS.settings.sysinfo();
   var data = (info.success && info.data) ? info.data : {};
 
   return UI.column([
@@ -1246,6 +1295,71 @@ function renderAboutPage(self) {
         UI.text(data.apps !== undefined ? String(data.apps) : '—', infoValue),
       ], infoRowStyle),
     ], { gap: '4px' }),
+  ], { gap: '8px', flex: '1' });
+}
+
+// ── Language Page ─────────────────────────────────────────────
+function renderLanguagePage(self) {
+  var langResult = OS.settings.getLanguage();
+  var langData = (langResult.success && langResult.data) ? langResult.data : {};
+  var current = langData.current || 'zh-TW';
+  var supported = langData.supported || [];
+
+  var langItems = [];
+  for (var i = 0; i < supported.length; i++) {
+    (function (lang) {
+      var isActive = lang.code === current;
+      langItems.push(UI.button(lang.nativeName + (lang.name !== lang.nativeName ? '  (' + lang.name + ')' : ''), {
+        onClick: function () {
+          if (!isActive) {
+            OS.settings.setLanguage(lang.code);
+            self.rerender();
+          }
+        },
+        style: {
+          padding: '12px 16px',
+          borderRadius: '10px',
+          fontSize: '13px',
+          fontWeight: isActive ? 'bold' : 'normal',
+          background: isActive ? 'rgba(103,184,255,0.15)' : 'rgba(255,255,255,0.03)',
+          color: isActive ? '#67b8ff' : '#d8e8ff',
+          border: isActive ? '1px solid rgba(103,184,255,0.3)' : '1px solid rgba(255,255,255,0.06)',
+          textAlign: 'left',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+      }));
+    })(supported[i]);
+  }
+
+  return UI.column([
+    UI.heading('語言設定', { color: '#ecf4ff' }),
+    UI.text('選擇系統顯示語言。語言變更會即時通知所有支援多語系的應用程式。', {
+      fontSize: '13px', color: 'rgba(216,232,255,0.45)', lineHeight: '1.5',
+    }),
+
+    UI.box([], { height: '8px' }),
+
+    UI.text('目前語言：' + current, {
+      fontSize: '13px', color: 'rgba(216,232,255,0.6)',
+    }),
+
+    UI.box([], { height: '4px' }),
+
+    UI.column(langItems, { gap: '6px' }),
+
+    UI.box([], { height: '12px' }),
+
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('應用程式多語系', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('應用程式可透過載入 stdlib/i18n 函式庫來支援多語系。語言切換時會自動通知已載入 i18n 的應用程式更新介面。',
+            { fontSize: '12px', color: 'rgba(216,232,255,0.4)', lineHeight: '1.5' }),
+        ], { flex: '1', gap: '4px' }),
+      ], { alignItems: 'flex-start' }),
+    ]),
   ], { gap: '8px', flex: '1' });
 }
 
@@ -1307,6 +1421,7 @@ var app = UI.createApp({
       case 'defaults': content = renderDefaultsPage(self); break;
       case 'storage': content = renderStoragePage(self); break;
       case 'network': content = renderNetworkPage(self); break;
+      case 'language': content = renderLanguagePage(self); break;
       case 'security': content = renderSecurityPage(self); break;
       case 'accessibility': content = renderAccessibilityPage(self); break;
       case 'about': content = renderAboutPage(self); break;

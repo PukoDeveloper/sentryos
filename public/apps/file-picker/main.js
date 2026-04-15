@@ -1,4 +1,4 @@
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -32,7 +32,7 @@ function onFileOpen(args) {
 
 // ── Helpers ─────────────────────────────────────────────────
 function loadEntries() {
-  var result = OS.listAllFiles('user');
+  var result = OS.storage.listAllFiles('user');
   if (!result.success) { state.entries = []; state.namespaces = []; return; }
   var all = result.data || [];
   state.entries = all;
@@ -300,7 +300,7 @@ function render(s, self) {
       onClick: function () {
         var name = (s.saveName || '').trim();
         if (!name) {
-          OS.notify('請輸入檔案名稱', '', 'warning');
+          OS.notification.notify('請輸入檔案名稱', '', 'warning');
           return;
         }
         var fullPath = s.currentNamespace ? s.currentNamespace + '/' + name : name;

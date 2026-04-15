@@ -1,4 +1,4 @@
-var _loadResult = OS.loadLibrary('stdlib/UI Utils');
+var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 if (!_loadResult.success) {
   throw new Error('Failed to load UI library: ' + (_loadResult.error || 'Unknown'));
 }
@@ -18,7 +18,7 @@ function saveDocument() {
   if (!state.currentFilename) return;
   var filename = state.currentFilename.trim();
   if (!filename) {
-    OS.notify('儲存失敗', '檔案名稱不可為空', 'warning');
+    OS.notification.notify('儲存失敗', '檔案名稱不可為空', 'warning');
     return;
   }
 
@@ -27,23 +27,23 @@ function saveDocument() {
 
   // 若檔名變更（且有舊 key），先刪除舊檔
   if (state.currentKey && state.currentKey !== savePath) {
-    OS.deleteFile('user:' + state.currentKey);
+    OS.storage.deleteFile('user:' + state.currentKey);
   }
 
-  var result = OS.writeFile('user:' + savePath, state.currentContent, { overwrite: true });
+  var result = OS.storage.writeFile('user:' + savePath, state.currentContent, { overwrite: true });
   if (result.success) {
     state.currentKey = savePath;
     state.dirty = false;
-    OS.notify('已儲存', filename, 'success');
+    OS.notification.notify('已儲存', filename, 'success');
   } else {
-    OS.notify('儲存失敗', result.error || '未知錯誤', 'error');
+    OS.notification.notify('儲存失敗', result.error || '未知錯誤', 'error');
   }
 }
 
 function deleteDocument(key) {
-  var result = OS.deleteFile('user:' + key);
+  var result = OS.storage.deleteFile('user:' + key);
   if (result.success) {
-    OS.notify('已刪除', '文件已刪除', 'info');
+    OS.notification.notify('已刪除', '文件已刪除', 'info');
   }
 }
 
@@ -64,9 +64,9 @@ function openFilePicker() {
 }
 
 function openDocument(key) {
-  var result = OS.readFile('user:' + key);
+  var result = OS.storage.readFile('user:' + key);
   if (!result.success) {
-    OS.notify('開啟失敗', result.error || '未知錯誤', 'error');
+    OS.notification.notify('開啟失敗', result.error || '未知錯誤', 'error');
     return;
   }
   state.currentKey = key;
@@ -285,7 +285,7 @@ function onFileOpen(file) {
 
   if (file.tier === 'user') {
     // user 層是共享空間，直接用 key 讀取
-    var result = OS.readFile('user:' + file.key);
+    var result = OS.storage.readFile('user:' + file.key);
     if (result.success && result.data) {
       var raw = result.data.data;
       if (raw && typeof raw === 'object' && raw.content !== undefined) {
@@ -305,9 +305,9 @@ function onFileOpen(file) {
     if (slashIdx >= 0) filename = filename.slice(slashIdx + 1);
 
     var path = file.tier + ':@' + file.key;
-    var result = OS.readFile(path);
+    var result = OS.storage.readFile(path);
     if (!result.success) {
-      result = OS.readFile(file.tier + ':' + filename);
+      result = OS.storage.readFile(file.tier + ':' + filename);
     }
     if (result.success && result.data) {
       var raw = result.data.data;

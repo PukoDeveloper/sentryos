@@ -66,5 +66,5 @@ export function registerUiApi(kernel: Kernel): void {
       // ── Node 建構器（來自 registry）─────────────────────────
       ...nodeBuilders,
     };
-  }, ['window']);
+  }, ['window'], 'ui');
 }
