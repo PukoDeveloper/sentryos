@@ -32,6 +32,9 @@ type AppEntryManifest = {
     maxInstances?: number;
     autoStart?: boolean;
     hidden?: boolean;
+    /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
+     *  省略時預設使用 'quickjs'。 */
+    engine?: string;
 };
 
 /** 舊格式：單一應用程式清單（向下相容） */
@@ -60,6 +63,9 @@ type RegisteredApplication = Application & {
     runtimeType: AppType;
     autoStart: boolean;
     hidden: boolean;
+    /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
+     *  省略時預設使用 'quickjs'。 */
+    engine?: string;
 };
 
 // ── Catalog Loader ──────────────────────────────────────────
@@ -184,6 +190,7 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
         runtimeType,
         autoStart: entry.autoStart ?? defaultAutoStart(runtimeType),
         hidden: entry.hidden === true,
+        engine: entry.engine,
     };
 }
 

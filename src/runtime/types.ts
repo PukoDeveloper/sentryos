@@ -43,15 +43,20 @@ type Message = {
     timestamp: number;
 };
 
-type RuntimeProcess = {
-    runtime: any;
-    context: any;
+/** 所有 Runtime 引擎共用的基礎程序狀態（與引擎無關）。 */
+type BaseProcessState = {
     inbox: Message[];
     eventSubscriptions: Map<string, (...args: unknown[]) => void>;
+    /** 應用程式套件根目錄（用於模組路徑解析） */
+    entryPath: string | null;
+};
+
+/** QuickJS 引擎的完整程序狀態（繼承自 BaseProcessState）。 */
+type RuntimeProcess = BaseProcessState & {
+    runtime: any;
+    context: any;
     /** 模組快取：已載入模組的路徑 → 匯出值 */
     moduleCache: Map<string, unknown>;
-    /** 應用程式套件根目錄（用於 imports() 路徑解析） */
-    entryPath: string | null;
     /** imports() 是否已注入 */
     importsInjected?: boolean;
     /** 已註冊的 host-side timer ID 集合（用於 process 銷毀時清理） */
@@ -76,6 +81,7 @@ export type {
     ApiFactoryContext,
     ApiFactory,
     Message,
+    BaseProcessState,
     RuntimeProcess,
     ResponseType,
 
