@@ -1,0 +1,82 @@
+// ── RuntimeRegistry ───────────────────────────────────────────
+// 管理多個 Runtime 引擎實例，並追蹤程序與引擎的對應關係。
+// ApplicationLauncher 在啟動應用程式時，根據 manifest 的 engine 欄位
+// 路由到正確的 Runtime 實例。
+
+import type { IRuntime } from './IRuntime';
+
+/** 所有 QuickJS（預設）引擎的識別字串 */
+const DEFAULT_ENGINE = 'quickjs';
+
+class RuntimeRegistry {
+    private readonly runtimes = new Map<string, IRuntime>();
+    /** pid → engine 名稱 */
+    private readonly pidEngines = new Map<number, string>();
+    /** processAppId → engine 名稱 */
+    private readonly appIdEngines = new Map<string, string>();
+    private defaultEngine = DEFAULT_ENGINE;
+
+    // ── 引擎管理 ────────────────────────────────────────────
+
+    /** 以 engine 名稱（例如 'quickjs'）註冊一個 Runtime 實例。 */
+    register(engine: string, runtime: IRuntime): void {
+        this.runtimes.set(engine, runtime);
+    }
+
+    /** 取得指定引擎的 Runtime 實例（未找到時回傳 undefined）。 */
+    get(engine: string): IRuntime | undefined {
+        return this.runtimes.get(engine);
+    }
+
+    /** 取得預設引擎的 Runtime 實例。 */
+    getDefault(): IRuntime {
+        const runtime = this.runtimes.get(this.defaultEngine);
+        if (!runtime) {
+            throw new Error(`Default runtime engine '${this.defaultEngine}' is not registered`);
+        }
+        return runtime;
+    }
+
+    /** 設定預設引擎名稱（預設為 'quickjs'）。 */
+    setDefault(engine: string): void {
+        this.defaultEngine = engine;
+    }
+
+    has(engine: string): boolean {
+        return this.runtimes.has(engine);
+    }
+
+    // ── 程序追蹤 ────────────────────────────────────────────
+
+    /** 在程序啟動時記錄該程序使用的引擎，以便後續路由。 */
+    bindProcess(pid: number, processAppId: string, engine: string): void {
+        this.pidEngines.set(pid, engine);
+        this.appIdEngines.set(processAppId, engine);
+    }
+
+    /** 在程序終止時解除追蹤。 */
+    unbindProcess(pid: number, processAppId: string): void {
+        this.pidEngines.delete(pid);
+        this.appIdEngines.delete(processAppId);
+    }
+
+    /**
+     * 根據 PID 取得負責該程序的 Runtime 實例。
+     * 若未找到追蹤記錄，回傳預設引擎。
+     */
+    getForPid(pid: number): IRuntime {
+        const engine = this.pidEngines.get(pid) ?? this.defaultEngine;
+        return this.runtimes.get(engine) ?? this.getDefault();
+    }
+
+    /**
+     * 根據 processAppId 取得負責該程序的 Runtime 實例。
+     * 若未找到追蹤記錄，回傳預設引擎。
+     */
+    getForProcessAppId(processAppId: string): IRuntime {
+        const engine = this.appIdEngines.get(processAppId) ?? this.defaultEngine;
+        return this.runtimes.get(engine) ?? this.getDefault();
+    }
+}
+
+export { RuntimeRegistry, DEFAULT_ENGINE };
