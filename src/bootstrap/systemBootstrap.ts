@@ -24,6 +24,7 @@ import { bios } from '../ui/Bios';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager } from '../plugin/PluginManager';
 import { LanguageManager } from '../language/LanguageManager';
+import { desktopShellPack, systemAlertPack, bootstrapPack, kernelConsolePack } from '../language/systemPacks';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -34,7 +35,19 @@ function bufferedLog(source: string, level: Parameters<typeof bios.log>[1], mess
 }
 
 // ── System-level error: show BIOS error screen ──────────────────
-function showSystemError(title: string, error?: unknown): void {
+function bootT(kernel: Kernel | undefined, key: string, fallback: string): string {
+  try {
+    if (kernel) {
+      const lm = kernel.resolve('languageManager') as LanguageManager;
+      return lm.t('bootstrap', key);
+    }
+  } catch { /* languageManager may not be available yet */ }
+  return fallback;
+}
+
+function showSystemError(title: string, error?: unknown, kernel?: Kernel): void {
+  const restartLabel = bootT(kernel, 'boot.btn.restart', '重新啟動系統');
+
   const details = [...bootLog];
   if (error instanceof Error) {
     details.push('', `[CRITICAL] ${error.message}`);
@@ -49,7 +62,7 @@ function showSystemError(title: string, error?: unknown): void {
 
   bios.destroyBootTerminal();
   bios.showErrorScreen(title, details, [
-    { label: '重新啟動系統', handler: () => location.reload() },
+    { label: restartLabel, handler: () => location.reload() },
   ]);
 }
 
@@ -76,12 +89,12 @@ async function bootstrapSystem(): Promise<void> {
   try {
     const catalogResult = await loadApplicationCatalog();
     if (!catalogResult.success || !catalogResult.data) {
-      showSystemError('應用程式目錄載入失敗', catalogResult.error ?? 'UnknownError');
+      showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
       return;
     }
     catalogApps = catalogResult.data;
   } catch (err) {
-    showSystemError('應用程式目錄載入失敗', err);
+    showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
     return;
   }
 
@@ -122,7 +135,7 @@ async function bootstrapSystem(): Promise<void> {
   // 4. Mount desktop shell
   const mounted = desktopShell.mount(applications);
   if (!mounted) {
-    showSystemError('桌面外殼掛載失敗', 'Desktop shell mount failed — app container is unavailable');
+    showSystemError(bootT(kernel, 'boot.shellMountFailed', '桌面外殼掛載失敗'), 'Desktop shell mount failed — app container is unavailable', kernel);
     return;
   }
 
@@ -140,7 +153,7 @@ async function bootstrapSystem(): Promise<void> {
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
   if (!windowHost) {
-    showSystemError('桌面外殼掛載失敗', 'Desktop shell has no window host element');
+    showSystemError(bootT(kernel, 'boot.shellMountFailed', '桌面外殼掛載失敗'), 'Desktop shell has no window host element', kernel);
     return;
   }
 
@@ -346,6 +359,12 @@ async function initializeCore(): Promise<Kernel> {
 
   const languageManager = new LanguageManager(kernel);
   kernel.register('languageManager', languageManager);
+
+  // 註冊系統翻譯包
+  languageManager.registerSystemPack('desktop', desktopShellPack);
+  languageManager.registerSystemPack('alert', systemAlertPack);
+  languageManager.registerSystemPack('bootstrap', bootstrapPack);
+  languageManager.registerSystemPack('console', kernelConsolePack);
 
   const notificationManager = new NotificationManager();
   kernel.register('notificationManager', notificationManager);

@@ -38,6 +38,9 @@ class DesktopShell {
   private startSearchInput: HTMLInputElement | null = null;
   private startSearchList: HTMLDivElement | null = null;
   private startFolderList: HTMLDivElement | null = null;
+  private folderTabEl: HTMLButtonElement | null = null;
+  private searchTabEl: HTMLButtonElement | null = null;
+  private addFolderBtnEl: HTMLButtonElement | null = null;
   private allApps: RegisteredApplication[] = [];
   private openedWindows = new Map<string, WindowInfo>();
   private lastTaskbarFingerprint = '';
@@ -64,9 +67,15 @@ class DesktopShell {
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
   private locale: string = 'zh-TW';
+  private translator: ((key: string) => string) | null = null;
   private compactExpanded = false;
   private compactDragging = false;
   private compactDragOffset = { x: 0, y: 0 };
+
+  /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
+  private t(key: string): string {
+    return this.translator ? this.translator(key) : key;
+  }
 
   /** Return a stable identifier for an app that survives page refreshes */
   private stableId(app: RegisteredApplication): string {
@@ -124,12 +133,12 @@ class DesktopShell {
     const folderTab = document.createElement('button');
     folderTab.type = 'button';
     folderTab.className = 'desktop-start-tab is-active';
-    folderTab.textContent = '資料夾';
+    folderTab.textContent = this.t('tab.folders');
 
     const searchTab = document.createElement('button');
     searchTab.type = 'button';
     searchTab.className = 'desktop-start-tab';
-    searchTab.textContent = '搜尋';
+    searchTab.textContent = this.t('tab.search');
 
     tabBar.appendChild(folderTab);
     tabBar.appendChild(searchTab);
@@ -144,9 +153,9 @@ class DesktopShell {
     const addFolderBtn = document.createElement('button');
     addFolderBtn.type = 'button';
     addFolderBtn.className = 'desktop-start-folder-add';
-    addFolderBtn.textContent = '+ 新增資料夾';
+    addFolderBtn.textContent = this.t('btn.addFolder');
     addFolderBtn.addEventListener('click', () => {
-      this.addFolder('新資料夾');
+      this.addFolder(this.t('folder.default'));
     });
     folderToolbar.appendChild(addFolderBtn);
 
@@ -179,7 +188,7 @@ class DesktopShell {
     const startSearchInput = document.createElement('input');
     startSearchInput.className = 'desktop-start-search';
     startSearchInput.type = 'search';
-    startSearchInput.placeholder = '搜尋應用程式';
+    startSearchInput.placeholder = this.t('search.placeholder');
 
     const startSearchList = document.createElement('div');
     startSearchList.className = 'desktop-start-list';
@@ -222,6 +231,9 @@ class DesktopShell {
     this.startSearchInput = startSearchInput;
     this.startSearchList = startSearchList;
     this.startFolderList = startFolderList;
+    this.folderTabEl = folderTab;
+    this.searchTabEl = searchTab;
+    this.addFolderBtnEl = addFolderBtn;
     this.clockLabel = clock;
 
     startButton.addEventListener('click', () => {
@@ -411,9 +423,20 @@ class DesktopShell {
     this.taskbarModeChangeHandler = handler;
   }
 
-  setLocale(locale: string): void {
+  setLocale(locale: string, translator?: (key: string) => string): void {
     this.locale = locale;
+    if (translator) this.translator = translator;
+    this.updateLocaleStrings();
     this.updateClock();
+    this.renderStartMenu();
+    this.renderFoldersTab();
+  }
+
+  private updateLocaleStrings(): void {
+    if (this.folderTabEl) this.folderTabEl.textContent = this.t('tab.folders');
+    if (this.searchTabEl) this.searchTabEl.textContent = this.t('tab.search');
+    if (this.addFolderBtnEl) this.addFolderBtnEl.textContent = this.t('btn.addFolder');
+    if (this.startSearchInput) this.startSearchInput.placeholder = this.t('search.placeholder');
   }
 
   private toggleCompactExpand(): void {
@@ -853,12 +876,12 @@ class DesktopShell {
 
     if (!this.pinnedAppIds.includes(sid)) {
       items.push({
-        label: '📌 釘選到選單',
+        label: this.t('ctx.pin'),
         action: () => this.pinApp(sid),
       });
     } else {
       items.push({
-        label: '📌 從選單取消釘選',
+        label: this.t('ctx.unpin'),
         action: () => this.unpinApp(sid),
       });
     }
@@ -881,7 +904,7 @@ class DesktopShell {
     const y = e.clientY - (rootRect?.top ?? 0);
 
     const items: { label: string; action: () => void }[] = [
-      { label: '📌 從選單取消釘選', action: () => this.unpinApp(sid) },
+      { label: this.t('ctx.unpin'), action: () => this.unpinApp(sid) },
     ];
 
     for (const folder of this.folders) {
@@ -906,7 +929,7 @@ class DesktopShell {
 
     this.showContextMenu(x, y, [
       {
-        label: '✎ 重新命名',
+        label: this.t('ctx.rename'),
         action: () => {
           this.openFolderName = folderName;
           this.editingFolderName = folderName;
@@ -914,7 +937,7 @@ class DesktopShell {
         },
       },
       {
-        label: '🗑 刪除資料夾',
+        label: this.t('ctx.deleteFolder'),
         action: () => this.removeFolder(folderName),
       },
     ]);
@@ -952,7 +975,7 @@ class DesktopShell {
     if (this.folders.length === 0 && this.pinnedAppIds.length === 0) {
       const hint = document.createElement('div');
       hint.className = 'desktop-start-folder-empty';
-      hint.textContent = '在搜尋中右鍵點擊應用程式以新增到選單';
+      hint.textContent = this.t('hint.addFromSearch');
       this.startFolderList.appendChild(hint);
       return;
     }
@@ -1035,7 +1058,7 @@ class DesktopShell {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.className = 'desktop-start-folder-back-btn';
-    backBtn.textContent = '← 返回';
+    backBtn.textContent = this.t('btn.back');
     backBtn.addEventListener('click', () => {
       this.openFolderName = null;
       this.editingFolderName = null;
@@ -1093,7 +1116,7 @@ class DesktopShell {
       renameBtn.type = 'button';
       renameBtn.className = 'desktop-start-folder-rename-btn';
       renameBtn.textContent = '✎';
-      renameBtn.title = '重新命名';
+      renameBtn.title = this.t('tooltip.rename');
       renameBtn.addEventListener('click', () => {
         this.editingFolderName = folder.name;
         this.renderFoldersTab();
@@ -1107,7 +1130,7 @@ class DesktopShell {
     if (folder.appIds.length === 0) {
       const hint = document.createElement('div');
       hint.className = 'desktop-start-folder-empty';
-      hint.textContent = '從搜尋拖曳應用程式到此資料夾';
+      hint.textContent = this.t('hint.dragApp');
       this.startFolderList.appendChild(hint);
     } else {
       for (const sid of folder.appIds) {
@@ -1123,7 +1146,7 @@ class DesktopShell {
         removeBtn.type = 'button';
         removeBtn.className = 'desktop-start-folder-remove-app';
         removeBtn.textContent = '✕';
-        removeBtn.title = '從資料夾移除';
+        removeBtn.title = this.t('tooltip.removeFromFolder');
         removeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.removeAppFromFolder(folder.name, sid);

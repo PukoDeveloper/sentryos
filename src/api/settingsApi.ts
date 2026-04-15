@@ -203,7 +203,7 @@ export function registerSettingsApi(kernel: Kernel): void {
         return { success: true, data: false };
       }
       // 同步桌面外殼語系
-      desktopShell.setLocale(locale);
+      desktopShell.setLocale(locale, (key: string) => languageManager.t('desktop', key));
       // 持久化語言設定
       fileSystem.write(systemAppId, SETTINGS_TIER, LANGUAGE_SETTINGS_KEY,
         languageManager.exportSettings(), { overwrite: true });
@@ -232,5 +232,5 @@ export function registerSettingsApi(kernel: Kernel): void {
     languageManager.importSettings(langSaved.data.data as { locale?: string });
   }
   // Apply loaded language to desktop shell
-  desktopShell.setLocale(languageManager.getCurrentLocale());
+  desktopShell.setLocale(languageManager.getCurrentLocale(), (key: string) => languageManager.t('desktop', key));
 }

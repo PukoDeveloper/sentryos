@@ -7,6 +7,7 @@
 
 import type { Kernel } from '../kernel/Kernel';
 import type { ConsoleWindowController } from '../window/types';
+import type { LanguageManager } from '../language/LanguageManager';
 import { Permissions, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 
 // ── Types ───────────────────────────────────────────────────
@@ -55,6 +56,17 @@ class KernelConsole {
     this.registerBuiltinCommands();
   }
 
+  // ── i18n helper ─────────────────────────────────────────
+
+  private t(key: string): string {
+    try {
+      const lm = this.kernel.resolve('languageManager') as LanguageManager;
+      return lm.t('console', key);
+    } catch {
+      return key;
+    }
+  }
+
   // ── Kernel accessors ────────────────────────────────────
 
   private get userAppId() { return this.kernel.get('userAppId'); }
@@ -73,8 +85,8 @@ class KernelConsole {
     const session: ConsoleSession = { id, processAppId, pid, controller };
     this.sessions.set(id, session);
 
-    controller.appendLine('=== SentryOS Terminal ===');
-    controller.appendLine('Type "help" for available commands.');
+    controller.appendLine(this.t('console.welcome'));
+    controller.appendLine(this.t('console.helpHint'));
     controller.appendLine('');
 
     return id;
@@ -134,8 +146,8 @@ class KernelConsole {
   private dispatchDynamicCommand(session: ConsoleSession, cmd: string, args: string[]): void {
     const entry = this.environmentManager.getCommand(cmd);
     if (!entry) {
-      session.controller.appendLine('Unknown command: ' + cmd);
-      session.controller.appendLine('Type "help" or "commands" for available commands.');
+      session.controller.appendLine(this.t('console.unknownCmd') + cmd);
+      session.controller.appendLine(this.t('console.helpOrCommands'));
       return;
     }
 
@@ -160,7 +172,7 @@ class KernelConsole {
     const result = this.runtime.execute(session.pid, code);
     if (result.success) {
       if (result.data === '__CMD_NOT_FOUND__') {
-        session.controller.appendLine('Command handler not found: ' + cmd);
+        session.controller.appendLine(this.t('console.cmdNotFound') + cmd);
       } else if (result.data) {
         session.controller.appendLine(String(result.data));
       }
@@ -173,7 +185,7 @@ class KernelConsole {
 
   private checkPermission(ctx: CommandContext, permission: string): boolean {
     if (this.permissions.has(this.userAppId, permission)) return true;
-    ctx.writeLine('Permission denied: ' + permission);
+    ctx.writeLine(this.t('console.permissionDenied') + permission);
     return false;
   }
 
@@ -181,28 +193,27 @@ class KernelConsole {
 
   private registerBuiltinCommands(): void {
     this.commands.set('help', (ctx) => {
-      ctx.writeLine('Application commands:');
-      ctx.writeLine('  help              - Show this help message');
-      ctx.writeLine('  echo <msg>        - Echo a message');
-      ctx.writeLine('  clear             - Clear the console');
-      ctx.writeLine('  eval <expr>       - Evaluate a JavaScript expression');
-      ctx.writeLine('  exit              - Terminate this terminal');
+      ctx.writeLine(this.t('console.help.title.app'));
+      ctx.writeLine(this.t('console.help.help'));
+      ctx.writeLine(this.t('console.help.echo'));
+      ctx.writeLine(this.t('console.help.clear'));
+      ctx.writeLine(this.t('console.help.eval'));
+      ctx.writeLine(this.t('console.help.exit'));
       ctx.writeLine('');
-      ctx.writeLine('Library commands:');
-      ctx.writeLine('  libs              - List available libraries');
-      ctx.writeLine('  load <lib>        - Load a library into this session');
+      ctx.writeLine(this.t('console.help.title.lib'));
+      ctx.writeLine(this.t('console.help.libs'));
+      ctx.writeLine(this.t('console.help.load'));
       ctx.writeLine('');
-      ctx.writeLine('System commands:');
-      ctx.writeLine('  ps                - List running processes');
-      ctx.writeLine('  kill <pid>        - Terminate a process');
-      ctx.writeLine('  apps              - List installed applications');
-      ctx.writeLine('  launch <name|id>  - Launch an application');
-      ctx.writeLine('  windows           - List open windows');
-      ctx.writeLine('  sysinfo           - Show system information');
-      ctx.writeLine('  commands          - List registered CLI commands');
+      ctx.writeLine(this.t('console.help.title.sys'));
+      ctx.writeLine(this.t('console.help.ps'));
+      ctx.writeLine(this.t('console.help.kill'));
+      ctx.writeLine(this.t('console.help.apps'));
+      ctx.writeLine(this.t('console.help.launch'));
+      ctx.writeLine(this.t('console.help.windows'));
+      ctx.writeLine(this.t('console.help.sysinfo'));
+      ctx.writeLine(this.t('console.help.commands'));
       ctx.writeLine('');
-      ctx.writeLine('CLI commands from libraries can be invoked directly.');
-      ctx.writeLine('Example: factorial 10, reverse hello');
+      ctx.writeLine(this.t('console.help.footer'));
     });
 
     this.commands.set('echo', (ctx) => {
@@ -214,7 +225,7 @@ class KernelConsole {
     });
 
     this.commands.set('exit', (ctx) => {
-      ctx.writeLine('Goodbye!');
+      ctx.writeLine(this.t('console.goodbye'));
       setTimeout(() => this.launcher.terminateApplication(ctx.session.processAppId, 'User exit'), 0);
     });
 
@@ -222,7 +233,7 @@ class KernelConsole {
 
     this.commands.set('eval', (ctx) => {
       const expr = ctx.args.join(' ');
-      if (!expr) { ctx.writeLine('Usage: eval <expression>'); return; }
+      if (!expr) { ctx.writeLine(this.t('console.usage.eval')); return; }
       const result = this.runtime.execute(ctx.session.pid, expr);
       if (result.success) {
         ctx.writeLine(String(result.data));
@@ -237,9 +248,9 @@ class KernelConsole {
       if (!this.checkPermission(ctx, Permissions.ENV_READ)) return;
       const ids = this.environmentManager.getLibraryIds();
       if (ids.length === 0) {
-        ctx.writeLine('No libraries available.');
+        ctx.writeLine(this.t('console.noLibraries'));
       } else {
-        ctx.writeLine('Available libraries (' + ids.length + '):');
+        ctx.writeLine(this.t('console.availableLibraries') + ' (' + ids.length + '):');
         for (const id of ids) ctx.writeLine('  ' + id);
       }
     });
@@ -247,14 +258,14 @@ class KernelConsole {
     this.commands.set('load', (ctx) => {
       if (!this.checkPermission(ctx, Permissions.ENV_LOAD_LIBRARY)) return;
       const libId = ctx.args.join(' ');
-      if (!libId) { ctx.writeLine('Usage: load <library-id>'); return; }
+      if (!libId) { ctx.writeLine(this.t('console.usage.load')); return; }
       const source = this.environmentManager.getLibraryCode(libId);
-      if (!source) { ctx.writeLine('Library not found: ' + libId); return; }
+      if (!source) { ctx.writeLine(this.t('console.libNotFound') + libId); return; }
       const result = this.runtime.execute(ctx.session.pid, source);
       if (result.success) {
-        ctx.writeLine('Library loaded: ' + libId);
+        ctx.writeLine(this.t('console.libLoaded') + libId);
       } else {
-        ctx.writeLine('Failed: ' + String(result.data ?? result.error));
+        ctx.writeLine(this.t('console.libFailed') + String(result.data ?? result.error));
       }
     });
 
@@ -277,16 +288,16 @@ class KernelConsole {
 
     this.commands.set('kill', (ctx) => {
       if (!this.checkPermission(ctx, Permissions.PROCESS_TERMINATE)) return;
-      if (ctx.args.length === 0) { ctx.writeLine('Usage: kill <pid>'); return; }
+      if (ctx.args.length === 0) { ctx.writeLine(this.t('console.usage.kill')); return; }
       const targetPid = parseInt(ctx.args[0], 10);
-      if (isNaN(targetPid)) { ctx.writeLine('Invalid PID: ' + ctx.args[0]); return; }
+      if (isNaN(targetPid)) { ctx.writeLine(this.t('console.invalidPid') + ctx.args[0]); return; }
       const target = this.processManager.get(targetPid);
-      if (!target) { ctx.writeLine('Process not found: ' + targetPid); return; }
+      if (!target) { ctx.writeLine(this.t('console.processNotFound') + targetPid); return; }
       const reason = target.pid === ctx.session.pid
         ? 'Self-terminated via shell'
         : `Killed by console session via shell`;
       setTimeout(() => this.launcher.terminateApplication(target.processAppId, reason), 0);
-      ctx.writeLine('Process ' + targetPid + ' terminated.');
+      ctx.writeLine(this.t('console.processTerminated'));
     });
 
     // ── App commands ────────────────────────────────────
@@ -309,17 +320,17 @@ class KernelConsole {
     this.commands.set('launch', (ctx) => {
       if (!this.checkPermission(ctx, Permissions.SHELL_LAUNCH)) return;
       const name = ctx.args.join(' ');
-      if (!name) { ctx.writeLine('Usage: launch <name|id>'); return; }
+      if (!name) { ctx.writeLine(this.t('console.usage.launch')); return; }
       const catalogApps = this.kernel.get('catalogApps');
       const app = catalogApps.find(a => a.appId === name || a.name === name);
-      if (!app) { ctx.writeLine('App not found: ' + name); return; }
-      if (app.runtimeType === 'Library') { ctx.writeLine('Cannot launch a library'); return; }
+      if (!app) { ctx.writeLine(this.t('console.appNotFound') + name); return; }
+      if (app.runtimeType === 'Library') { ctx.writeLine(this.t('console.cannotLaunchLib')); return; }
       if (app.appId === BUILTIN_KERNEL_CONSOLE) {
         this.launcher.launchKernelConsole(BUILTIN_KERNEL_CONSOLE, app.name, app.icon);
       } else {
         this.launcher.launchApplication({ app, type: app.runtimeType });
       }
-      ctx.writeLine('Launching: ' + app.name);
+      ctx.writeLine(this.t('console.launching') + app.name);
     });
 
     // ── Window commands ─────────────────────────────────
@@ -328,7 +339,7 @@ class KernelConsole {
       if (!this.checkPermission(ctx, Permissions.SHELL_WINDOWS)) return;
       const wins = this.windowManager.getOpenWindowSummaries();
       if (wins.length === 0) {
-        ctx.writeLine('No windows open.');
+        ctx.writeLine(this.t('console.noWindows'));
       } else {
         ctx.writeLine(padRight('TITLE', 25) + padRight('STATE', 12) + 'PROCESS');
         ctx.writeLine('-----------------------  ----------  -------');
@@ -363,13 +374,13 @@ class KernelConsole {
           ? `${uptimeMin}m ${uptimeSec % 60}s`
           : `${uptimeSec}s`;
 
-      ctx.writeLine('SentryOS System Information');
-      ctx.writeLine('  Uptime:      ' + uptime);
-      ctx.writeLine('  Processes:   ' + running + ' running / ' + allProcs.length + ' total');
-      ctx.writeLine('  Windows:     ' + windows);
-      ctx.writeLine('  Libraries:   ' + libs.length);
-      ctx.writeLine('  Commands:    ' + cmds.length + ' registered');
-      ctx.writeLine('  Apps:        ' + catalogApps.length + ' installed');
+      ctx.writeLine(this.t('console.sysinfo'));
+      ctx.writeLine(this.t('console.sysinfo.uptime') + uptime);
+      ctx.writeLine(this.t('console.sysinfo.processes') + running + this.t('console.sysinfo.processesRunning') + allProcs.length + this.t('console.sysinfo.processesTotal'));
+      ctx.writeLine(this.t('console.sysinfo.windows') + windows);
+      ctx.writeLine(this.t('console.sysinfo.libraries') + libs.length);
+      ctx.writeLine(this.t('console.sysinfo.commands') + cmds.length + this.t('console.sysinfo.commandsRegistered'));
+      ctx.writeLine(this.t('console.sysinfo.apps') + catalogApps.length + this.t('console.sysinfo.appsInstalled'));
     });
 
     // ── Command registry ────────────────────────────────
@@ -377,7 +388,7 @@ class KernelConsole {
     this.commands.set('commands', (ctx) => {
       const cmds = this.environmentManager.getAllCommands();
       if (cmds.length === 0) {
-        ctx.writeLine('No commands registered.');
+        ctx.writeLine(this.t('console.noCommands'));
       } else {
         ctx.writeLine(padRight('COMMAND', 16) + padRight('DESCRIPTION', 35) + 'LIBRARY');
         ctx.writeLine('--------------  ---------------------------------  -------');

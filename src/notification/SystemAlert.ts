@@ -10,6 +10,7 @@
 //   alert.show({ code: 'APP_LAUNCH_FAILED', title: '啟動失敗', body: '...' });
 
 import type { Kernel } from '../kernel/Kernel';
+import type { LanguageManager } from '../language/LanguageManager';
 
 // ── Alert Code 列舉 ────────────────────────────────────────
 export type AlertCode =
@@ -34,39 +35,49 @@ export interface SystemAlertOptions {
 }
 
 interface AlertPreset {
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
   level: AlertLevel;
 }
 
 const ALERT_PRESETS: Record<AlertCode, AlertPreset> = {
   PERMISSION_DENIED: {
-    title: '權限不足',
-    body: '你沒有執行此操作的權限。',
+    titleKey: 'alert.permissionDenied.title',
+    bodyKey: 'alert.permissionDenied.body',
     level: 'warning',
   },
   APP_LAUNCH_FAILED: {
-    title: '應用程式啟動失敗',
-    body: '無法啟動應用程式，請稍後再試。',
+    titleKey: 'alert.appLaunchFailed.title',
+    bodyKey: 'alert.appLaunchFailed.body',
     level: 'error',
   },
   APP_FETCH_FAILED: {
-    title: '無法載入應用程式',
-    body: '應用程式的主程式檔案載入失敗。',
+    titleKey: 'alert.appFetchFailed.title',
+    bodyKey: 'alert.appFetchFailed.body',
     level: 'error',
   },
   SYSTEM_ERROR: {
-    title: '系統錯誤',
-    body: '發生了非預期的系統錯誤。',
+    titleKey: 'alert.systemError.title',
+    bodyKey: 'alert.systemError.body',
     level: 'error',
   },
 };
 
 class SystemAlert {
   private container: HTMLDivElement | null = null;
+  private readonly kernel: Kernel;
 
-  constructor(_kernel: Kernel) {
-    // kernel reserved for future use (e.g. permission-gated alerts)
+  constructor(kernel: Kernel) {
+    this.kernel = kernel;
+  }
+
+  private t(key: string): string {
+    try {
+      const lm = this.kernel.resolve('languageManager') as LanguageManager;
+      return lm.t('alert', key);
+    } catch {
+      return key;
+    }
   }
 
   /** 建立浮層容器，回傳供 DesktopShell.registerOverlay 掛載 */
@@ -83,8 +94,8 @@ class SystemAlert {
 
     const preset = ALERT_PRESETS[options.code];
     const level = options.level ?? preset.level;
-    const title = options.title ?? preset.title;
-    let body = options.body ?? preset.body;
+    const title = options.title ?? this.t(preset.titleKey);
+    let body = options.body ?? this.t(preset.bodyKey);
     if (options.detail) {
       body += `\n${options.detail}`;
     }
@@ -119,7 +130,7 @@ class SystemAlert {
     const btnEl = document.createElement('button');
     btnEl.type = 'button';
     btnEl.className = 'system-alert-btn';
-    btnEl.textContent = '確定';
+    btnEl.textContent = this.t('alert.btn.ok');
     dialog.appendChild(btnEl);
 
     backdrop.appendChild(dialog);
