@@ -5,7 +5,7 @@
 
 import type { IRuntime } from './IRuntime';
 
-/** 所有 QuickJS（預設）引擎的識別字串 */
+/** 預設 Runtime 引擎的識別字串（QuickJS-emscripten） */
 const DEFAULT_ENGINE = 'quickjs';
 
 class RuntimeRegistry {
