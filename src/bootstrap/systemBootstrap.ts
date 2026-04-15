@@ -1,5 +1,6 @@
 import { initializeQuickJS } from '../runtime/QuickJsInit';
 import { ScriptRuntime } from '../runtime/ScriptRuntime';
+import { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import { PermissionsManager } from '../permissions/PermissionsManager';
 import { EventBus } from '../events/EventBus';
 import { ApplicationManager, type Application } from '../application/ApplicationManager';
@@ -165,7 +166,7 @@ async function bootstrapSystem(): Promise<void> {
 
   const systemAppId = kernel.get('systemAppId');
   const processManager = kernel.resolve('processManager');
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const eventBus = kernel.resolve('eventBus');
   const systemMonitor = kernel.resolve('systemMonitor');
 
@@ -182,7 +183,8 @@ async function bootstrapSystem(): Promise<void> {
         const proc = processManager.getByProcessAppId(event.processAppId);
         if (proc) {
           systemMonitor.recordProcessTerminate(proc.pid, proc.appDefId);
-          runtime.destroyProcessRuntime(proc.pid);
+          runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
+          runtimeRegistry.unbindProcess(proc.pid, proc.processAppId);
           processManager.terminate(systemAppId, proc.pid);
           eventBus.emit(systemAppId, Events.PROCESS_STOPPED, {
             pid: proc.pid,
@@ -195,7 +197,7 @@ async function bootstrapSystem(): Promise<void> {
 
     if (event.type === 'resized' && event.bounds) {
       try {
-        runtime.dispatchUiEvent(event.processAppId, {
+        runtimeRegistry.getForProcessAppId(event.processAppId).dispatchUiEvent(event.processAppId, {
           eventId: '',
           windowId: event.windowId,
           processAppId: event.processAppId,
@@ -247,7 +249,7 @@ async function bootstrapSystem(): Promise<void> {
     const focusedProcessAppId = windowManager.getFocusedProcessAppId();
     if (focusedProcessAppId) {
       try {
-        runtime.dispatchKeyboardEvent(focusedProcessAppId, keyEvent);
+        runtimeRegistry.getForProcessAppId(focusedProcessAppId).dispatchKeyboardEvent(focusedProcessAppId, keyEvent);
       } catch { /* process may be gone */ }
     } else {
       eventBus.emit(systemAppId, Events.KEYBOARD, keyEvent);
@@ -330,6 +332,10 @@ async function initializeCore(): Promise<Kernel> {
 
   const runtime = new ScriptRuntime(kernel);
   kernel.register('runtime', runtime);
+
+  const runtimeRegistry = new RuntimeRegistry();
+  runtimeRegistry.register('quickjs', runtime);
+  kernel.register('runtimeRegistry', runtimeRegistry);
 
   const fileSystem = new WebFileSystemAdapter(kernel);
   kernel.register('fileSystem', fileSystem);
