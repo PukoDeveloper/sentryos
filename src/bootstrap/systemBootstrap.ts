@@ -21,6 +21,7 @@ import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
+import { PluginManager } from '../plugin/PluginManager';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -153,6 +154,12 @@ async function bootstrapSystem(): Promise<void> {
   });
   kernel.register('windowManager', windowManager);
 
+  // Wire floating taskbar mode to window manager
+  desktopShell.onTaskbarModeChange((mode) => {
+    const height = mode === 'docked' ? 96 : 0;
+    windowManager.setMaximizedTaskbarHeight(height);
+  });
+
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
 
@@ -249,7 +256,29 @@ async function bootstrapSystem(): Promise<void> {
   document.addEventListener('keydown', handleKeyboardEvent);
   document.addEventListener('keyup', handleKeyboardEvent);
 
-  // 8. Boot auto-start apps (Library → Service → Window/Console)
+  // 8. Load plugins
+  try {
+    const pluginManager = new PluginManager(kernel);
+    kernel.register('pluginManager', pluginManager);
+
+    const pluginListRes = await fetch('/plugins.json');
+    if (pluginListRes.ok) {
+      const pluginPaths: string[] = await pluginListRes.json();
+      const result = await pluginManager.loadPlugins(pluginPaths);
+      for (const path of result.loaded) {
+        bufferedLog('BOOT', 'INFO', `Plugin loaded: ${path}`);
+      }
+      for (const { path, error } of result.failed) {
+        bufferedLog('BOOT', 'WARN', `Plugin failed: ${path} — ${error}`);
+      }
+    } else {
+      bufferedLog('BOOT', 'INFO', 'No plugins.json found, skipping plugin loading');
+    }
+  } catch (err) {
+    bufferedLog('BOOT', 'WARN', `Plugin loading error: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 9. Boot auto-start apps (Library → Service → Window/Console)
   // 自動啟動由系統發起，使用 systemAppId 繞過使用者權限限制
   const systemAppIdForBoot = kernel.get('systemAppId');
   const libraries = catalogApps.filter(a => a.runtimeType === 'Library');
