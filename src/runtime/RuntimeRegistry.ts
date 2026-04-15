@@ -46,6 +46,11 @@ class RuntimeRegistry {
         return this.runtimes.has(engine);
     }
 
+    /** 移除指定引擎的 Runtime 實例（例如插件卸載時）。 */
+    unregister(engine: string): boolean {
+        return this.runtimes.delete(engine);
+    }
+
     // ── 程序追蹤 ────────────────────────────────────────────
 
     /** 在程序啟動時記錄該程序使用的引擎，以便後續路由。 */
