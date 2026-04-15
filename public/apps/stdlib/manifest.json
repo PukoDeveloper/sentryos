@@ -24,6 +24,12 @@
             "name": "UI Utils",
             "main": "ui.js",
             "type": "Library"
+        },
+        {
+            "id": "stdlib-i18n",
+            "name": "i18n",
+            "main": "i18n.js",
+            "type": "Library"
         }
     ]
 }

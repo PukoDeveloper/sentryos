@@ -6,6 +6,7 @@ const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const
 
 const SETTINGS_KEY = 'system-theme';
 const NOTIFICATION_SETTINGS_KEY = 'notification-settings';
+const LANGUAGE_SETTINGS_KEY = 'system-language';
 const SETTINGS_TIER = 'sys' as const;
 
 export function registerSettingsApi(kernel: Kernel): void {
@@ -17,6 +18,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   const windowManager = kernel.resolve('windowManager');
   const environmentManager = kernel.resolve('environmentManager');
   const notificationManager = kernel.resolve('notificationManager');
+  const languageManager = kernel.resolve('languageManager');
   const systemAppId = kernel.get('systemAppId');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
@@ -175,6 +177,38 @@ export function registerSettingsApi(kernel: Kernel): void {
         })),
       };
     },
+
+    // ── Language Settings ─────────────────────────────────────
+    getLanguage: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return {
+        success: true,
+        data: {
+          current: languageManager.getCurrentLocale(),
+          supported: languageManager.getSupportedLocales(),
+        },
+      };
+    },
+    setLanguage: (locale: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof locale !== 'string') {
+        return { success: false, error: 'InvalidLocale' };
+      }
+      const changed = languageManager.setLocale(locale);
+      if (!changed) {
+        return { success: true, data: false };
+      }
+      // 同步桌面外殼語系
+      desktopShell.setLocale(locale);
+      // 持久化語言設定
+      fileSystem.write(systemAppId, SETTINGS_TIER, LANGUAGE_SETTINGS_KEY,
+        languageManager.exportSettings(), { overwrite: true });
+      return { success: true, data: true };
+    },
   }), ['settings'], 'settings');
 
   // Load saved theme on boot
@@ -191,4 +225,12 @@ export function registerSettingsApi(kernel: Kernel): void {
     if (typeof ns.defaultDuration === 'number') notificationManager.defaultDuration = ns.defaultDuration;
     if (typeof ns.maxVisible === 'number') notificationManager.maxVisible = ns.maxVisible;
   }
+
+  // Load saved language settings on boot
+  const langSaved = fileSystem.read(systemAppId, SETTINGS_TIER, LANGUAGE_SETTINGS_KEY);
+  if (langSaved.success && langSaved.data && typeof langSaved.data.data === 'object') {
+    languageManager.importSettings(langSaved.data.data as { locale?: string });
+  }
+  // Apply loaded language to desktop shell
+  desktopShell.setLocale(languageManager.getCurrentLocale());
 }

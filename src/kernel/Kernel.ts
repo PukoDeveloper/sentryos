@@ -19,6 +19,7 @@ import type { NetworkAdapter } from '../network/NetworkAdapter';
 import type { SystemRegistry } from '../registry/SystemRegistry';
 import type { DialogManager } from '../dialog/DialogManager';
 import type { PluginManager } from '../plugin/PluginManager';
+import type { LanguageManager } from '../language/LanguageManager';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -40,6 +41,7 @@ export interface ServiceMap {
   systemRegistry: SystemRegistry;
   dialogManager: DialogManager;
   pluginManager: PluginManager;
+  languageManager: LanguageManager;
 }
 
 export interface ValueMap {

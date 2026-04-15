@@ -248,6 +248,7 @@ var pages = [
   { id: 'storage', label: '💾  儲存空間' },
   { id: 'network', label: '🌐  網路' },
   { id: 'security', label: '🔒  安全性' },
+  { id: 'language', label: '🌐  語言' },
   { id: 'accessibility', label: '♿  無障礙' },
   { id: 'about', label: 'ℹ️  關於' },
 ];
@@ -270,6 +271,7 @@ function renderHomePage(self) {
       quickNavBtn('📦', '應用程式', 'apps', self),
       quickNavBtn('📂', '預設程式', 'defaults', self),
       quickNavBtn('💾', '儲存空間', 'storage', self),
+      quickNavBtn('🌐', '語言', 'language', self),
       quickNavBtn('🔒', '安全性', 'security', self),
       quickNavBtn('ℹ️', '關於', 'about', self),
     ], { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
@@ -1296,6 +1298,71 @@ function renderAboutPage(self) {
   ], { gap: '8px', flex: '1' });
 }
 
+// ── Language Page ─────────────────────────────────────────────
+function renderLanguagePage(self) {
+  var langResult = OS.settings.getLanguage();
+  var langData = (langResult.success && langResult.data) ? langResult.data : {};
+  var current = langData.current || 'zh-TW';
+  var supported = langData.supported || [];
+
+  var langItems = [];
+  for (var i = 0; i < supported.length; i++) {
+    (function (lang) {
+      var isActive = lang.code === current;
+      langItems.push(UI.button(lang.nativeName + (lang.name !== lang.nativeName ? '  (' + lang.name + ')' : ''), {
+        onClick: function () {
+          if (!isActive) {
+            OS.settings.setLanguage(lang.code);
+            self.rerender();
+          }
+        },
+        style: {
+          padding: '12px 16px',
+          borderRadius: '10px',
+          fontSize: '13px',
+          fontWeight: isActive ? 'bold' : 'normal',
+          background: isActive ? 'rgba(103,184,255,0.15)' : 'rgba(255,255,255,0.03)',
+          color: isActive ? '#67b8ff' : '#d8e8ff',
+          border: isActive ? '1px solid rgba(103,184,255,0.3)' : '1px solid rgba(255,255,255,0.06)',
+          textAlign: 'left',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+      }));
+    })(supported[i]);
+  }
+
+  return UI.column([
+    UI.heading('語言設定', { color: '#ecf4ff' }),
+    UI.text('選擇系統顯示語言。語言變更會即時通知所有支援多語系的應用程式。', {
+      fontSize: '13px', color: 'rgba(216,232,255,0.45)', lineHeight: '1.5',
+    }),
+
+    UI.box([], { height: '8px' }),
+
+    UI.text('目前語言：' + current, {
+      fontSize: '13px', color: 'rgba(216,232,255,0.6)',
+    }),
+
+    UI.box([], { height: '4px' }),
+
+    UI.column(langItems, { gap: '6px' }),
+
+    UI.box([], { height: '12px' }),
+
+    UI.card([
+      UI.row([
+        UI.column([
+          UI.text('應用程式多語系', { fontSize: '14px', fontWeight: 'bold', color: '#d8e8ff' }),
+          UI.text('應用程式可透過載入 stdlib/i18n 函式庫來支援多語系。語言切換時會自動通知已載入 i18n 的應用程式更新介面。',
+            { fontSize: '12px', color: 'rgba(216,232,255,0.4)', lineHeight: '1.5' }),
+        ], { flex: '1', gap: '4px' }),
+      ], { alignItems: 'flex-start' }),
+    ]),
+  ], { gap: '8px', flex: '1' });
+}
+
 // ── Stub 區塊 ────────────────────────────────────────────────
 function stubSection(title, desc) {
   return UI.card([
@@ -1354,6 +1421,7 @@ var app = UI.createApp({
       case 'defaults': content = renderDefaultsPage(self); break;
       case 'storage': content = renderStoragePage(self); break;
       case 'network': content = renderNetworkPage(self); break;
+      case 'language': content = renderLanguagePage(self); break;
       case 'security': content = renderSecurityPage(self); break;
       case 'accessibility': content = renderAccessibilityPage(self); break;
       case 'about': content = renderAboutPage(self); break;

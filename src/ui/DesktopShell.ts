@@ -63,6 +63,7 @@ class DesktopShell {
   private taskbarTrigger: HTMLDivElement | null = null;
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
+  private locale: string = 'zh-TW';
   private compactExpanded = false;
   private compactDragging = false;
   private compactDragOffset = { x: 0, y: 0 };
@@ -408,6 +409,11 @@ class DesktopShell {
 
   onTaskbarModeChange(handler: (mode: TaskbarMode) => void): void {
     this.taskbarModeChangeHandler = handler;
+  }
+
+  setLocale(locale: string): void {
+    this.locale = locale;
+    this.updateClock();
   }
 
   private toggleCompactExpand(): void {
@@ -1289,7 +1295,7 @@ class DesktopShell {
     }
 
     const now = new Date();
-    this.clockLabel.textContent = now.toLocaleTimeString('zh-TW', {
+    this.clockLabel.textContent = now.toLocaleTimeString(this.locale, {
       hour: '2-digit',
       minute: '2-digit',
     });

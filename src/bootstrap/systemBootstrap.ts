@@ -23,6 +23,7 @@ import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager } from '../plugin/PluginManager';
+import { LanguageManager } from '../language/LanguageManager';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -342,6 +343,9 @@ async function initializeCore(): Promise<Kernel> {
 
   const environmentManager = new EnvironmentManager();
   kernel.register('environmentManager', environmentManager);
+
+  const languageManager = new LanguageManager(kernel);
+  kernel.register('languageManager', languageManager);
 
   const notificationManager = new NotificationManager();
   kernel.register('notificationManager', notificationManager);

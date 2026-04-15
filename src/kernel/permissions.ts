@@ -91,6 +91,7 @@ export const Events = {
   PROCESS_STOPPED: 'process.stopped',
   NOTIFICATION: 'notification',
   KEYBOARD: 'keyboard',
+  LANGUAGE_CHANGED: 'language.changed',
 } as const;
 
 // ── User Default Permissions ────────────────────────────────
