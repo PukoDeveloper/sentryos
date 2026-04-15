@@ -1,8 +1,10 @@
 import type { Kernel } from '../kernel/Kernel';
 import type { RegisteredApplication } from './ApplicationCatalog';
 import type { ConsoleWindowController, WindowUiEvent } from '../window/types';
+import type { RuntimeResult } from '../runtime/types';
 import { bios } from '../ui/Bios';
 import { Events, type AppType } from '../kernel/constants';
+import { DEFAULT_ENGINE } from '../runtime/RuntimeRegistry';
 
 export interface LaunchContext {
   app: RegisteredApplication;
@@ -26,7 +28,7 @@ export class ApplicationLauncher {
   private get eventBus() { return this.kernel.resolve('eventBus'); }
   private get appManager() { return this.kernel.resolve('appManager'); }
   private get processManager() { return this.kernel.resolve('processManager'); }
-  private get runtime() { return this.kernel.resolve('runtime'); }
+  private get runtimeRegistry() { return this.kernel.resolve('runtimeRegistry'); }
   private get windowManager() { return this.kernel.resolve('windowManager'); }
   private get environmentManager() { return this.kernel.resolve('environmentManager'); }
   private get systemMonitor() { return this.kernel.resolve('systemMonitor'); }
@@ -59,8 +61,9 @@ export class ApplicationLauncher {
       try { this.windowManager.closeWindow(processAppId, wid); } catch { /* window may already be gone */ }
     }
 
-    // Destroy QuickJS runtime
-    this.runtime.destroyProcessRuntime(proc.pid);
+    // Destroy the process's runtime and remove tracking
+    this.runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
+    this.runtimeRegistry.unbindProcess(proc.pid, processAppId);
 
     // Terminate process tree
     this.processManager.terminate(this.systemAppId, proc.pid);
@@ -89,7 +92,7 @@ export class ApplicationLauncher {
     const processes = this.processManager.getByApp(appDefId);
     for (const proc of processes) {
       if (proc.status === 'running') {
-        this.runtime.dispatchFileOpen(proc.processAppId, fileArgs);
+        this.runtimeRegistry.getForPid(proc.pid).dispatchFileOpen(proc.processAppId, fileArgs);
         return;
       }
     }
@@ -127,6 +130,11 @@ export class ApplicationLauncher {
       return;
     }
 
+    // Resolve the runtime engine for this application
+    const engine = app.engine ?? DEFAULT_ENGINE;
+    const runtime = this.runtimeRegistry.get(engine) ?? this.runtimeRegistry.getDefault();
+    this.runtimeRegistry.bindProcess(pid, proc.processAppId, engine);
+
     this.systemMonitor.recordProcessLaunch(proc.pid, proc.appDefId, proc.processAppId, proc.type);
 
     let source: Response;
@@ -154,13 +162,14 @@ export class ApplicationLauncher {
       this.environmentManager.registerLibrary(libraryId, code);
       bios.log('BOOT', 'INFO', `Library registered: ${libraryId}`);
 
-      const initResult = this.runtime.execute(pid, code);
+      const initResult = runtime.execute(pid, code);
       if (!initResult.success) {
         bios.log('BOOT', 'WARN', `Library init failed: ${libraryId} — ${String(initResult.data ?? initResult.error)}`);
       }
 
       // Library process served its purpose — release runtime resources
-      this.runtime.destroyProcessRuntime(pid);
+      runtime.destroyProcessRuntime(pid);
+      this.runtimeRegistry.unbindProcess(pid, proc.processAppId);
       this.processManager.terminate(this.systemAppId, pid);
       this.eventBus.emit(this.systemAppId, Events.PROCESS_STARTED, {
         pid: proc.pid,
@@ -182,7 +191,7 @@ export class ApplicationLauncher {
         app.name,
         (line: string) => {
           try {
-            this.runtime.dispatchConsoleInput(proc.processAppId, line);
+            this.runtimeRegistry.getForPid(pid).dispatchConsoleInput(proc.processAppId, line);
           } catch {
             // Runtime destroyed — ignore
           }
@@ -191,7 +200,7 @@ export class ApplicationLauncher {
       this.consoleControllers.set(proc.processAppId, controller);
     }
 
-    const executed = this.runtime.execute(pid, code, undefined, app.entryPath);
+    const executed = runtime.execute(pid, code, undefined, app.entryPath);
     if (!executed.success) {
       const errorDetail = this.formatError(executed.data ?? executed.error);
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
@@ -200,7 +209,7 @@ export class ApplicationLauncher {
 
     // Dispatch file-open callback if launched with file arguments
     if (fileArgs) {
-      this.runtime.dispatchFileOpen(proc.processAppId, fileArgs);
+      runtime.dispatchFileOpen(proc.processAppId, fileArgs);
     }
 
     // Emit lifecycle event
@@ -212,7 +221,7 @@ export class ApplicationLauncher {
   }
 
   onWindowUiEvent(event: WindowUiEvent): void {
-    let result: ReturnType<typeof this.runtime.dispatchUiEvent>;
+    let result: RuntimeResult<unknown>;
     try {
       const payload: Record<string, unknown> = {
         eventId: event.eventId,
@@ -224,7 +233,7 @@ export class ApplicationLauncher {
       };
       if (event.x !== undefined) payload.x = event.x;
       if (event.y !== undefined) payload.y = event.y;
-      result = this.runtime.dispatchUiEvent(event.processAppId, payload);
+      result = this.runtimeRegistry.getForProcessAppId(event.processAppId).dispatchUiEvent(event.processAppId, payload);
     } catch {
       // Runtime was destroyed (e.g. process terminated) — expected, ignore
       return;
