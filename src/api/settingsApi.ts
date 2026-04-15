@@ -1,6 +1,8 @@
 import type { Kernel } from '../kernel/Kernel';
-import type { ThemeSettings } from '../ui/DesktopShell';
+import type { ThemeSettings, TaskbarMode } from '../ui/DesktopShell';
 import { Permissions } from '../kernel/constants';
+
+const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const;
 
 const SETTINGS_KEY = 'system-theme';
 const NOTIFICATION_SETTINGS_KEY = 'notification-settings';
@@ -36,6 +38,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
@@ -52,6 +55,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
       if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
       if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
       if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;

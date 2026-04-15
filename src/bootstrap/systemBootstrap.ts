@@ -157,7 +157,7 @@ async function bootstrapSystem(): Promise<void> {
 
   // Wire floating taskbar mode to window manager
   desktopShell.onTaskbarModeChange((mode) => {
-    const height = mode === 'docked' ? 96 : 0;
+    const height = mode === 'docked' ? 96 : mode === 'fullwidth' ? 64 : 0;
     windowManager.setMaximizedTaskbarHeight(height);
   });
 

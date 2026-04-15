@@ -34,10 +34,17 @@ var opacitySteps = [
   { name: '不透明', value: 0.95 },
 ];
 
+var taskbarModes = [
+  { name: '固定', value: 'docked', desc: '工作列固定在底部' },
+  { name: '填滿', value: 'fullwidth', desc: '工作列填滿底部邊緣' },
+  { name: '精簡', value: 'floating-compact', desc: '最小化為可拖曳按鈕，點擊展開工作列' },
+];
+
 // ── State ────────────────────────────────────────────────────
 var selectedWallpaper = 0;
 var selectedAccent = 0;
 var selectedOpacity = 2;
+var selectedTaskbarMode = 0;
 var startMenuWidth = 380;
 var startMenuHeight = 480;
 var startMenuGroupByPackage = false;
@@ -63,6 +70,11 @@ if (saved.success && saved.data) {
   }
   for (var i = 0; i < opacitySteps.length; i++) {
     if (opacitySteps[i].value === d.taskbarOpacity) { selectedOpacity = i; break; }
+  }
+  if (typeof d.taskbarMode === 'string') {
+    for (var i = 0; i < taskbarModes.length; i++) {
+      if (taskbarModes[i].value === d.taskbarMode) { selectedTaskbarMode = i; break; }
+    }
   }
   if (typeof d.startMenuWidth === 'number') startMenuWidth = d.startMenuWidth;
   if (typeof d.startMenuHeight === 'number') startMenuHeight = d.startMenuHeight;
@@ -194,6 +206,7 @@ function buildThemeObject() {
     accentPrimary: accents[selectedAccent].primary,
     accentSecondary: accents[selectedAccent].secondary,
     taskbarOpacity: opacitySteps[selectedOpacity].value,
+    taskbarMode: taskbarModes[selectedTaskbarMode].value,
     startMenuWidth: startMenuWidth,
     startMenuHeight: startMenuHeight,
     startMenuGroupByPackage: startMenuGroupByPackage,
@@ -314,7 +327,7 @@ function renderAppearancePage(self) {
     UI.box([], { height: '4px' }),
     collapsible('wallpaper', '桌面背景', renderWallpaperSection, self),
     collapsible('accent', '主題色', renderAccentSection, self),
-    collapsible('taskbar', '工作列透明度', renderTaskbarSection, self),
+    collapsible('taskbar', '工作列', renderTaskbarSection, self),
     collapsible('startmenu', '開始選單大小', renderStartMenuSection, self),
 
     UI.box([], { height: '8px' }),
@@ -361,6 +374,32 @@ function renderAccentSection(self) {
 }
 
 function renderTaskbarSection(self) {
+  // ── Mode selection ──
+  var modeItems = [];
+  for (var i = 0; i < taskbarModes.length; i++) {
+    (function (idx) {
+      var active = idx === selectedTaskbarMode;
+      modeItems.push(UI.button(taskbarModes[idx].name, {
+        onClick: function () {
+          selectedTaskbarMode = idx;
+          liveApply();
+          self.rerender();
+        },
+        style: {
+          padding: '10px 8px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: active ? 'bold' : 'normal',
+          background: active ? 'rgba(103,184,255,0.18)' : 'rgba(255,255,255,0.04)',
+          color: active ? '#67b8ff' : 'rgba(216,232,255,0.6)',
+          border: active ? '1px solid rgba(103,184,255,0.3)' : '1px solid transparent',
+          textAlign: 'center',
+        },
+      }));
+    })(i);
+  }
+
+  // ── Opacity selection ──
   var items = [];
   for (var i = 0; i < opacitySteps.length; i++) {
     (function (idx) {
@@ -377,7 +416,14 @@ function renderTaskbarSection(self) {
       }));
     })(i);
   }
-  return UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' });
+  return UI.column([
+    UI.text('顯示模式', sectionTitle),
+    UI.text(taskbarModes[selectedTaskbarMode].desc, { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
+    UI.box(modeItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box([], { height: '6px' }),
+    UI.text('透明度', sectionTitle),
+    UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }),
+  ], { gap: '6px' });
 }
 
 function renderStartMenuSection(self) {
@@ -471,6 +517,7 @@ function renderSaveRow(self) {
         selectedWallpaper = 0;
         selectedAccent = 0;
         selectedOpacity = 2;
+        selectedTaskbarMode = 0;
         startMenuWidth = 380;
         startMenuHeight = 480;
         startMenuGroupByPackage = false;
