@@ -429,7 +429,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         return 'text';
     }
 
-    // ── 型別轉換（QuickJS Handle ↔ JS 值）──────────────────
+    // ── 型別轉換（JS 值 → QuickJS Handle）──────────────────
 
     private toHandle(context: any, value: HostApiValue): any {
         if (value === null) return context.null;

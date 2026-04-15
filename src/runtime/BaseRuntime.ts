@@ -260,7 +260,7 @@ abstract class BaseRuntime implements IRuntime {
         return wrapped;
     }
 
-    // ── 型別正規化（供子類別使用）──────────────────────────
+    // ── 回傳值正規化（QuickJS toHandle 使用，亦供子類別覆用）──
 
     protected normalizeReturnValue(value: unknown): HostApiValue {
         if (value === null || value === undefined) return value;
