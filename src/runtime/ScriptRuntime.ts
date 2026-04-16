@@ -178,6 +178,17 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 return { error: err };
             };
 
+            // ── Library imports (@-prefix) ────────────────────────────────
+            // import '@packageName/libName' → look up the registered library code
+            if (typeof moduleName === 'string' && moduleName.startsWith('@')) {
+                const libraryId = moduleName.slice(1);
+                const code = this.environmentManager.getLibraryCode(libraryId);
+                if (code === undefined) {
+                    return throwImportError(`Library '${moduleName}' is not registered`);
+                }
+                return code;
+            }
+
             const entryPath = runtimeProcess.entryPath;
             if (!entryPath) {
                 return throwImportError('imports() is not available in this context');
