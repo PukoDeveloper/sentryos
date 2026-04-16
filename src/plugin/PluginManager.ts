@@ -326,12 +326,10 @@ export class PluginManager {
     }
 
     // Kahn's: plugins with no unsatisfied deps (within subgraph) first.
-    // But we want *dependents first*, i.e. plugins that nothing depends on
-    // should be unloaded first → start from nodes with out-degree 0 in the
-    // dependency direction, which is in-degree 0 in the "who depends on me"
-    // direction. inDegree here counts "how many deps this plugin has inside
-    // the subgraph", so nodes with inDegree 0 are leaves in the dep tree →
-    // safe to unload first.
+    // inDegree[n] counts how many of n's dependencies are inside the subgraph.
+    // Nodes with inDegree 0 have no in-subgraph deps → they are the providers /
+    // roots (e.g. the unload target) and are processed first by Kahn's,
+    // producing dependency-installation order: providers first, consumers last.
     const sortQ: string[] = [];
     for (const [n, deg] of inDegree) {
       if (deg === 0) sortQ.push(n);
@@ -348,9 +346,9 @@ export class PluginManager {
       }
     }
 
-    // ordered is now: leaves first, deep deps last — the correct teardown order
-    // for dependents. But we want dependents *before* the target. Reverse so
-    // that highest-level dependents come first and target is last.
+    // `ordered` is in dependency-installation order (providers first, consumers last).
+    // Reversing gives safe teardown order: consumers (dependents) unloaded first,
+    // the target plugin (provider) unloaded last.
     // Safety fallback: include any nodes excluded due to an unexpected cycle.
     const orderedSet = new Set(ordered);
     for (const n of visited) {
