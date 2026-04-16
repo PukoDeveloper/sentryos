@@ -1243,6 +1243,11 @@ body {
 	display: block;
 }
 
+.console-line span {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
 .console-input-line {
 	display: flex;
 	align-items: center;

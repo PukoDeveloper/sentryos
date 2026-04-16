@@ -21,6 +21,7 @@ import type {
 } from './types';
 import { uiComponentRegistry } from './UiComponentRegistry';
 import type { RenderContext } from './UiComponentRegistry';
+import { renderAnsiLine } from '../console/AnsiParser';
 import './builtinComponents';
 
 const ANIM_CLOSE_MS    = 220;
@@ -650,7 +651,12 @@ class WindowManager {
         const appendLine = (text: string) => {
             const line = document.createElement('div');
             line.className = 'console-line';
-            line.textContent = text;
+            const rendered = renderAnsiLine(text);
+            if (rendered) {
+                line.appendChild(rendered);
+            } else {
+                line.textContent = text;
+            }
             output.appendChild(line);
             output.scrollTop = output.scrollHeight;
         };
@@ -658,7 +664,12 @@ class WindowManager {
         const appendText = (text: string) => {
             const last = output.lastElementChild;
             if (last && last.classList.contains('console-line')) {
-                last.textContent += text;
+                const rendered = renderAnsiLine(text);
+                if (rendered) {
+                    last.appendChild(rendered);
+                } else {
+                    last.appendChild(document.createTextNode(text));
+                }
             } else {
                 appendLine(text);
             }

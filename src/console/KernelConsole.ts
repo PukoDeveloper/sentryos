@@ -9,6 +9,7 @@ import type { Kernel } from '../kernel/Kernel';
 import type { ConsoleWindowController } from '../window/types';
 import type { LanguageManager } from '../language/LanguageManager';
 import { Permissions, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
+import { ANSI } from './AnsiParser';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ class KernelConsole {
   private dispatchDynamicCommand(session: ConsoleSession, cmd: string, args: string[]): void {
     const entry = this.environmentManager.getCommand(cmd);
     if (!entry) {
-      session.controller.appendLine(this.t('console.unknownCmd') + cmd);
+      session.controller.appendLine(ANSI.RED + this.t('console.unknownCmd') + cmd + ANSI.RESET);
       session.controller.appendLine(this.t('console.helpOrCommands'));
       return;
     }
@@ -185,7 +186,7 @@ class KernelConsole {
 
   private checkPermission(ctx: CommandContext, permission: string): boolean {
     if (this.permissions.has(this.userAppId, permission)) return true;
-    ctx.writeLine(this.t('console.permissionDenied') + permission);
+    ctx.writeLine(ANSI.RED + this.t('console.permissionDenied') + permission + ANSI.RESET);
     return false;
   }
 
