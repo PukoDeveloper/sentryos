@@ -18,7 +18,7 @@ export class PluginContext {
   private readonly registeredApis: string[] = [];
   private readonly registeredUiComponents: string[] = [];
   private readonly registeredRuntimes: string[] = [];
-  private readonly eventListeners: { event: string; listener: (...args: any[]) => void }[] = [];
+  private readonly eventListeners: { event: string; listener: (...args: unknown[]) => void }[] = [];
 
   constructor(pluginName: string, pluginAppId: string, kernel: Kernel) {
     this.pluginName = pluginName;
@@ -40,7 +40,7 @@ export class PluginContext {
 
   // ── Event Bus (scoped to plugin appId) ────────────────────
 
-  on(event: string, listener: (...args: any[]) => void): EventBusResult {
+  on(event: string, listener: (...args: unknown[]) => void): EventBusResult {
     const eventBus = this.kernel.resolve('eventBus');
     const result = eventBus.on(this.pluginAppId, event, listener);
     if (result.success) {
@@ -49,7 +49,7 @@ export class PluginContext {
     return result;
   }
 
-  off(event: string, listener: (...args: any[]) => void): EventBusResult {
+  off(event: string, listener: (...args: unknown[]) => void): EventBusResult {
     const eventBus = this.kernel.resolve('eventBus');
     const result = eventBus.off(this.pluginAppId, event, listener);
     if (result.success) {
@@ -59,7 +59,7 @@ export class PluginContext {
     return result;
   }
 
-  emit(event: string, ...args: any[]): EventBusResult {
+  emit(event: string, ...args: unknown[]): EventBusResult {
     const eventBus = this.kernel.resolve('eventBus');
     return eventBus.emit(this.pluginAppId, event, ...args);
   }

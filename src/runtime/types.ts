@@ -1,5 +1,6 @@
 // ── ScriptRuntime 型別定義 ──────────────────────────────────
 import type { AppType } from '../kernel/constants';
+import type { QuickJSRuntime, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten';
 
 type ProcessType = AppType;
 
@@ -27,6 +28,9 @@ type ProcessView = {
 };
 
 type HostApiValue = string | number | boolean | null | undefined | HostApiValue[] | { [k: string]: HostApiValue } | HostApiFunction;
+// HostApiFunction uses `any[]` intentionally: these functions are called through the QuickJS
+// bridge which converts all values, so specific param types cannot be enforced here.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type HostApiFunction = (...args: any[]) => unknown;
 type ApiFactoryContext = {
     pid: number;
@@ -53,10 +57,10 @@ type BaseProcessState = {
 
 /** QuickJS 引擎的完整程序狀態（繼承自 BaseProcessState）。 */
 type RuntimeProcess = BaseProcessState & {
-    runtime: any;
-    context: any;
+    runtime: QuickJSRuntime;
+    context: QuickJSContext;
     /** 模組快取：已載入模組的路徑 → 匯出值 */
-    moduleCache: Map<string, unknown>;
+    moduleCache: Map<string, QuickJSHandle>;
     /** imports() 是否已注入 */
     importsInjected?: boolean;
     /** 已註冊的 host-side timer ID 集合（用於 process 銷毀時清理） */
@@ -64,7 +68,7 @@ type RuntimeProcess = BaseProcessState & {
     /** timer 順序 ID → host timer ID 對應 */
     timerMap: Map<number, number>;
     /** timer 順序 ID → QuickJS callback handle 對應（銷毀時需 dispose） */
-    timerCallbacks: Map<number, any>;
+    timerCallbacks: Map<number, QuickJSHandle>;
     /** timer 順序 ID 計數器 */
     timerNextId: number;
 };

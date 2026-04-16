@@ -4,6 +4,7 @@
 // 本類別只負責 QuickJS 特有的沙箱建立、程式碼執行、API 注入與資源釋放。
 
 import { shouldInterruptAfterDeadline } from 'quickjs-emscripten';
+import type { QuickJSContext, QuickJSHandle } from 'quickjs-emscripten';
 import type { Kernel } from '../kernel/Kernel';
 import { DEFAULT_EXECUTION_TIMEOUT_MS } from '../kernel/constants';
 import { getQuickJSInstance } from './QuickJsInit';
@@ -92,7 +93,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         }
         // 釋放模組快取中的 QuickJS handle
         for (const handle of runtimeProcess.moduleCache.values()) {
-            try { (handle as any).dispose(); } catch { /* already disposed */ }
+            try { handle.dispose(); } catch { /* already disposed */ }
         }
         runtimeProcess.moduleCache.clear();
         // 清理所有 host-side timers
@@ -107,8 +108,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             try { cb.dispose(); } catch { /* already disposed */ }
         }
         runtimeProcess.timerCallbacks.clear();
-        try { runtimeProcess.context.dispose(); } catch { /* already disposed or in-flight */ }
-        try { runtimeProcess.runtime.dispose(); } catch { /* already disposed */ }
+        try { runtimeProcess.context.dispose(); } catch (err) { console.warn('[Runtime] context.dispose failed:', err); }
+        try { runtimeProcess.runtime.dispose(); } catch (err) { console.warn('[Runtime] runtime.dispose failed:', err); }
     }
 
     destroyAll(): void {
@@ -144,7 +145,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
     // ── API 注入 / 編排 ──────────────────────────────────────
 
-    private injectApis(context: any, process: ProcessView): void {
+    private injectApis(context: QuickJSContext, process: ProcessView): void {
         const runtimeProcess = this.processStates.get(process.pid) as RuntimeProcess | undefined;
         const global = context.global;
         const osApi = context.newObject();
@@ -170,13 +171,17 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
     // ── imports() 機制 ───────────────────────────────────────
 
     /** 注入 import 預設模組載入方法 */
-    private injectImportCommand(context: any, runtimeProcess: RuntimeProcess): void {
-        runtimeProcess.runtime.setModuleLoader((moduleName: any) => {
+    private injectImportCommand(context: QuickJSContext, runtimeProcess: RuntimeProcess): void {
+        runtimeProcess.runtime.setModuleLoader((moduleName: unknown) => {
 
             const throwImportError = (msg: string) => {
                 const err = context.newError(msg);
                 return { error: err };
             };
+
+            if (typeof moduleName !== 'string') {
+                return throwImportError('Module name must be a string');
+            }
 
             // ── Library imports (@-prefix) ────────────────────────────────
             // import '@packageName/libName' → look up the registered library code
@@ -201,8 +206,10 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             const resolvedPath = resolved.path;
 
             if (runtimeProcess.moduleCache.has(resolvedPath)) {
-                const cached = runtimeProcess.moduleCache.get(resolvedPath) as any;
-                return cached.dup();
+                const cached = runtimeProcess.moduleCache.get(resolvedPath) as QuickJSHandle;
+                // QuickJS supports returning a pre-evaluated module handle from the loader,
+                // but the TypeScript types only model string source code. The cast is safe at runtime.
+                return cached.dup() as unknown as string;
             }
 
             // 同步載入檔案
@@ -214,7 +221,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 return code;
             }
             else if (type === 'json') {
-                return Object.entries(JSON.parse(code)).map(([k, v]: any) => {
+                return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
                     return "export const " + k + " = " + JSON.stringify(v) + ";";
                 }).join("\n") + "\nexport default " + code + ";";
             }
@@ -228,7 +235,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
      * 注入 imports() 全域函式，讓應用程式可以載入同一套件中的其他檔案。
      * 使用 CommonJS-like 的 module.exports 慣例。
      */
-    private injectImportsFunction(context: any, global: any, runtimeProcess: RuntimeProcess): void {
+    private injectImportsFunction(context: QuickJSContext, global: QuickJSHandle, runtimeProcess: RuntimeProcess): void {
         const self = this;
 
         const throwImportError = (msg: string) => {
@@ -258,9 +265,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             }
             const resolvedPath = resolved.path;
 
-            // 快取命中：回傳 handle 的複本（保留函式等不可序列化的值）
             if (runtimeProcess.moduleCache.has(resolvedPath)) {
-                const cached = runtimeProcess.moduleCache.get(resolvedPath) as any;
+                const cached = runtimeProcess.moduleCache.get(resolvedPath) as QuickJSHandle;
                 return cached.dup();
             }
 
@@ -299,7 +305,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
      * 注入 setTimeout / setInterval / clearTimeout / clearInterval。
      * 回呼在 host-side 觸發後透過 context.callFunction 呼叫 QuickJS 函式。
      */
-    private injectTimerFunctions(context: any, global: any, pid: number, runtimeProcess: RuntimeProcess): void {
+    private injectTimerFunctions(context: QuickJSContext, global: QuickJSHandle, pid: number, runtimeProcess: RuntimeProcess): void {
         const self = this;
 
         const makeTimerFn = (repeat: boolean) =>
@@ -330,7 +336,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                             result.value.dispose();
                         }
                         context.runtime.executePendingJobs();
-                    } catch { /* context may be disposed */ }
+                    } catch (err) { console.warn('[Runtime] timer callback error (context may be disposed):', err); }
 
                     // 單次 timer 觸發後自動清理
                     if (!repeat) {
@@ -442,7 +448,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
     // ── 型別轉換（JS 值 → QuickJS Handle）──────────────────
 
-    private toHandle(context: any, value: HostApiValue): any {
+    private toHandle(context: QuickJSContext, value: HostApiValue): QuickJSHandle {
         if (value === null) return context.null;
         if (value === undefined) return context.undefined;
         if (typeof value === 'boolean') return value ? context.true : context.false;
