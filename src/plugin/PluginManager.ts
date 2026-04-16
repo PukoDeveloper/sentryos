@@ -23,6 +23,24 @@ export interface LoadedPlugin {
 
 type PluginEntry = { path: string; module: PluginModule };
 
+/**
+ * Controls the behaviour of `unloadPlugin` when other loaded plugins depend
+ * on the plugin being unloaded:
+ *
+ * - `'soft'` *(default)* – abort and throw if any loaded plugin declares a
+ *   dependency on the target plugin.
+ * - `'root'` – recursively unload all plugins that transitively depend on the
+ *   target (dependents first), then unload the target itself. Returns the full
+ *   list of unloaded plugin names.
+ * - `'force'` – unload the target plugin unconditionally, ignoring dependents.
+ */
+export type UnloadMode = 'soft' | 'root' | 'force';
+
+export interface UnloadResult {
+  /** Names of all plugins that were actually unloaded. */
+  unloaded: string[];
+}
+
 export class PluginManager {
   private readonly kernel: Kernel;
   private readonly plugins = new Map<string, LoadedPlugin>();
@@ -211,23 +229,134 @@ export class PluginManager {
     });
   }
 
-  async unloadPlugin(name: string): Promise<void> {
-    const entry = this.plugins.get(name);
-    if (!entry) {
+  async unloadPlugin(name: string, mode: UnloadMode = 'soft'): Promise<UnloadResult> {
+    if (!this.plugins.has(name)) {
       throw new Error(`Plugin "${name}" is not loaded`);
     }
 
+    const directDependents = this.getDirectDependents(name);
+
+    if (mode === 'soft') {
+      if (directDependents.length > 0) {
+        throw new Error(
+          `Plugin "${name}" cannot be unloaded: [${directDependents.join(', ')}] depend on it. ` +
+          `Use 'root' mode to unload all dependents, or 'force' to unload unconditionally.`,
+        );
+      }
+      await this.teardownOne(name);
+      return { unloaded: [name] };
+    }
+
+    if (mode === 'force') {
+      await this.teardownOne(name);
+      return { unloaded: [name] };
+    }
+
+    // 'root' mode: unload all transitive dependents first, then the target
+    const ordered = this.getTransitiveDependentsOrdered(name);
+    const unloaded: string[] = [];
+    for (const n of ordered) {
+      await this.teardownOne(n);
+      unloaded.push(n);
+    }
+    return { unloaded };
+  }
+
+  async unloadAll(): Promise<void> {
+    // Unload in reverse insertion order, force mode to skip dependency checks
+    const names = [...this.plugins.keys()].reverse();
+    for (const name of names) {
+      await this.teardownOne(name);
+    }
+  }
+
+  // ── Unload helpers ────────────────────────────────────────────
+
+  /** Call teardown(), cleanup(), and remove a single plugin from the map. */
+  private async teardownOne(name: string): Promise<void> {
+    const entry = this.plugins.get(name);
+    if (!entry) return;
     await entry.module.teardown(entry.context);
     entry.context.cleanup();
     this.plugins.delete(name);
   }
 
-  async unloadAll(): Promise<void> {
-    // Unload in reverse insertion order
-    const names = [...this.plugins.keys()].reverse();
-    for (const name of names) {
-      await this.unloadPlugin(name);
+  /** Returns names of loaded plugins that directly list `name` as a dependency. */
+  private getDirectDependents(name: string): string[] {
+    const result: string[] = [];
+    for (const [pName, entry] of this.plugins) {
+      if (pName !== name && (entry.module.dependencies ?? []).includes(name)) {
+        result.push(pName);
+      }
     }
+    return result;
+  }
+
+  /**
+   * Returns all plugins to be unloaded for a 'root' unload of `name`,
+   * ordered so that dependents come before their dependencies
+   * (i.e. safe teardown order). The target `name` is always last.
+   */
+  private getTransitiveDependentsOrdered(name: string): string[] {
+    // BFS: collect full set of transitive dependents
+    const visited = new Set<string>();
+    const queue: string[] = [name];
+    let head = 0;
+    while (head < queue.length) {
+      const current = queue[head++];
+      if (visited.has(current)) continue;
+      visited.add(current);
+      for (const dependent of this.getDirectDependents(current)) {
+        if (!visited.has(dependent)) queue.push(dependent);
+      }
+    }
+
+    // Topological sort within `visited` so dependents appear before dependencies.
+    // Build inDegree counting edges *within* the visited subgraph only.
+    const inDegree = new Map<string, number>();
+    const edgesFrom = new Map<string, string[]>(); // dep → [dependents]
+    for (const n of visited) {
+      if (!inDegree.has(n)) inDegree.set(n, 0);
+      for (const dep of this.plugins.get(n)?.module.dependencies ?? []) {
+        if (!visited.has(dep)) continue; // cross-subgraph edge, ignore
+        if (!edgesFrom.has(dep)) edgesFrom.set(dep, []);
+        edgesFrom.get(dep)!.push(n);
+        inDegree.set(n, (inDegree.get(n) ?? 0) + 1);
+      }
+    }
+
+    // Kahn's: plugins with no unsatisfied deps (within subgraph) first.
+    // But we want *dependents first*, i.e. plugins that nothing depends on
+    // should be unloaded first → start from nodes with out-degree 0 in the
+    // dependency direction, which is in-degree 0 in the "who depends on me"
+    // direction. inDegree here counts "how many deps this plugin has inside
+    // the subgraph", so nodes with inDegree 0 are leaves in the dep tree →
+    // safe to unload first.
+    const sortQ: string[] = [];
+    for (const [n, deg] of inDegree) {
+      if (deg === 0) sortQ.push(n);
+    }
+    const ordered: string[] = [];
+    let sortHead = 0;
+    while (sortHead < sortQ.length) {
+      const n = sortQ[sortHead++];
+      ordered.push(n);
+      for (const dependent of edgesFrom.get(n) ?? []) {
+        const newDeg = (inDegree.get(dependent) ?? 1) - 1;
+        inDegree.set(dependent, newDeg);
+        if (newDeg === 0) sortQ.push(dependent);
+      }
+    }
+
+    // ordered is now: leaves first, deep deps last — the correct teardown order
+    // for dependents. But we want dependents *before* the target. Reverse so
+    // that highest-level dependents come first and target is last.
+    // Safety fallback: include any nodes excluded due to an unexpected cycle.
+    const orderedSet = new Set(ordered);
+    for (const n of visited) {
+      if (!orderedSet.has(n)) ordered.push(n);
+    }
+    return ordered.reverse();
   }
 
   getLoadedPlugins(): { name: string; version: string; description?: string; author?: string; path: string; loadedAt: number }[] {
