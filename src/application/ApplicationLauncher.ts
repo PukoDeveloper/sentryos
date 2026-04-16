@@ -58,7 +58,7 @@ export class ApplicationLauncher {
     // Close all windows owned by this process
     const windowIds = this.windowManager.getWindowsByProcess(processAppId);
     for (const wid of windowIds) {
-      try { this.windowManager.closeWindow(processAppId, wid); } catch { /* window may already be gone */ }
+      try { this.windowManager.closeWindow(processAppId, wid); } catch (err) { console.warn('[Launcher] closeWindow failed (may already be gone):', err); }
     }
 
     // Destroy the process's runtime and remove tracking

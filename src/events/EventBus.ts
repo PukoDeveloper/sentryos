@@ -5,14 +5,14 @@ import { Permissions } from '../kernel/constants';
 
 interface ListenerEntry {
     appId: string;
-    listener: (...args: any[]) => void;
+    listener: (...args: unknown[]) => void;
 }
 
 class EventBus {
     // 依事件類型索引：eventType -> [{appId, listener}]
     private eventListeners: Map<string, ListenerEntry[]>;
     // 依應用程式 ID 索引：appId -> [{event, listener}]
-    private appListeners: Map<string, Array<{ event: string; listener: (...args: any[]) => void }>>;
+    private appListeners: Map<string, Array<{ event: string; listener: (...args: unknown[]) => void }>>;
     private readonly kernel: Kernel;
 
     constructor(kernel: Kernel) {
@@ -24,7 +24,7 @@ class EventBus {
     private get permissions() { return this.kernel.resolve('permissions'); }
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
 
-    on(appId: string, event: string, listener: (...args: any[]) => void): EventBusResult {
+    on(appId: string, event: string, listener: (...args: unknown[]) => void): EventBusResult {
         if (!this.permissions.has(appId, Permissions.eventSubscribe(event))) {
             return { success: false, error: 'PermissionDenied' };
         }
@@ -43,7 +43,7 @@ class EventBus {
     }
 
 
-    off(appId: string, event: string, listener: (...args: any[]) => void): EventBusResult {
+    off(appId: string, event: string, listener: (...args: unknown[]) => void): EventBusResult {
         if (!this.permissions.has(appId, Permissions.eventSubscribe(event))) {
             return { success: false, error: 'PermissionDenied' };
         }
@@ -67,7 +67,7 @@ class EventBus {
     }
 
 
-    emit(appId: string, event: string, ...args: any[]): EventBusResult {
+    emit(appId: string, event: string, ...args: unknown[]): EventBusResult {
         if (!this.permissions.has(appId, Permissions.eventEmit(event))) {
             return { success: false, error: 'PermissionDenied' };
         }

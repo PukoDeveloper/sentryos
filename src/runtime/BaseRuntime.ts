@@ -60,59 +60,40 @@ abstract class BaseRuntime implements IRuntime {
 
     // ── IRuntime: 事件派發（路由至 execute）────────────────
 
-    dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
+    /** 共用輔助：在指定 processAppId 的執行中程序上執行一段程式碼。 */
+    private dispatchToProcess(processAppId: string, code: string): RuntimeResult<unknown> {
         for (const [pid] of this.processStates) {
             const proc = this.getProcess(pid);
             if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                const payload = JSON.stringify(event);
-                return this.execute(pid, `if(typeof onWindowEvent==='function'){onWindowEvent(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+                return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
             }
         }
         return { success: false, error: 'ProcessNotFound' };
+    }
+
+    dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
+        const payload = JSON.stringify(event);
+        return this.dispatchToProcess(processAppId, `if(typeof onWindowEvent==='function'){onWindowEvent(${payload})}`);
     }
 
     dispatchConsoleInput(processAppId: string, line: string): RuntimeResult<unknown> {
-        for (const [pid] of this.processStates) {
-            const proc = this.getProcess(pid);
-            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                const escaped = JSON.stringify(line);
-                return this.execute(pid, `if(typeof onConsoleInput==='function'){onConsoleInput(${escaped})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-            }
-        }
-        return { success: false, error: 'ProcessNotFound' };
+        const escaped = JSON.stringify(line);
+        return this.dispatchToProcess(processAppId, `if(typeof onConsoleInput==='function'){onConsoleInput(${escaped})}`);
     }
 
     dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
-        for (const [pid] of this.processStates) {
-            const proc = this.getProcess(pid);
-            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                const payload = JSON.stringify(event);
-                return this.execute(pid, `if(typeof onKeyboardEvent==='function'){onKeyboardEvent(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-            }
-        }
-        return { success: false, error: 'ProcessNotFound' };
+        const payload = JSON.stringify(event);
+        return this.dispatchToProcess(processAppId, `if(typeof onKeyboardEvent==='function'){onKeyboardEvent(${payload})}`);
     }
 
     dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown> {
-        for (const [pid] of this.processStates) {
-            const proc = this.getProcess(pid);
-            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                const payload = JSON.stringify(fileInfo);
-                return this.execute(pid, `if(typeof onFileOpen==='function'){onFileOpen(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-            }
-        }
-        return { success: false, error: 'ProcessNotFound' };
+        const payload = JSON.stringify(fileInfo);
+        return this.dispatchToProcess(processAppId, `if(typeof onFileOpen==='function'){onFileOpen(${payload})}`);
     }
 
     dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown> {
-        for (const [pid] of this.processStates) {
-            const proc = this.getProcess(pid);
-            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                const payload = JSON.stringify(result);
-                return this.execute(pid, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-            }
-        }
-        return { success: false, error: 'ProcessNotFound' };
+        const payload = JSON.stringify(result);
+        return this.dispatchToProcess(processAppId, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`);
     }
 
     // ── 內建 API 註冊 ───────────────────────────────────────
@@ -246,11 +227,11 @@ abstract class BaseRuntime implements IRuntime {
         for (const [key, value] of Object.entries(obj)) {
             if (typeof value === 'function') {
                 const originalFn = value as HostApiFunction;
-                wrapped[key] = ((...args: any[]) => {
+                wrapped[key] = ((...args: unknown[]) => {
                     const start = performance.now();
-                    const result = originalFn(...args);
+                    const result = (originalFn as HostApiFunction)(...args);
                     const duration = performance.now() - start;
-                    const success = result != null && typeof result === 'object' && 'success' in result ? !!(result as any).success : true;
+                    const success = result != null && typeof result === 'object' && 'success' in result ? !!(result as Record<string, unknown>).success : true;
                     monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);
                     return result;
                 }) as HostApiFunction;
@@ -302,7 +283,7 @@ abstract class BaseRuntime implements IRuntime {
                 const safeChannel = JSON.stringify(eventName);
                 const safePayload = JSON.stringify(args[0] ?? null);
                 this.execute(pid, `if(typeof onEvent==='function'){onEvent(${safeChannel},${safePayload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-            } catch { /* runtime may have been destroyed during termination — safe to ignore */ }
+            } catch (err) { console.warn('[Runtime] onEvent dispatch failed (runtime may be destroyed):', err); }
         };
 
         const res = this.eventBus.on(processAppId, eventName, listener);
@@ -383,7 +364,7 @@ abstract class BaseRuntime implements IRuntime {
         try {
             const safeMsg = JSON.stringify({ fromPid: message.fromPid, channel: message.channel, payload: message.payload, timestamp: message.timestamp });
             this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-        } catch { /* target context may be gone */ }
+        } catch (err) { console.warn('[Runtime] onMessage dispatch failed (context may be gone):', err); }
 
         return { success: true, data: true };
     }

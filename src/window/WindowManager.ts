@@ -56,6 +56,24 @@ class WindowManager {
         this.windowChangeListener = listener;
     }
 
+    /** 清理所有視窗、DOM 元素及內部狀態。應在系統關閉時呼叫。 */
+    destroy(): void {
+        this.closeContextMenu();
+        for (const descriptor of this.windows.values()) {
+            descriptor.root.remove();
+        }
+        for (const overlay of this.blockedOverlays.values()) {
+            overlay.remove();
+        }
+        this.windows.clear();
+        this.processWindows.clear();
+        this.eventBindings.clear();
+        this.windowNodeMaps.clear();
+        this.blockedOverlays.clear();
+        this.focusedWindowId = null;
+        this.windowChangeListener = undefined;
+    }
+
     /**
      * 設定最大化視窗底部預留的 taskbar 高度。
      * 漂浮模式下傳 0 讓視窗完全填充螢幕。

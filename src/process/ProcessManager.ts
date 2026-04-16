@@ -17,6 +17,8 @@ class ProcessManager {
     private processes: Map<number, Process> = new Map();
     /** appDefId → Set<PID>，用於 maxInstances 檢查與按 app 查詢 */
     private appProcesses: Map<string, Set<number>> = new Map();
+    /** processAppId → PID，用於 O(1) 反向查找 */
+    private processAppIdIndex: Map<string, number> = new Map();
     private nextPid = 1;
 
     private readonly kernel: Kernel;
@@ -78,6 +80,7 @@ class ProcessManager {
             this.appProcesses.set(appDefId, new Set());
         }
         this.appProcesses.get(appDefId)!.add(pid);
+        this.processAppIdIndex.set(processAppId, pid);
 
         // 登記到父程序的子程序集合
         if (parentPid !== null) {
@@ -122,6 +125,7 @@ class ProcessManager {
         this.permissions.removeApp(this.systemAppId, proc.processAppId);
 
         this.appProcesses.get(proc.appDefId)?.delete(pid);
+        this.processAppIdIndex.delete(proc.processAppId);
         this.processes.delete(pid);
 
         return { success: true, data: pid };
@@ -154,10 +158,8 @@ class ProcessManager {
 
     /** 以 processAppId（權限憑證 ID）反查程序 */
     getByProcessAppId(processAppId: string): Process | undefined {
-        for (const proc of this.processes.values()) {
-            if (proc.processAppId === processAppId) return proc;
-        }
-        return undefined;
+        const pid = this.processAppIdIndex.get(processAppId);
+        return pid !== undefined ? this.processes.get(pid) : undefined;
     }
 
     /** 取得某應用所有執行中的程序實例 */
