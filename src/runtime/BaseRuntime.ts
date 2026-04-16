@@ -229,7 +229,7 @@ abstract class BaseRuntime implements IRuntime {
                 const originalFn = value as HostApiFunction;
                 wrapped[key] = ((...args: unknown[]) => {
                     const start = performance.now();
-                    const result = (originalFn as HostApiFunction)(...args);
+                    const result = originalFn(...args);
                     const duration = performance.now() - start;
                     const success = result != null && typeof result === 'object' && 'success' in result ? !!(result as Record<string, unknown>).success : true;
                     monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);

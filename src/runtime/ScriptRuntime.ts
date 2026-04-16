@@ -221,7 +221,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 return code;
             }
             else if (type === 'json') {
-                return Object.entries(JSON.parse(code)).map(([k, v]: unknown[]) => {
+                return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
                     return "export const " + k + " = " + JSON.stringify(v) + ";";
                 }).join("\n") + "\nexport default " + code + ";";
             }
