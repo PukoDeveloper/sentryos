@@ -11,13 +11,26 @@
             "id": "stdlib-math",
             "name": "Math Utils",
             "main": "math.js",
-            "type": "Library"
+            "type": "Library",
+            "commands": [
+                { "name": "factorial", "description": "Calculate factorial of a number", "usage": "factorial <n>" },
+                { "name": "fib", "description": "Calculate Fibonacci number", "usage": "fib <n>" },
+                { "name": "prime", "description": "Check if a number is prime", "usage": "prime <n>" },
+                { "name": "gcd", "description": "Calculate GCD of two numbers", "usage": "gcd <a> <b>" },
+                { "name": "lcm", "description": "Calculate LCM of two numbers", "usage": "lcm <a> <b>" }
+            ]
         },
         {
             "id": "stdlib-string",
             "name": "String Utils",
             "main": "string.js",
-            "type": "Library"
+            "type": "Library",
+            "commands": [
+                { "name": "reverse", "description": "Reverse a string", "usage": "reverse <text>" },
+                { "name": "capitalize", "description": "Capitalize first letter", "usage": "capitalize <text>" },
+                { "name": "wordcount", "description": "Count words in text", "usage": "wordcount <text...>" },
+                { "name": "repeat", "description": "Repeat a string N times", "usage": "repeat <text> <n>" }
+            ]
         },
         {
             "id": "stdlib-ui",

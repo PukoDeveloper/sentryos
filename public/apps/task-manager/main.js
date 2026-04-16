@@ -386,6 +386,16 @@ function renderPermissionsTab() {
   var data = result.data;
   var denyRate = data.totalChecks > 0 ? Math.round(data.totalDenied / data.totalChecks * 100) : 0;
 
+  // 建立 processAppId → appDefId 查找表
+  var appIdToName = {};
+  var histResult = OS.monitor.processHistory();
+  if (histResult.success && histResult.data) {
+    for (var hi = 0; hi < histResult.data.length; hi++) {
+      var h = histResult.data[hi];
+      appIdToName[h.processAppId] = h.appDefId;
+    }
+  }
+
   // Summary
   var summary = OS.ui.panel([
     OS.ui.stack([
@@ -416,13 +426,35 @@ function renderPermissionsTab() {
     var entry = data.byApp[appId];
     var appDenyRate = entry.checks > 0 ? Math.round(entry.denied / entry.checks * 100) : 0;
     var dColor = appDenyRate > 20 ? '#ff6b6b' : '#6be68a';
-    appRows.push(OS.ui.panel([
+
+    // 顯示被拒絕的權限類型明細
+    var deniedDetail = '';
+    if (entry.deniedPermissions) {
+      var dps = [];
+      for (var dp in entry.deniedPermissions) { dps.push(dp + ' ×' + entry.deniedPermissions[dp]); }
+      if (dps.length > 0) deniedDetail = dps.join(', ');
+    }
+
+    var displayName = appIdToName[appId] ? appIdToName[appId] : appId;
+
+    var rowChildren = [
       OS.ui.stack([
-        OS.ui.label(truncate(appId, 28), { fontSize: '12px', color: '#d8e8ff', flex: '1', fontFamily: 'monospace' }),
+        OS.ui.label(truncate(displayName, 28), { fontSize: '12px', color: '#d8e8ff', flex: '1', fontFamily: 'monospace' }),
         OS.ui.label('' + entry.checks + ' 次', { fontSize: '12px', color: '#a78bfa', minWidth: '60px', textAlign: 'right' }),
         OS.ui.label(entry.denied + ' 拒絕', { fontSize: '12px', color: dColor, minWidth: '60px', textAlign: 'right' }),
       ], { flexDirection: 'row', alignItems: 'center', gap: '8px' }),
-    ], { padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.02)' }));
+    ];
+    if (displayName !== appId) {
+      rowChildren.push(
+        OS.ui.label(truncate(appId, 40), { fontSize: '10px', color: 'rgba(216,232,255,0.3)', fontFamily: 'monospace' })
+      );
+    }
+    if (deniedDetail) {
+      rowChildren.push(
+        OS.ui.label('⛔ ' + deniedDetail, { fontSize: '11px', color: '#ff8a8a', padding: '2px 0 0 0', fontFamily: 'monospace' })
+      );
+    }
+    appRows.push(OS.ui.panel(rowChildren, { padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.02)' }));
   }
   if (appKeys.length === 0) {
     appRows.push(OS.ui.label('尚無紀錄', { fontSize: '12px', color: 'rgba(216,232,255,0.4)', textAlign: 'center', padding: '12px' }));
@@ -681,7 +713,7 @@ globalThis.onWindowEvent = function(event) {
   }
 
   if (cid === 'action-terminate' && selectedPid) {
-    OS.terminateProcess(selectedPid);
+    OS.system.terminateProcess(selectedPid);
     selectedPid = null;
     render();
     return;

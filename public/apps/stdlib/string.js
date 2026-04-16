@@ -45,12 +45,7 @@ globalThis.StringUtils = {
     wordCount: wordCount,
 };
 
-// ── Register CLI commands ─────────────────────────────────────
-
-OS.env.registerCommand('reverse', 'Reverse a string', 'reverse <text>');
-OS.env.registerCommand('capitalize', 'Capitalize first letter', 'capitalize <text>');
-OS.env.registerCommand('wordcount', 'Count words in text', 'wordcount <text...>');
-OS.env.registerCommand('repeat', 'Repeat a string N times', 'repeat <text> <n>');
+// ── CLI command handlers ──────────────────────────────────────
 
 globalThis.__commands = globalThis.__commands || {};
 

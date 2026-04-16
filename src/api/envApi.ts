@@ -53,15 +53,7 @@ export function registerEnvApi(kernel: Kernel): void {
       }
       const code = environmentManager.getLibraryCode(libraryId);
       if (!code) return { success: false, error: 'LibraryNotFound' };
-      // Suppress command re-registration — commands are only registered at boot time
-      runtime.evaluateInContext(pid,
-        `globalThis.__savedRegCmd = OS.registerCommand; OS.registerCommand = function(){};`
-      );
-      const result = runtime.evaluateInContext(pid, code);
-      runtime.evaluateInContext(pid,
-        `OS.registerCommand = globalThis.__savedRegCmd; delete globalThis.__savedRegCmd;`
-      );
-      return result;
+      return runtime.evaluateInContext(pid, code);
     },
     listLibraries: () => {
       return { success: true, data: environmentManager.getLibraryIds() };

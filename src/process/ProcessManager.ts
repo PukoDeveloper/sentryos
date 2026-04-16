@@ -64,6 +64,7 @@ class ProcessManager {
         }
 
         // 由系統為此實例建立獨立的權限槽
+        const type = options.type ?? 'Service';
         const permResult = this.permissions.new(this.systemAppId, app.permissions);
         if (!permResult.success || permResult.data == null) {
             return { success: false, error: 'UnknownError' };
@@ -71,7 +72,6 @@ class ProcessManager {
         const processAppId = permResult.data as string;
 
         const pid = this.nextPid++;
-        const type = options.type ?? 'Service';
         const proc = new Process(pid, appDefId, processAppId, type, parentPid);
 
         this.processes.set(pid, proc);

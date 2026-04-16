@@ -156,18 +156,24 @@ export class ApplicationLauncher {
 
     const code = await source.text();
 
-    // Library type: cache source code, execute init, then clean up process
+    // Library type: cache source code, register manifest commands, no runtime execution needed
     if (type === 'Library') {
       const libraryId = app.packageName + '/' + app.name;
       this.environmentManager.registerLibrary(libraryId, code);
       bios.log('BOOT', 'INFO', `Library registered: ${libraryId}`);
 
-      const initResult = runtime.execute(pid, code);
-      if (!initResult.success) {
-        bios.log('BOOT', 'WARN', `Library init failed: ${libraryId} — ${String(initResult.data ?? initResult.error)}`);
+      // Register commands declared in manifest (no need to execute code)
+      if (app.commands) {
+        for (const cmd of app.commands) {
+          this.environmentManager.registerCommand(cmd.name, {
+            libraryId,
+            description: cmd.description,
+            usage: cmd.usage,
+          });
+        }
       }
 
-      // Library process served its purpose — release runtime resources
+      // Library doesn't need a live process — release immediately
       runtime.destroyProcessRuntime(pid);
       this.runtimeRegistry.unbindProcess(pid, proc.processAppId);
       this.processManager.terminate(this.systemAppId, pid);

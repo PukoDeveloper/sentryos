@@ -54,7 +54,7 @@ export interface ApiStats {
 export interface PermissionStats {
     totalChecks: number;
     totalDenied: number;
-    byApp: { [appId: string]: { checks: number; denied: number } };
+    byApp: { [appId: string]: { checks: number; denied: number; deniedPermissions: { [perm: string]: number } } };
     byPermission: { [permission: string]: { checks: number; denied: number } };
 }
 
@@ -113,7 +113,7 @@ class SystemMonitor {
     // ── Permission tracking ──
     private permissionChecks = 0;
     private permissionDenied = 0;
-    private permissionByApp = new Map<string, { checks: number; denied: number }>();
+    private permissionByApp = new Map<string, { checks: number; denied: number; deniedPermissions: Map<string, number> }>();
     private permissionByPerm = new Map<string, { checks: number; denied: number }>();
 
     // ── Process tracking ──
@@ -179,11 +179,14 @@ class SystemMonitor {
         if (!granted) this.permissionDenied++;
         let entry = this.permissionByApp.get(appId);
         if (!entry) {
-            entry = { checks: 0, denied: 0 };
+            entry = { checks: 0, denied: 0, deniedPermissions: new Map() };
             this.permissionByApp.set(appId, entry);
         }
         entry.checks++;
-        if (!granted) entry.denied++;
+        if (!granted) {
+            entry.denied++;
+            entry.deniedPermissions.set(permission, (entry.deniedPermissions.get(permission) ?? 0) + 1);
+        }
 
         let permEntry = this.permissionByPerm.get(permission);
         if (!permEntry) {
@@ -273,9 +276,13 @@ class SystemMonitor {
         apiStats.sort((a, b) => b.callCount - a.callCount);
 
         // Permission stats
-        const permByApp: { [appId: string]: { checks: number; denied: number } } = {};
+        const permByApp: { [appId: string]: { checks: number; denied: number; deniedPermissions: { [perm: string]: number } } } = {};
         for (const [appId, entry] of this.permissionByApp) {
-            permByApp[appId] = { ...entry };
+            const deniedPerms: { [perm: string]: number } = {};
+            for (const [perm, count] of entry.deniedPermissions) {
+                deniedPerms[perm] = count;
+            }
+            permByApp[appId] = { checks: entry.checks, denied: entry.denied, deniedPermissions: deniedPerms };
         }
         const permByPerm: { [permission: string]: { checks: number; denied: number } } = {};
         for (const [perm, entry] of this.permissionByPerm) {
@@ -362,9 +369,13 @@ class SystemMonitor {
     }
 
     getPermissionStats(): PermissionStats {
-        const byApp: { [appId: string]: { checks: number; denied: number } } = {};
+        const byApp: PermissionStats['byApp'] = {};
         for (const [appId, entry] of this.permissionByApp) {
-            byApp[appId] = { ...entry };
+            const deniedPerms: { [perm: string]: number } = {};
+            for (const [perm, count] of entry.deniedPermissions) {
+                deniedPerms[perm] = count;
+            }
+            byApp[appId] = { checks: entry.checks, denied: entry.denied, deniedPermissions: deniedPerms };
         }
         const byPermission: { [permission: string]: { checks: number; denied: number } } = {};
         for (const [perm, entry] of this.permissionByPerm) {

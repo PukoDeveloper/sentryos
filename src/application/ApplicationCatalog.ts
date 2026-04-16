@@ -22,6 +22,12 @@ type PackageManifest = {
 };
 
 /** 套件內的單一應用程式定義 */
+type ManifestCommand = {
+    name: string;
+    description: string;
+    usage?: string;
+};
+
 type AppEntryManifest = {
     id: string;
     name: string;
@@ -35,6 +41,8 @@ type AppEntryManifest = {
     /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
      *  省略時預設使用 'quickjs'。 */
     engine?: string;
+    /** Library 可在 manifest 中靜態宣告命令，開機時直接註冊。 */
+    commands?: ManifestCommand[];
 };
 
 /** 舊格式：單一應用程式清單（向下相容） */
@@ -66,6 +74,8 @@ type RegisteredApplication = Application & {
     /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
      *  省略時預設使用 'quickjs'。 */
     engine?: string;
+    /** manifest 中靜態宣告的命令 */
+    commands?: ManifestCommand[];
 };
 
 // ── Catalog Loader ──────────────────────────────────────────
@@ -191,6 +201,7 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
         autoStart: entry.autoStart ?? defaultAutoStart(runtimeType),
         hidden: entry.hidden === true,
         engine: entry.engine,
+        commands: entry.commands,
     };
 }
 
