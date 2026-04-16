@@ -163,9 +163,12 @@ export class PluginManager {
     }
 
     const sorted: PluginEntry[] = [];
-    while (queue.length > 0) {
-      const name = queue.shift()!;
+    const sortedNames = new Set<string>();
+    let head = 0; // avoid O(n) shift() on every iteration
+    while (head < queue.length) {
+      const name = queue[head++];
       sorted.push(byName.get(name)!);
+      sortedNames.add(name);
       for (const dependent of dependentsOf.get(name) ?? []) {
         if (!byName.has(dependent)) continue;
         const newDeg = (inDegree.get(dependent) ?? 1) - 1;
@@ -176,7 +179,7 @@ export class PluginManager {
 
     // Any remaining entry in byName that wasn't sorted is part of a cycle
     for (const [name, entry] of byName) {
-      if (!sorted.find(s => s.module.pluginName === name)) {
+      if (!sortedNames.has(name)) {
         failed.push({ path: entry.path, error: `Plugin "${name}" has a circular dependency and cannot be loaded` });
       }
     }
