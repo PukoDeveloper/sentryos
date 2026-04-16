@@ -39,6 +39,7 @@ abstract class BaseRuntime implements IRuntime {
     protected get eventBus() { return this.kernel.resolve('eventBus'); }
     private get permissions() { return this.kernel.resolve('permissions'); }
     protected get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
+    protected get environmentManager() { return this.kernel.resolve('environmentManager'); }
 
     // ── IRuntime: API 管理 ──────────────────────────────────
 
