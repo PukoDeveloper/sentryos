@@ -1,12 +1,12 @@
 {
     "name": "Text Manager",
-    "version": "1.0.0",
     "description": "A simple text document manager for SentryOS.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "text-manager-app",
             "name": "文字編輯器",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Window",
             "icon": "icon.svg",

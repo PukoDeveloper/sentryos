@@ -7,11 +7,13 @@ import {
 import type {
     WindowBounds,
     ContextMenuEntry,
+    InitializeUiOptions,
     WindowDescriptor,
     WindowInitOptions,
     WindowLifecycleEvent,
     WindowProcessContext,
     WindowState,
+    WindowStyle,
     WindowSystemResult,
     WindowUiEvent,
     WindowUiNode,
@@ -21,7 +23,16 @@ import type {
 } from './types';
 import { uiComponentRegistry } from './UiComponentRegistry';
 import type { RenderContext } from './UiComponentRegistry';
+import { renderAnsiLine } from '../console/AnsiParser';
 import './builtinComponents';
+
+/** See builtinComponents.ts — normalises Lua proxy objects to JS arrays. */
+function toIterable<T>(v: T[] | Iterable<T> | null | undefined | Record<string, unknown>): T[] {
+    if (v == null) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof (v as any)[Symbol.iterator] === 'function') return Array.from(v as Iterable<T>);
+    return [];
+}
 
 const ANIM_CLOSE_MS    = 220;
 const ANIM_MINIMIZE_MS = 280;
@@ -46,6 +57,10 @@ class WindowManager {
     private maximizedTaskbarHeight = MAXIMIZED_TASKBAR_HEIGHT;
     /** 被 modal 鎖定的視窗 → 遮罩元素 */
     private readonly blockedOverlays = new Map<string, HTMLElement>();
+    /** 每個程序的視窗建立時間戳（用於速率限制） */
+    private readonly windowCreationTimes = new Map<string, number[]>();
+    private static readonly WINDOW_RATE_LIMIT = 10;
+    private static readonly WINDOW_RATE_WINDOW_MS = 1000;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -91,6 +106,20 @@ class WindowManager {
     }
 
     createWindow(context: WindowProcessContext, options: WindowInitOptions): WindowSystemResult<string> {
+        // 速率限制：每個程序每秒最多建立 N 個視窗
+        const now = Date.now();
+        if (!this.windowCreationTimes.has(context.processAppId)) {
+            this.windowCreationTimes.set(context.processAppId, []);
+        }
+        const times = this.windowCreationTimes.get(context.processAppId)!;
+        while (times.length > 0 && times[0] < now - WindowManager.WINDOW_RATE_WINDOW_MS) {
+            times.shift();
+        }
+        if (times.length >= WindowManager.WINDOW_RATE_LIMIT) {
+            return { success: false, error: 'RateLimitExceeded' };
+        }
+        times.push(now);
+
         const windowId = `window_${Date.now()}_${this.windowCounter++}`;
         const root = document.createElement('div');
         root.className = 'window-shell';
@@ -98,9 +127,10 @@ class WindowManager {
 
         const frame = document.createElement('div');
         frame.className = options.useDefaultFrame === false ? 'window-frame window-frame-unstyled' : 'window-frame';
+        if (options.style) frame.classList.add('window-frame-custom');
 
         const titleBar = document.createElement('div');
-        titleBar.className = 'window-titlebar';
+        titleBar.className = options.style ? 'window-titlebar-custom' : 'window-titlebar';
 
         const titleLabel = document.createElement('div');
         titleLabel.className = 'window-title';
@@ -191,7 +221,7 @@ class WindowManager {
         return { success: true, data: windowId };
     }
 
-    initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[]): WindowSystemResult<string> {
+    initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[], options?: InitializeUiOptions): WindowSystemResult<string> {
         const descriptor = this.getOwnedWindow(processAppId, windowId);
         if (!descriptor.success) {
             return { success: false, error: descriptor.error };
@@ -215,13 +245,26 @@ class WindowManager {
             }
         }
 
+        // Save scroll positions before re-render
+        const scrollMap = new Map<string, { top: number; left: number }>();
+        let contentScroll: { top: number; left: number } | null = null;
+        if (options?.preserveScroll) {
+            contentScroll = { top: windowDescriptor.content.scrollTop, left: windowDescriptor.content.scrollLeft };
+            const scrollable = windowDescriptor.content.querySelectorAll<HTMLElement>('[data-control-id]');
+            for (const el of scrollable) {
+                if (el.scrollTop !== 0 || el.scrollLeft !== 0) {
+                    scrollMap.set(el.dataset.controlId!, { top: el.scrollTop, left: el.scrollLeft });
+                }
+            }
+        }
+
         windowDescriptor.content.replaceChildren();
         this.pruneBindings(windowId);
 
         const nodeMap = new Map<string, HTMLElement>();
         this.windowNodeMaps.set(windowId, nodeMap);
 
-        for (const node of tree) {
+        for (const node of toIterable(tree)) {
             const rendered = this.renderNode(windowDescriptor, processAppId, node);
             windowDescriptor.content.appendChild(rendered);
         }
@@ -238,6 +281,21 @@ class WindowManager {
                 } else {
                     const inner = target.querySelector('input') as HTMLElement | null;
                     (inner ?? target).focus();
+                }
+            }
+        }
+
+        // Restore scroll positions
+        if (options?.preserveScroll) {
+            if (contentScroll) {
+                windowDescriptor.content.scrollTop = contentScroll.top;
+                windowDescriptor.content.scrollLeft = contentScroll.left;
+            }
+            for (const [controlId, scroll] of scrollMap) {
+                const el = nodeMap.get(controlId);
+                if (el) {
+                    el.scrollTop = scroll.top;
+                    el.scrollLeft = scroll.left;
                 }
             }
         }
@@ -323,7 +381,7 @@ class WindowManager {
             return { success: false, error: 'NodeNotFound' };
         }
 
-        for (const node of nodes) {
+        for (const node of toIterable(nodes)) {
             const rendered = this.renderNode(descriptor.data!, processAppId, node);
             parent.appendChild(rendered);
         }
@@ -352,6 +410,24 @@ class WindowManager {
 
         setTimeout(() => current.root.remove(), ANIM_CLOSE_MS);
 
+        return { success: true, data: windowId };
+    }
+
+    setWindowStyle(processAppId: string, windowId: string, style: WindowStyle): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const current = descriptor.data!;
+        current.style = { ...current.style, ...style };
+        current.frame.classList.add('window-frame-custom');
+        const tb = current.frame.querySelector('.window-titlebar') as HTMLElement | null;
+        if (tb) {
+            tb.classList.remove('window-titlebar');
+            tb.classList.add('window-titlebar-custom');
+        }
+        this.applyWindowLayout(current);
         return { success: true, data: windowId };
     }
 
@@ -516,7 +592,7 @@ class WindowManager {
         const menu = document.createElement('div');
         menu.className = 'desktop-context-menu';
 
-        for (const entry of items) {
+        for (const entry of toIterable(items)) {
             if ('separator' in entry && entry.separator) {
                 const sep = document.createElement('div');
                 sep.className = 'desktop-context-menu-separator';
@@ -594,12 +670,6 @@ class WindowManager {
             width: DEFAULT_CONSOLE_WIDTH,
             height: DEFAULT_CONSOLE_HEIGHT,
             useDefaultFrame: true,
-            style: {
-                background: 'rgba(6, 8, 14, 0.98)',
-                color: '#c8d8e8',
-                border: '1px solid rgba(100, 160, 220, 0.18)',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
-            },
         });
 
         if (!result.success || !result.data) {
@@ -650,7 +720,12 @@ class WindowManager {
         const appendLine = (text: string) => {
             const line = document.createElement('div');
             line.className = 'console-line';
-            line.textContent = text;
+            const rendered = renderAnsiLine(text);
+            if (rendered) {
+                line.appendChild(rendered);
+            } else {
+                line.textContent = text;
+            }
             output.appendChild(line);
             output.scrollTop = output.scrollHeight;
         };
@@ -658,7 +733,12 @@ class WindowManager {
         const appendText = (text: string) => {
             const last = output.lastElementChild;
             if (last && last.classList.contains('console-line')) {
-                last.textContent += text;
+                const rendered = renderAnsiLine(text);
+                if (rendered) {
+                    last.appendChild(rendered);
+                } else {
+                    last.appendChild(document.createTextNode(text));
+                }
             } else {
                 appendLine(text);
             }
@@ -731,7 +811,7 @@ class WindowManager {
         const events = (node as any).events as WindowUiEvent['type'][] | undefined;
         if (!events || !node.id) return;
 
-        for (const evt of events) {
+        for (const evt of toIterable(events)) {
             // Skip events already handled natively by the component renderer
             if (evt === 'click' && node.type === 'button') continue;
             if ((evt === 'change' || evt === 'submit') && ['input', 'textarea', 'checkbox', 'select'].includes(node.type)) continue;
@@ -861,6 +941,13 @@ class WindowManager {
         }
         if (descriptor.style?.boxShadow) {
             descriptor.frame.style.boxShadow = descriptor.style.boxShadow;
+        }
+        // Apply titlebar custom styles
+        const tb = descriptor.frame.querySelector('.window-titlebar, .window-titlebar-custom') as HTMLElement | null;
+        if (tb && descriptor.style?.titlebar) {
+            if (descriptor.style.titlebar.background) tb.style.background = descriptor.style.titlebar.background;
+            if (descriptor.style.titlebar.color) tb.style.color = descriptor.style.titlebar.color;
+            if (descriptor.style.titlebar.borderBottom) tb.style.borderBottom = descriptor.style.titlebar.borderBottom;
         }
     }
 

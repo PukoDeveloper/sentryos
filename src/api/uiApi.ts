@@ -3,13 +3,13 @@ import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../ker
 import { uiComponentRegistry } from '../window/UiComponentRegistry';
 
 export function registerUiApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const appManager = kernel.resolve('appManager');
   const windowManager = kernel.resolve('windowManager');
   const iconMap = kernel.get('iconMap');
 
-  runtime.registerApi('ui', ({ process }) => {
+  runtimeRegistry.registerApi('ui', ({ process }) => {
     const app = appManager.get(process.appDefId);
     if (!app) {
       return {};
@@ -49,14 +49,23 @@ export function registerUiApi(kernel: Kernel): void {
       },
 
       // ── Tree 操作 ──────────────────────────────────────────
-      initialize: (windowId: string, tree: unknown[]) =>
-        windowManager.initializeUi(process.processAppId, windowId, (tree ?? []) as any),
+      initialize: (windowId: string, tree: unknown[], options?: Record<string, unknown>) =>
+        windowManager.initializeUi(process.processAppId, windowId, (tree ?? []) as any,
+          options ? { preserveScroll: options.preserveScroll === true } : undefined),
       update: (windowId: string, nodeId: string, patch: Record<string, unknown>) =>
         windowManager.updateUi(process.processAppId, windowId, nodeId, patch as any),
       remove: (windowId: string, nodeId: string) =>
         windowManager.removeUiNode(process.processAppId, windowId, nodeId),
       append: (windowId: string, parentId: string, nodes: unknown[]) =>
         windowManager.appendUiNode(process.processAppId, windowId, parentId, (nodes ?? []) as any),
+
+      // ── Window Style ───────────────────────────────────────
+      setWindowStyle: (windowId: string, style: Record<string, unknown>) => {
+        if (!permissions.has(process.processAppId, Permissions.WINDOW_CREATE)) {
+          return { success: false, error: 'PermissionDenied' };
+        }
+        return windowManager.setWindowStyle(process.processAppId, windowId, style as any);
+      },
 
       // ── Context Menu ───────────────────────────────────────
       showContextMenu: (windowId: string, controlId: string, x: number, y: number, items: unknown[]) =>

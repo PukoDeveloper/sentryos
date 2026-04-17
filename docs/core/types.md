@@ -1,14 +1,10 @@
-# 共用型別
+# 共用型別定義
 
-**檔案**：`src/kernel/types.ts`
-
-定義所有核心元件共用的基礎型別。
+本文件彙整跨模組使用的 Result 型別與錯誤型別。
 
 ---
 
-## Result
-
-所有核心操作的統一回傳格式：
+## 通用 Result
 
 ```typescript
 type Result<DataT, ErrorT> = {
@@ -20,33 +16,25 @@ type Result<DataT, ErrorT> = {
 
 ---
 
-## EventBusResult
+## EventBus
 
 ```typescript
 type EventBusError = 'PermissionDenied' | 'EventNotFound' | 'UnknownError';
-
-type EventBusResult = {
-  success: boolean;
-  error?: EventBusError;
-} & Result<any, EventBusError>;
+type EventBusResult = Result<any, EventBusError> & { success: boolean; error?: EventBusError };
 ```
 
 ---
 
-## PermissionResult
+## Permissions
 
 ```typescript
 type PermissionError = 'PermissionDenied' | 'InvalidPermission' | 'NotInitialized' | 'UnknownError';
-
-type PermissionResult = {
-  success: boolean;
-  error?: PermissionError;
-} & Result<any, PermissionError>;
+type PermissionResult = Result<any, PermissionError> & { success: boolean; error?: PermissionError };
 ```
 
 ---
 
-## ProcessResult
+## Process
 
 ```typescript
 type ProcessError =
@@ -56,9 +44,45 @@ type ProcessError =
   | 'ParentNotFound'
   | 'NotFound'
   | 'UnknownError';
+type ProcessResult = Result<number, ProcessError> & { success: boolean; error?: ProcessError };
+```
 
-type ProcessResult = {
-  success: boolean;
-  error?: ProcessError;
-} & Result<number, ProcessError>;
+---
+
+## Storage
+
+```typescript
+type StorageError =
+  | 'PermissionDenied' | 'NotFound' | 'AlreadyExists'
+  | 'CapacityExceeded' | 'InvalidTier' | 'InvalidKey' | 'UnknownError';
+type StorageResult<TData = unknown> = Result<TData, StorageError> & { success: boolean; error?: StorageError };
+```
+
+---
+
+## WindowSystem
+
+```typescript
+type WindowSystemError =
+  | 'PermissionDenied' | 'WindowNotFound' | 'NodeNotFound'
+  | 'Closed' | 'InvalidOperation' | 'RateLimitExceeded';
+type WindowSystemResult<TData = unknown> = { success: boolean; data?: TData; error?: WindowSystemError };
+```
+
+---
+
+## ApplicationCatalog
+
+```typescript
+type ApplicationCatalogError = 'ManifestNotFound' | 'InvalidManifest' | 'LoadFailed';
+type ApplicationCatalogResult<TData> = Result<TData, ApplicationCatalogError> & { success: boolean; error?: ApplicationCatalogError };
+```
+
+---
+
+## Runtime
+
+```typescript
+type RuntimeError = 'ProcessNotFound' | 'ProcessNotRunning' | 'RuntimeError' | 'PermissionDenied' | 'InvalidTarget';
+type RuntimeResult<T> = { success: boolean; data?: T; error?: RuntimeError };
 ```

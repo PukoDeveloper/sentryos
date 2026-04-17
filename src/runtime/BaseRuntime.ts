@@ -18,6 +18,7 @@ import type {
     ApiFactory,
     Message,
     BaseProcessState,
+    RuntimeMemoryUsage,
 } from './types';
 
 abstract class BaseRuntime implements IRuntime {
@@ -26,7 +27,8 @@ abstract class BaseRuntime implements IRuntime {
      *  子類別可在同一個 Map 中存放更豐富的物件（例如 RuntimeProcess），
      *  因為它們結構上是 BaseProcessState 的超集。 */
     protected readonly processStates: Map<number, BaseProcessState> = new Map();
-    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[]; group?: string }> = new Map();
+    /** 引擎內建 API（process, event, ipc 等依賴 runtime 實例狀態的 API） */
+    private readonly builtinApiEntries: Map<string, { factory: ApiFactory; gates: string[]; group?: string }> = new Map();
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
@@ -41,14 +43,11 @@ abstract class BaseRuntime implements IRuntime {
     protected get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
     protected get environmentManager() { return this.kernel.resolve('environmentManager'); }
 
-    // ── IRuntime: API 管理 ──────────────────────────────────
+    // ── 內建 API 註冊（僅供 registerBuiltinApis 使用）───────
 
-    registerApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
-        this.apiEntries.set(name, { factory, gates, group });
-    }
-
-    unregisterApi(name: string): boolean {
-        return this.apiEntries.delete(name);
+    /** 註冊引擎內建 API（依賴 runtime 實例狀態，不進入中央註冊表）。 */
+    private registerBuiltinApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
+        this.builtinApiEntries.set(name, { factory, gates, group });
     }
 
     // ── IRuntime: 抽象方法（由引擎子類別實作）──────────────
@@ -57,49 +56,58 @@ abstract class BaseRuntime implements IRuntime {
     abstract evaluateInContext(pid: number, code: string): RuntimeResult<unknown>;
     abstract destroyProcessRuntime(pid: number): void;
     abstract destroyAll(): void;
+    abstract getMemoryUsage(): RuntimeMemoryUsage;
 
-    // ── IRuntime: 事件派發（路由至 execute）────────────────
+    // ── IRuntime: 事件派發 ──────────────────────────────────
 
-    /** 共用輔助：在指定 processAppId 的執行中程序上執行一段程式碼。 */
-    private dispatchToProcess(processAppId: string, code: string): RuntimeResult<unknown> {
+    /**
+     * 語言無關的事件派發核心。
+     * 在指定 PID 的沙箱中呼叫全域 handler 函式。
+     * 預設實作產生 JavaScript 程式碼字串（適用於 QuickJS/ScriptRuntime），
+     * 非 JS 引擎（如 Lua）的子類別應覆寫此方法以使用原生函式呼叫。
+     */
+    protected invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown> {
+        const safePayload = JSON.stringify(arg);
+        const safeHandler = JSON.stringify(handlerName);
+        const code = `(function(){var _h=${safeHandler};if(typeof globalThis[_h]==='function'){return globalThis[_h](${safePayload})}})()`;
+        return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
+    }
+
+    /** 在指定 processAppId 的執行中程序上呼叫 handler。 */
+    private dispatchToHandler(processAppId: string, handlerName: string, arg: unknown): RuntimeResult<unknown> {
         for (const [pid] of this.processStates) {
             const proc = this.getProcess(pid);
             if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
+                return this.invokeHandler(pid, handlerName, arg);
             }
         }
         return { success: false, error: 'ProcessNotFound' };
     }
 
     dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(event);
-        return this.dispatchToProcess(processAppId, `if(typeof onWindowEvent==='function'){onWindowEvent(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onWindowEvent', event);
     }
 
     dispatchConsoleInput(processAppId: string, line: string): RuntimeResult<unknown> {
-        const escaped = JSON.stringify(line);
-        return this.dispatchToProcess(processAppId, `if(typeof onConsoleInput==='function'){onConsoleInput(${escaped})}`);
+        return this.dispatchToHandler(processAppId, 'onConsoleInput', line);
     }
 
     dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(event);
-        return this.dispatchToProcess(processAppId, `if(typeof onKeyboardEvent==='function'){onKeyboardEvent(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onKeyboardEvent', event);
     }
 
     dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(fileInfo);
-        return this.dispatchToProcess(processAppId, `if(typeof onFileOpen==='function'){onFileOpen(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onFileOpen', fileInfo);
     }
 
     dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(result);
-        return this.dispatchToProcess(processAppId, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onDialogResult', result);
     }
 
     // ── 內建 API 註冊 ───────────────────────────────────────
 
     private registerBuiltinApis(): void {
-        this.registerApi('process', ({ pid, process }) => ({
+        this.registerBuiltinApi('process', ({ pid, process }) => ({
             pid,
             appDefId: process.appDefId,
             appId: process.processAppId,
@@ -107,6 +115,10 @@ abstract class BaseRuntime implements IRuntime {
             parentPid: process.parentPid,
             status: () => this.getProcess(pid)?.status ?? 'stopped',
             spawnChild: (appDefId?: string, type?: ProcessType) => {
+                const MAX_CHILDREN = 32;
+                if (process.children.size >= MAX_CHILDREN) {
+                    return { success: false, error: 'TooManyChildren' };
+                }
                 const targetApp = typeof appDefId === 'string' && appDefId.length > 0 ? appDefId : process.appDefId;
                 const launchResult = this.processManager.launch(process.processAppId, targetApp, {
                     parentPid: pid,
@@ -143,21 +155,21 @@ abstract class BaseRuntime implements IRuntime {
                 this.processManager.terminate(process.processAppId, targetPid),
         }));
 
-        this.registerApi('event', ({ pid, process }) => ({
+        this.registerBuiltinApi('event', ({ pid, process }) => ({
             subscribe: (eventName: string) => this.subscribeProcessEvent(pid, process.processAppId, eventName),
             unsubscribe: (eventName: string) => this.unsubscribeProcessEvent(pid, process.processAppId, eventName),
             emit: (eventName: string, payload?: unknown): EventBusResult =>
                 this.eventBus.emit(process.processAppId, eventName, payload)
         }));
 
-        this.registerApi('ipc', ({ pid, process }) => ({
+        this.registerBuiltinApi('ipc', ({ pid, process }) => ({
             sendToParent: (payload: unknown) => this.sendToParent(process, payload),
             sendToChild: (childPid: number, payload: unknown) => this.sendToChild(process, childPid, payload),
             broadcastChildren: (payload: unknown) => this.broadcastChildren(process, payload),
             receive: () => this.readInbox(pid)
         }));
 
-        this.registerApi('serviceApi', ({ pid, process }) => ({
+        this.registerBuiltinApi('serviceApi', ({ pid, process }) => ({
             publishHealth: (health: unknown) => {
                 if (!this.permissions.has(process.processAppId, Permissions.SERVICE_PUBLISH_HEALTH)) {
                     return { success: false, error: 'PermissionDenied' };
@@ -169,7 +181,7 @@ abstract class BaseRuntime implements IRuntime {
             }
         }), ['service'], 'service');
 
-        this.registerApi('windowApi', ({ pid, process }) => ({
+        this.registerBuiltinApi('windowApi', ({ pid, process }) => ({
             postUiEvent: (name: string, payload?: unknown) =>
                 this.eventBus.emit(process.processAppId, Events.WINDOW_UI, {
                     pid,
@@ -177,25 +189,12 @@ abstract class BaseRuntime implements IRuntime {
                     payload
                 })
         }), ['window'], 'window');
-
-        this.registerApi('consoleApi', ({ pid, process }) => ({
-            writeLine: (text: unknown) => {
-                if (!this.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
-                    return { success: false, error: 'PermissionDenied' };
-                }
-                const message = String(text);
-                this.eventBus.emit(process.processAppId, Events.CONSOLE_OUTPUT, {
-                    pid,
-                    message
-                });
-                return true;
-            }
-        }), ['console']);
     }
 
     // ── API 表面建構 ────────────────────────────────────────
 
-    /** 根據程序的權限建構完整的 Host API 表面（純 JS 物件，引擎無關）。 */
+    /** 根據程序的權限建構完整的 Host API 表面（純 JS 物件，引擎無關）。
+     *  合併來源：引擎內建 API（builtinApiEntries）+ 中央 Host API（RuntimeRegistry.hostApiEntries）。 */
     protected buildApiSurface(process: ProcessView): Record<string, HostApiValue> {
         const ctx: ApiFactoryContext = {
             pid: process.pid,
@@ -203,7 +202,13 @@ abstract class BaseRuntime implements IRuntime {
         };
         const merged: Record<string, HostApiValue> = {};
 
-        for (const [name, { factory, gates, group }] of this.apiEntries) {
+        // 合併引擎內建 API + 中央 Host API（中央 API 優先覆蓋同名內建 API）
+        const allEntries: [string, { factory: ApiFactory; gates: string[]; group?: string }][] = [
+            ...this.builtinApiEntries,
+            ...this.kernel.resolve('runtimeRegistry').getHostApiEntries(),
+        ];
+
+        for (const [name, { factory, gates, group }] of allEntries) {
             if (gates.length > 0 && !gates.some(g => this.permissions.hasAnyUnder(process.processAppId, g))) {
                 continue;
             }
@@ -340,6 +345,7 @@ abstract class BaseRuntime implements IRuntime {
     }
 
     protected pushMessage(fromPid: number, toPid: number, channel: string, payload: unknown): RuntimeResult<boolean> {
+        const MAX_INBOX_SIZE = 256;
         const targetProc = this.getProcess(toPid);
         if (!targetProc || targetProc.status !== 'running') {
             return { success: false, error: 'ProcessNotFound' };
@@ -348,6 +354,10 @@ abstract class BaseRuntime implements IRuntime {
         const targetState = this.processStates.get(toPid);
         if (!targetState) {
             return { success: false, error: 'ProcessNotFound' };
+        }
+
+        if (targetState.inbox.length >= MAX_INBOX_SIZE) {
+            return { success: false, error: 'InboxFull' };
         }
 
         const message: Message = {
@@ -364,7 +374,10 @@ abstract class BaseRuntime implements IRuntime {
         try {
             const safeMsg = JSON.stringify({ fromPid: message.fromPid, channel: message.channel, payload: message.payload, timestamp: message.timestamp });
             this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-        } catch (err) { console.warn('[Runtime] onMessage dispatch failed (context may be gone):', err); }
+        } catch (err) {
+            // JSON.stringify may fail on circular references; log and continue
+            console.warn('[Runtime] onMessage dispatch failed:', err);
+        }
 
         return { success: true, data: true };
     }

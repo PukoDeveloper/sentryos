@@ -1,48 +1,48 @@
-# WebFileSystemAdapter
+# FileSystem
 
 **檔案**：`src/storage/FileSystem.ts`
 
-記憶體內的虛擬檔案系統，以 Storage Tier 劃分容量。所有操作皆需通過權限檢查。
+分層儲存系統，以 `StorageTier` 區分不同用途的儲存區域，使用 `localStorage` 持久化。
 
 ---
 
-## Storage Tiers
+## StorageTier
 
-| Tier | 預設容量（條目數） | 用途 |
-|------|-------------------|------|
-| `sys` | 256 | 系統資料 |
-| `app` | 384 | 應用資料 |
+| Tier | 預設容量 | 用途 |
+|------|---------|------|
+| `sys` | 256 | 系統設定 |
+| `app` | 384 | 應用程式資料 |
 | `user` | 256 | 使用者資料 |
 | `cache` | 128 | 快取 |
 
-總容量預設 1024 條目。
+總容量預設 `1024`（定義於 `STORAGE_TOTAL_CAPACITY`）。
 
 ---
 
-## API
+## API（FileSystemAdapter）
 
 | 方法 | 簽章 | 說明 |
 |------|------|------|
-| `read()` | `(appId, tier, key) → StorageResult<StorageEntry>` | 讀取條目 |
-| `write()` | `(appId, tier, key, data, options?) → StorageResult<StorageEntry>` | 寫入條目 |
-| `delete()` | `(appId, tier, key) → StorageResult<string>` | 刪除條目 |
-| `list()` | `(appId, tier?) → StorageResult<StorageEntry[]>` | 列出條目（tier 可省略以列出所有可讀 tier） |
+| `read()` | `(appId, tier, key) → StorageResult<StorageEntry>` | 讀取 |
+| `write()` | `(appId, tier, key, data, options?) → StorageResult<StorageEntry>` | 寫入 |
+| `delete()` | `(appId, tier, key) → StorageResult<string>` | 刪除 |
+| `list()` | `(appId, tier?) → StorageResult<StorageEntry[]>` | 列出（可指定 tier 或全部） |
+| `listByPrefix()` | `(appId, tier, prefix) → StorageResult<StorageEntry[]>` | 以 key 前綴列出 |
 | `exists()` | `(appId, tier, key) → StorageResult<boolean>` | 檢查是否存在 |
-| `usage()` | `(appId) → StorageResult<StorageUsage>` | 查詢各 tier 用量與容量 |
-| `configureCapacity()` | `(tier, capacity) → StorageResult<number>` | 調整 tier 容量上限 |
+| `usage()` | `(appId) → StorageResult<StorageUsage>` | 查詢使用量 |
+| `configureCapacity()` | `(appId, tier, capacity) → StorageResult<number>` | 調整容量，需 `FILE_ADMIN_CONFIGURE` 權限 |
 
 ---
 
-## 權限要求
+## WriteOptions
 
-每個操作會檢查 `file.<action>.<tier>` 權限：
-
-| 操作 | 所需權限範例 |
-|------|-------------|
-| 讀取 app tier | `file.read.app` |
-| 寫入 user tier | `file.write.user` |
-| 刪除 cache tier | `file.delete.cache` |
-| 列出 sys tier | `file.list.sys` |
+```typescript
+interface WriteOptions {
+  metadata?: Record<string, string | number | boolean | null>;
+  overwrite?: boolean;       // 預設 true；false 時若已存在回傳 AlreadyExists
+  ownerLabel?: string;       // 若提供，寫入時以此作為 ownerAppId（穩定的擁有者識別）
+}
+```
 
 ---
 
@@ -54,57 +54,32 @@ interface StorageEntry<TData extends StorageData = StorageData> {
   tier: StorageTier;
   ownerAppId: string;
   data: TData;
-  createdAt: number;    // timestamp
-  updatedAt: number;    // timestamp
+  createdAt: number;
+  updatedAt: number;
   metadata?: Record<string, string | number | boolean | null>;
 }
 ```
 
 ---
 
-## WriteOptions
+## 權限模型
 
-```typescript
-interface WriteOptions {
-  metadata?: Record<string, string | number | boolean | null>;
-  overwrite?: boolean;  // false 時，若 key 已存在會回傳 AlreadyExists
-}
-```
+每個操作都需要對應的 tier 權限：
+- `file.read.{tier}` / `file.write.{tier}` / `file.delete.{tier}` / `file.list.{tier}`
+- `configureCapacity()` 需要 `file.admin.configure-capacity`
 
----
-
-## StorageData 型別
-
-```typescript
-type StoragePrimitive = string | number | boolean | null;
-type StorageData =
-  | StoragePrimitive
-  | StoragePrimitive[]
-  | { [key: string]: StoragePrimitive | StoragePrimitive[] | StorageRecord };
-```
+權限由 `Permissions.fileAction(action, tier)` 產生。
 
 ---
 
-## StorageUsage
-
-```typescript
-interface StorageUsage {
-  totalEntries: number;
-  totalCapacity: number;
-  tiers: Record<StorageTier, { used: number; capacity: number }>;
-}
-```
-
----
-
-## 錯誤代碼
+## 錯誤類型
 
 | 錯誤 | 說明 |
 |------|------|
-| `PermissionDenied` | 缺少所需權限 |
+| `PermissionDenied` | 無對應 tier 的操作權限 |
 | `NotFound` | key 不存在 |
-| `AlreadyExists` | 寫入時 key 已存在且 `overwrite: false` |
-| `CapacityExceeded` | tier 容量已滿 |
+| `AlreadyExists` | `overwrite: false` 時 key 已存在 |
+| `CapacityExceeded` | 超過 tier 容量 |
 | `InvalidTier` | 無效的 tier 名稱 |
 | `InvalidKey` | key 為空或包含 `..` |
-| `UnknownError` | 未知錯誤 |
+| `UnknownError` | 其他錯誤 |

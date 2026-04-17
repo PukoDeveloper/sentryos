@@ -13,12 +13,6 @@ var app = UI.createApp({
   title: '儲存空間範例',
   width: 500,
   height: 460,
-  style: {
-    background: 'linear-gradient(180deg, rgba(10, 14, 20, 0.96), rgba(6, 10, 14, 0.92))',
-    color: '#ecf4ff',
-    border: '1px solid rgba(118, 185, 255, 0.26)',
-    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.34)',
-  },
   state: {},
   render: function (state, self) {
     return UI.column([
@@ -106,7 +100,9 @@ var app = UI.createApp({
                 var result = OS.storage.storageUsage();
                 if (result.success && result.data) {
                   var d = result.data;
-                  statusMsg = '使用: ' + d.used + ' / ' + d.quota + ' 項';
+                  var kb = (d.totalBytes / 1024).toFixed(1);
+                  var capKb = (d.totalCapacityBytes / 1024).toFixed(1);
+                  statusMsg = '使用: ' + kb + ' KB / ' + capKb + ' KB (' + d.totalEntries + ' 項)';
                 } else {
                   statusMsg = '✗ ' + (result.error || '查詢失敗');
                 }

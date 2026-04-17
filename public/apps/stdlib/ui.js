@@ -91,7 +91,7 @@
         handlers = {};
         handlerCounter = 0;
         var tree = options.render(state, app);
-        OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+        OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree], { preserveScroll: true });
       },
       // 顯示系統右鍵選單
       showContextMenu: function (controlId, x, y, items) {
@@ -104,7 +104,7 @@
 
     // 初始繪製 (僅此一次)
     var tree = options.render(state, app);
-    OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree]);
+    OS.ui.initialize(windowId, Array.isArray(tree) ? tree : [tree], { preserveScroll: true });
     return app;
   }
 

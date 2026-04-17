@@ -2,12 +2,12 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerEnvApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const environmentManager = kernel.resolve('environmentManager');
   const catalogApps = kernel.get('catalogApps');
 
-  runtime.registerApi('envApi', ({ pid, process }) => ({
+  runtimeRegistry.registerApi('envApi', ({ pid, process }) => ({
     getVariable: (key: string) => {
       if (!permissions.has(process.processAppId, Permissions.ENV_READ)) {
         return { success: false, error: 'PermissionDenied' };
@@ -53,15 +53,14 @@ export function registerEnvApi(kernel: Kernel): void {
       }
       const code = environmentManager.getLibraryCode(libraryId);
       if (!code) return { success: false, error: 'LibraryNotFound' };
-      // Suppress command re-registration — commands are only registered at boot time
-      runtime.evaluateInContext(pid,
-        `globalThis.__savedRegCmd = OS.registerCommand; OS.registerCommand = function(){};`
-      );
-      const result = runtime.evaluateInContext(pid, code);
-      runtime.evaluateInContext(pid,
-        `OS.registerCommand = globalThis.__savedRegCmd; delete globalThis.__savedRegCmd;`
-      );
-      return result;
+      // Strip ES module export statements for script-mode evaluation.
+      // Library files may contain `export` declarations for import-mode
+      // compatibility; these are invalid in evalCode (script context).
+      const scriptCode = code
+        .replace(/^export\s+(var|const|let|function|class|default)\b[^\n]*/gm, '')
+        .replace(/^export\s*\{[^}]*\}\s*(from\s*['"][^'"]*['"])?\s*;?/gm, '')
+        .replace(/^export\s+\*\s*(from\s*['"][^'"]*['"])?\s*;?/gm, '');
+      return runtimeRegistry.getForPid(pid).evaluateInContext(pid, scriptCode);
     },
     listLibraries: () => {
       return { success: true, data: environmentManager.getLibraryIds() };

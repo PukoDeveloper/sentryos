@@ -2,58 +2,61 @@
 
 **檔案**：`src/application/ApplicationCatalog.ts`
 
-負責從 `public/app.json` 讀取應用清單，逐一 fetch 各 app 的 `manifest.json`，支援 **PackageManifest**（多應用套件）與 **LegacyManifest**（單一應用）兩種格式，解析為 `RegisteredApplication` 陣列。
-
----
-
-## API
-
-| 函式 | 簽章 | 說明 |
-|------|------|------|
-| `loadApplicationCatalog()` | `() → Promise<ApplicationCatalogResult<RegisteredApplication[]>>` | 載入並解析所有已註冊的應用 |
+負責從 `/app.json` 載入應用程式清單，解析套件清單（PackageManifest）或舊格式清單（LegacyManifest），產生 `RegisteredApplication[]`。
 
 ---
 
 ## 載入流程
 
-1. `fetch('/app.json')` 取得應用路徑陣列（如 `["app/stdlib", "app/example"]`）
-2. 對每個條目呼叫 `normalizeCatalogEntry()` 解析為 manifest 路徑
-3. `fetch(manifestPath)` 取得各 manifest
-4. 自動判別格式：
-   - 若含 `apps` 陣列 → **PackageManifest**：逐一驗證 `isValidAppEntry()`，轉換為 `RegisteredApplication`
-   - 否則 → **LegacyManifest**：驗證 `isLegacyManifest()`，轉換為 `RegisteredApplication`
-5. 組合所有結果為 `RegisteredApplication[]`
+1. Fetch `/app.json` 取得 entry 路徑陣列
+2. 對每個 entry，fetch 對應的 `manifest.json`
+3. 依格式判斷為 PackageManifest 或 LegacyManifest
+4. 轉換為 `RegisteredApplication` 陣列
 
 ---
 
-## Manifest 格式
-
-詳見 [Manifest 格式文件](../app-development/manifest.md)。
-
-### PackageManifest（多應用套件）
+## PackageManifest（套件清單）
 
 ```typescript
 type PackageManifest = {
-  name: string;           // 套件名稱
+  name: string;
   version: string;
   description?: string;
   author?: string;
+  permissions?: string[];     // 套件層級權限（所有 app 共用預設）
   apps: AppEntryManifest[];
-};
-
-type AppEntryManifest = {
-  id: string;             // 套件內唯一 ID
-  name: string;
-  main: string;
-  type?: AppType;         // 'Window' | 'Service' | 'Console' | 'Library'
-  icon?: string;
-  permissions?: string[];
-  maxInstances?: number;
-  autoStart?: boolean;
 };
 ```
 
-### LegacyManifest（單一應用，向下相容）
+---
+
+## AppEntryManifest（單一應用程式）
+
+```typescript
+type AppEntryManifest = {
+  id: string;
+  name: string;
+  main: string;
+  type?: AppType;            // 'Window' | 'Service' | 'Console' | 'Library'，預設 'Window'
+  icon?: string;
+  permissions?: string[];    // 優先於套件層級權限
+  maxInstances?: number;
+  autoStart?: boolean;
+  hidden?: boolean;          // 隱藏於啟動選單
+  engine?: string;           // Runtime 引擎識別字串，預設 'quickjs'
+  commands?: ManifestCommand[];  // Library 可靜態宣告命令
+};
+
+type ManifestCommand = {
+  name: string;
+  description: string;
+  usage?: string;
+};
+```
+
+---
+
+## LegacyManifest（舊格式）
 
 ```typescript
 type LegacyManifest = {
@@ -71,80 +74,44 @@ type LegacyManifest = {
 
 ---
 
-## 路徑解析規則
-
-### Manifest 路徑
-
-`app.json` 中的條目會經由 `normalizeCatalogEntry()` 轉換：
-
-| 輸入 | 輸出 |
-|------|------|
-| `"app/example"` | `/apps/example/manifest.json` |
-| `"apps/example"` | `/apps/example/manifest.json` |
-| `"apps/example/manifest.json"` | `/apps/example/manifest.json` |
-
-### Icon / Main 路徑
-
-Icon 與 Main 路徑會自動拼接為完整路徑：`${basePath}/${filename}`
-例如 `/apps/example/icon.svg`、`/apps/example/main.js`
-
----
-
 ## RegisteredApplication
-
-繼承 `Application` 並擴展：
 
 ```typescript
 type RegisteredApplication = Application & {
-  packageName: string;      // 套件名稱
-  entryPath: string;        // manifest 所在目錄（如 /apps/example）
-  mainPath: string;         // 入口腳本完整路徑（如 /apps/example/main.js）
+  packageName: string;
+  manifestId?: string;       // manifest 中的 app id
+  entryPath: string;         // 套件根目錄路徑
+  mainPath: string;          // 完整主程式路徑
   description?: string;
   author?: string;
-  icon?: string;            // 完整 icon 路徑
-  runtimeType: AppType;     // 'Service' | 'Window' | 'Console' | 'Library'
-  autoStart: boolean;       // 是否自動啟動
+  icon?: string;
+  runtimeType: AppType;
+  autoStart: boolean;        // Service/Library 預設 true
+  hidden: boolean;
+  engine?: string;           // Runtime 引擎識別字串
+  commands?: ManifestCommand[];
 };
 ```
 
-### autoStart 預設值
+---
 
-若 manifest 未指定 `autoStart`，依 `type` 自動設定：
+## 權限繼承
 
-| 類型 | 預設 autoStart |
-|------|---------------|
-| `Library` | `true` |
-| `Service` | `true` |
-| `Window` | `false` |
-| `Console` | `false` |
+`permissions` 解析順序：`app.permissions ?? package.permissions ?? []`
 
 ---
 
-## Manifest 驗證規則
+## Icon 解析
 
-### PackageManifest（`isPackageManifest`）
-
-- 含 `apps` 陣列 + `name`（string）+ `version`（string）
-
-### AppEntryManifest（`isValidAppEntry`）
-
-- `id`：非空字串
-- `name`：非空字串
-- `main`：非空字串
-- `permissions`：若存在必須是陣列
-
-### LegacyManifest（`isLegacyManifest`）
-
-- `name`：非空字串
-- `version`：string
-- `main`：非空字串
+- 若 icon 值含副檔名（`/\.[a-z0-9]+$/i`）→ 以 basePath 拼接
+- 否則 → 使用預設圖示 `/default-app-icon.svg`
 
 ---
 
-## 錯誤代碼
+## 錯誤類型
 
 | 錯誤 | 說明 |
 |------|------|
-| `ManifestNotFound` | app.json 或個別 manifest 的 fetch 失敗 |
-| `InvalidManifest` | manifest 格式驗證失敗 |
-| `LoadFailed` | 載入過程發生例外 |
+| `ManifestNotFound` | manifest.json 載入失敗 |
+| `InvalidManifest` | manifest 格式不正確 |
+| `LoadFailed` | 載入過程異常 |

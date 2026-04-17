@@ -1,12 +1,12 @@
 {
     "name": "Terminal",
-    "version": "1.0.0",
     "description": "A terminal emulator package for SentryOS.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "terminal-app",
             "name": "Terminal",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Console",
             "icon": "icon.svg",

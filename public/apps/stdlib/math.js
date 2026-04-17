@@ -49,13 +49,7 @@ globalThis.MathUtils = {
     lcm: lcm,
 };
 
-// ── Register CLI commands ─────────────────────────────────────
-
-OS.env.registerCommand('factorial', 'Calculate factorial of a number', 'factorial <n>');
-OS.env.registerCommand('fib', 'Calculate Fibonacci number', 'fib <n>');
-OS.env.registerCommand('prime', 'Check if a number is prime', 'prime <n>');
-OS.env.registerCommand('gcd', 'Calculate GCD of two numbers', 'gcd <a> <b>');
-OS.env.registerCommand('lcm', 'Calculate LCM of two numbers', 'lcm <a> <b>');
+// ── CLI command handlers ──────────────────────────────────────
 
 globalThis.__commands = globalThis.__commands || {};
 

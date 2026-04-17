@@ -29,7 +29,7 @@
 
 ```javascript
 // 1. 建立視窗
-var win = OS.createWindow({
+var win = OS.ui.createWindow({
   title: 'My App',
   width: 520,
   height: 400,
@@ -37,6 +37,11 @@ var win = OS.createWindow({
     background: 'rgba(10, 14, 20, 0.96)',
     color: '#ecf4ff',
     border: '1px solid rgba(118, 185, 255, 0.26)',
+    titlebar: {
+      background: 'rgba(255, 255, 255, 0.05)',
+      color: '#d8e8ff',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    },
   }
 });
 
@@ -46,12 +51,12 @@ var count = 0;
 // 3. 渲染函式（data-driven re-render）
 function render() {
   if (!win.success) return;
-  OS.initialize(win.data, [
-    OS.stack([
-      OS.label('Count: ' + count),
-      OS.button('+1', {}, 'increment'),
+  OS.ui.initialize(win.data, [
+    OS.ui.stack([
+      OS.ui.label('Count: ' + count),
+      OS.ui.button('+1', undefined, 'increment'),
     ], { padding: '16px', gap: '8px' })
-  ]);
+  ], { preserveScroll: true });
 }
 
 // 4. 初始渲染
@@ -88,8 +93,8 @@ Console 應用由系統自動建立控制台視窗，提供文字輸入/輸出�
 
 ```javascript
 // 歡迎訊息
-OS.writeLine('Welcome to My Console App');
-OS.writeLine('Type "help" for available commands.');
+OS.console.writeLine('Welcome to My Console App');
+OS.console.writeLine('Type "help" for available commands.');
 
 // 接收使用者輸入
 globalThis.onConsoleInput = function(line) {
@@ -98,24 +103,24 @@ globalThis.onConsoleInput = function(line) {
   var args = parts.slice(1);
 
   if (cmd === 'help') {
-    OS.writeLine('Available commands: help, echo, clear, exit');
+    OS.console.writeLine('Available commands: help, echo, clear, exit');
   } else if (cmd === 'echo') {
-    OS.writeLine(args.join(' '));
+    OS.console.writeLine(args.join(' '));
   } else if (cmd === 'clear') {
-    OS.clear();
+    OS.console.clear();
   } else if (cmd === 'exit') {
-    OS.terminateSelf();
+    OS.system.terminateProcess(OS.pid);
   } else {
-    OS.writeLine('Unknown command: ' + cmd);
+    OS.console.writeLine('Unknown command: ' + cmd);
   }
 };
 ```
 
 ### Console API 方法
 
-- `OS.writeLine(text)` — 輸出一行（附換行，需 `console.write` 權限）
-- `OS.write(text)` — 附加文字到最後一行（不換行，需 `console.write` 權限）
-- `OS.clear()` — 清除螢幕（需 `console.write` 權限）
+- `OS.console.writeLine(text)` — 輸出一行（附換行，需 `console.write` 權限）
+- `OS.console.write(text)` — 附加文字到最後一行（不換行，需 `console.write` 權限）
+- `OS.console.clear()` — 清除螢幕（需 `console.write` 權限）
 
 ### Console + Shell 命令分派
 
@@ -129,26 +134,26 @@ globalThis.onConsoleInput = function(line) {
 
   // 內建命令
   if (cmd === 'ps') {
-    var result = OS.listProcesses();
+    var result = OS.shell.listProcesses();
     if (result.success) {
       result.data.forEach(function(p) {
-        OS.writeLine('PID ' + p.pid + ' | ' + p.type + ' | ' + p.status);
+        OS.console.writeLine('PID ' + p.pid + ' | ' + p.type + ' | ' + p.status);
       });
     }
     return;
   }
 
   // 自動分派到已註冊命令
-  var resolved = OS.resolveCommand(cmd);
+  var resolved = OS.shell.resolveCommand(cmd);
   if (resolved.success) {
-    OS.loadLibrary(resolved.data.libraryId);
+    OS.env.loadLibrary(resolved.data.libraryId);
     if (globalThis.__commands && globalThis.__commands[cmd]) {
-      OS.writeLine(globalThis.__commands[cmd](args));
+      OS.console.writeLine(globalThis.__commands[cmd](args));
     }
     return;
   }
 
-  OS.writeLine('Unknown command: ' + cmd);
+  OS.console.writeLine('Unknown command: ' + cmd);
 };
 ```
 
@@ -179,8 +184,8 @@ globalThis.MathUtils = {
 };
 
 // 註冊 CLI 命令（可選）
-OS.registerCommand('factorial', '計算階乘', 'factorial <n>');
-OS.registerCommand('fib', '計算費氏數列', 'fib <n>');
+OS.env.registerCommand('factorial', '計算階乘', 'factorial <n>');
+OS.env.registerCommand('fib', '計算費氏數列', 'fib <n>');
 
 // 提供命令處理函式
 globalThis.__commands = globalThis.__commands || {};
@@ -198,7 +203,7 @@ globalThis.__commands['fib'] = function(args) {
 2. `EnvironmentManager.registerLibrary()` 快取程式碼
 3. 執行 init（Library 的 `main.js`）— 此時可註冊命令、匯出全域物件
 4. init 完成後，程序自動銷毀（Library 不持續運行）
-5. 其他程式透過 `OS.loadLibrary('packageName/appName')` 載入
+5. 其他程式透過 `OS.env.loadLibrary('packageName/appName')` 載入
 
 ---
 
@@ -206,10 +211,10 @@ globalThis.__commands['fib'] = function(args) {
 
 ### Data-Driven Re-render
 
-所有 UI 以純資料節點描述，每次狀態變更時呼叫 `render()` 重新建立完整 UI tree 並交由 `OS.initialize()` 替換 DOM。
+所有 UI 以純資料節點描述，每次狀態變更時呼叫 `render()` 重新建立完整 UI tree 並交由 `OS.ui.initialize()` 替換 DOM。
 
 ```
-  狀態變更 → render() → OS.initialize(windowId, newTree) → DOM 更新
+  狀態變更 → render() → OS.ui.initialize(windowId, newTree, { preserveScroll: true }) → DOM 更新
 ```
 
 **優點**：
@@ -217,15 +222,18 @@ globalThis.__commands['fib'] = function(args) {
 - 無需手動操作 DOM
 - 邏輯簡單可預測
 
-**注意**：每次 `OS.initialize()` 都會完全替換 `.window-content` 下的所有子元素。
+**注意**：
+- 每次 `OS.ui.initialize()` 都會完全替換 `.window-content` 下的所有子元素
+- 傳入 `{ preserveScroll: true }` 可在重新渲染時保留捲動位置，避免使用者體驗中斷
+- stdlib 的 `UI.createApp` 在 `rerender()` 時會自動啟用 `preserveScroll`
 
 ### 事件 ID 匹配
 
-在 `OS.button(text, style, id)` 的第三個參數給定 `id`，在 `onWindowEvent` 中以 `event.controlId` 比對。
+透過 `OS.ui.button(text, style?, id?)` 的 `id` 參數指定控制項 ID，在 `onWindowEvent` 中以 `event.controlId` 比對。
 
 ```javascript
 // 建立按鈕時指定 id
-OS.button('Submit', {}, 'submit-btn')
+OS.ui.button('Submit', undefined, 'submit-btn')
 
 // 事件處理時比對
 globalThis.onWindowEvent = function(event) {
@@ -237,18 +245,18 @@ globalThis.onWindowEvent = function(event) {
 
 ### 命令註冊模式（Library + Console）
 
-Library 在 init 時註冊命令名稱與處理函式，Console 透過 `OS.resolveCommand()` 查詢 → `OS.loadLibrary()` 載入 → `__commands[cmd](args)` 執行：
+Library 在 init 時註冊命令名稱與處理函式，Console 透過 `OS.shell.resolveCommand()` 查詢 → `OS.env.loadLibrary()` 載入 → `__commands[cmd](args)` 執行：
 
 ```
 Library init
-  → OS.registerCommand('cmd', ...)
+  → OS.env.registerCommand('cmd', ...)
   → globalThis.__commands['cmd'] = handler
 
 Console unknown input
-  → OS.resolveCommand('cmd')
-  → OS.loadLibrary(libraryId)
+  → OS.shell.resolveCommand('cmd')
+  → OS.env.loadLibrary(libraryId)
   → __commands['cmd'](args)
-  → OS.writeLine(result)
+  → OS.console.writeLine(result)
 ```
 
 ---
@@ -294,18 +302,18 @@ Console unknown input
 ## 進階：多按鈕互動
 
 ```javascript
-var win = OS.createWindow({ title: 'Multi-Button Demo', width: 400, height: 300 });
+var win = OS.ui.createWindow({ title: 'Multi-Button Demo', width: 400, height: 300 });
 var log = [];
 
 function render() {
   if (!win.success) return;
-  OS.initialize(win.data, [
-    OS.stack([
-      OS.label(log.join('\n') || '(no actions yet)'),
-      OS.stack([
-        OS.button('Action A', {}, 'action-a'),
-        OS.button('Action B', {}, 'action-b'),
-        OS.button('Clear', {}, 'clear'),
+  OS.ui.initialize(win.data, [
+    OS.ui.stack([
+      OS.ui.label(log.join('\n') || '(no actions yet)'),
+      OS.ui.stack([
+        OS.ui.button('Action A', undefined, 'action-a'),
+        OS.ui.button('Action B', undefined, 'action-b'),
+        OS.ui.button('Clear', undefined, 'clear'),
       ], { flexDirection: 'row', gap: '8px' })
     ], { padding: '16px', gap: '12px' })
   ]);
@@ -331,13 +339,13 @@ globalThis.onWindowEvent = function(event) {
 
 ```javascript
 // parent main.js
-var child = OS.spawnChild(undefined, 'Service');
+var child = OS.process.spawnChild(undefined, 'Service');
 if (child.success) {
-  OS.sendToChild(child.pid, { command: 'start' });
+  OS.ipc.sendToChild(child.pid, { command: 'start' });
 }
 
 // 讀取子程序回覆
-var messages = OS.receive();
+var messages = OS.ipc.receive();
 messages.forEach(function(msg) {
   if (msg.type === 'ipc') {
     // 處理回覆

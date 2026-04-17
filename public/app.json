@@ -1,12 +1,13 @@
 [
-    "app/stdlib",
-    "app/example",
-    "app/terminal",
-    "app/task-manager",
-    "app/text-manager",
-    "app/file-manager",
-    "app/file-picker",
-    "app/utilities",
-    "app/settings",
-    "app/developer-tools"
+    "apps/stdlib",
+    "apps/example",
+    "apps/terminal",
+    "apps/task-manager",
+    "apps/text-manager",
+    "apps/file-manager",
+    "apps/file-picker",
+    "apps/utilities",
+    "apps/settings",
+    "apps/developer-tools",
+    "pcode"
 ]

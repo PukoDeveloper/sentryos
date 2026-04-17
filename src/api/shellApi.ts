@@ -2,7 +2,7 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 
 export function registerShellApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const processManager = kernel.resolve('processManager');
   const windowManager = kernel.resolve('windowManager');
@@ -12,7 +12,7 @@ export function registerShellApi(kernel: Kernel): void {
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
 
-  runtime.registerApi('shellApi', ({ pid, process }) => ({
+  runtimeRegistry.registerApi('shellApi', ({ pid, process }) => ({
     listProcesses: () => {
       if (!permissions.has(process.processAppId, Permissions.PROCESS_LIST)) {
         return { success: false, error: 'PermissionDenied' };

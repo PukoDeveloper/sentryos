@@ -9,6 +9,7 @@ import type { Kernel } from '../kernel/Kernel';
 import type { ConsoleWindowController } from '../window/types';
 import type { LanguageManager } from '../language/LanguageManager';
 import { Permissions, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
+import { ANSI } from './AnsiParser';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ class KernelConsole {
   private dispatchDynamicCommand(session: ConsoleSession, cmd: string, args: string[]): void {
     const entry = this.environmentManager.getCommand(cmd);
     if (!entry) {
-      session.controller.appendLine(this.t('console.unknownCmd') + cmd);
+      session.controller.appendLine(ANSI.RED + this.t('console.unknownCmd') + cmd + ANSI.RESET);
       session.controller.appendLine(this.t('console.helpOrCommands'));
       return;
     }
@@ -158,12 +159,14 @@ class KernelConsole {
       this.runtime.execute(session.pid, source);
     }
 
-    // 在 QuickJS context 中呼叫命令處理函式
-    const argsJson = JSON.stringify(args);
-    const escapedCmd = cmd.replace(/'/g, "\\'");
+    // 在 QuickJS context 中呼叫命令處理函式（使用 JSON 安全傳遞參數，避免注入風險）
+    const safeCmd = JSON.stringify(cmd);
+    const safeArgs = JSON.stringify(args);
     const code = `(function(){
-      if(globalThis.__commands && typeof globalThis.__commands['${escapedCmd}']==='function'){
-        var _r=globalThis.__commands['${escapedCmd}'](${argsJson});
+      var _cmd=${safeCmd};
+      var _args=${safeArgs};
+      if(globalThis.__commands && typeof globalThis.__commands[_cmd]==='function'){
+        var _r=globalThis.__commands[_cmd](_args);
         return _r!==undefined&&_r!==null?String(_r):'';
       }
       return '__CMD_NOT_FOUND__';
@@ -185,7 +188,7 @@ class KernelConsole {
 
   private checkPermission(ctx: CommandContext, permission: string): boolean {
     if (this.permissions.has(this.userAppId, permission)) return true;
-    ctx.writeLine(this.t('console.permissionDenied') + permission);
+    ctx.writeLine(ANSI.RED + this.t('console.permissionDenied') + permission + ANSI.RESET);
     return false;
   }
 

@@ -194,12 +194,6 @@ var app = UI.createApp({
   title: '計算機',
   width: 340,
   height: 520,
-  style: {
-    background: 'linear-gradient(180deg, rgba(10,14,20,0.97), rgba(6,10,14,0.94))',
-    color: '#ecf4ff',
-    border: '1px solid rgba(118,185,255,0.26)',
-    boxShadow: '0 24px 60px rgba(0,0,0,0.34)',
-  },
   state: {},
   render: function (s, self) {
     function d(digit) {

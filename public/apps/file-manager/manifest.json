@@ -1,12 +1,12 @@
 {
     "name": "File Manager",
-    "version": "1.0.0",
     "description": "Browse, inspect and manage files across all storage tiers.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "file-manager-app",
             "name": "檔案管理器",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Window",
             "icon": "icon.svg",

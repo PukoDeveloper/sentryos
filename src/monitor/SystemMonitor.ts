@@ -54,7 +54,7 @@ export interface ApiStats {
 export interface PermissionStats {
     totalChecks: number;
     totalDenied: number;
-    byApp: { [appId: string]: { checks: number; denied: number } };
+    byApp: { [appId: string]: { checks: number; denied: number; deniedPermissions: { [perm: string]: number } } };
     byPermission: { [permission: string]: { checks: number; denied: number } };
 }
 
@@ -88,6 +88,29 @@ export interface SystemSnapshot {
         totalExecutions: number;
         recentExecutions: Array<{ pid: number; duration: number; timestamp: number }>;
     };
+    memory: MemorySnapshot;
+}
+
+export interface MemorySnapshot {
+    /** 瀏覽器 JS 堆資訊（僅 Chromium 可用） */
+    jsHeap: {
+        usedBytes: number | null;
+        totalBytes: number | null;
+        limitBytes: number | null;
+    };
+    /** 各 Runtime 引擎的記憶體使用量 */
+    runtimes: RuntimeMemorySnapshotEntry[];
+    /** 所有 Runtime 引擎的記憶體占用合計（位元組） */
+    runtimeTotalBytes: number;
+}
+
+export interface RuntimeMemorySnapshotEntry {
+    engineName: string;
+    activeProcesses: number;
+    totalModuleCacheEntries: number;
+    totalTimers: number;
+    engineMemory: Record<string, number>;
+    estimatedBytes: number;
 }
 
 const MAX_RECENT_EVENTS = 200;
@@ -113,7 +136,7 @@ class SystemMonitor {
     // ── Permission tracking ──
     private permissionChecks = 0;
     private permissionDenied = 0;
-    private permissionByApp = new Map<string, { checks: number; denied: number }>();
+    private permissionByApp = new Map<string, { checks: number; denied: number; deniedPermissions: Map<string, number> }>();
     private permissionByPerm = new Map<string, { checks: number; denied: number }>();
 
     // ── Process tracking ──
@@ -128,9 +151,16 @@ class SystemMonitor {
     private totalExecutions = 0;
 
     private readonly bootTime: number;
+    /** 提供 Runtime 記憶體使用量的回呼（由外部注入以避免循環依賴） */
+    private runtimeMemoryProvider: (() => RuntimeMemorySnapshotEntry[]) | null = null;
 
     constructor(bootTime: number) {
         this.bootTime = bootTime;
+    }
+
+    /** 設定 Runtime 記憶體使用量提供者。 */
+    setRuntimeMemoryProvider(provider: () => RuntimeMemorySnapshotEntry[]): void {
+        this.runtimeMemoryProvider = provider;
     }
 
     // ── Event hooks ──────────────────────────────────────────
@@ -179,11 +209,14 @@ class SystemMonitor {
         if (!granted) this.permissionDenied++;
         let entry = this.permissionByApp.get(appId);
         if (!entry) {
-            entry = { checks: 0, denied: 0 };
+            entry = { checks: 0, denied: 0, deniedPermissions: new Map() };
             this.permissionByApp.set(appId, entry);
         }
         entry.checks++;
-        if (!granted) entry.denied++;
+        if (!granted) {
+            entry.denied++;
+            entry.deniedPermissions.set(permission, (entry.deniedPermissions.get(permission) ?? 0) + 1);
+        }
 
         let permEntry = this.permissionByPerm.get(permission);
         if (!permEntry) {
@@ -273,9 +306,13 @@ class SystemMonitor {
         apiStats.sort((a, b) => b.callCount - a.callCount);
 
         // Permission stats
-        const permByApp: { [appId: string]: { checks: number; denied: number } } = {};
+        const permByApp: { [appId: string]: { checks: number; denied: number; deniedPermissions: { [perm: string]: number } } } = {};
         for (const [appId, entry] of this.permissionByApp) {
-            permByApp[appId] = { ...entry };
+            const deniedPerms: { [perm: string]: number } = {};
+            for (const [perm, count] of entry.deniedPermissions) {
+                deniedPerms[perm] = count;
+            }
+            permByApp[appId] = { checks: entry.checks, denied: entry.denied, deniedPermissions: deniedPerms };
         }
         const permByPerm: { [permission: string]: { checks: number; denied: number } } = {};
         for (const [perm, entry] of this.permissionByPerm) {
@@ -320,7 +357,32 @@ class SystemMonitor {
                 totalExecutions: this.totalExecutions,
                 recentExecutions: [...this.executionDurations].reverse(),
             },
+            memory: this.buildMemorySnapshot(),
         };
+    }
+
+    // ── Memory ───────────────────────────────────────────────
+
+    buildMemorySnapshot(): MemorySnapshot {
+        // 瀏覽器 JS 堆（Chromium 專屬）
+        const perf = performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } };
+        const jsHeap = {
+            usedBytes: perf.memory?.usedJSHeapSize ?? null,
+            totalBytes: perf.memory?.totalJSHeapSize ?? null,
+            limitBytes: perf.memory?.jsHeapSizeLimit ?? null,
+        };
+
+        const runtimes: RuntimeMemorySnapshotEntry[] = this.runtimeMemoryProvider?.() ?? [];
+        let runtimeTotalBytes = 0;
+        for (const r of runtimes) {
+            runtimeTotalBytes += r.estimatedBytes;
+        }
+
+        return { jsHeap, runtimes, runtimeTotalBytes };
+    }
+
+    getMemorySnapshot(): MemorySnapshot {
+        return this.buildMemorySnapshot();
     }
 
     // ── Partial queries (for lighter API calls) ──────────────
@@ -362,9 +424,13 @@ class SystemMonitor {
     }
 
     getPermissionStats(): PermissionStats {
-        const byApp: { [appId: string]: { checks: number; denied: number } } = {};
+        const byApp: PermissionStats['byApp'] = {};
         for (const [appId, entry] of this.permissionByApp) {
-            byApp[appId] = { ...entry };
+            const deniedPerms: { [perm: string]: number } = {};
+            for (const [perm, count] of entry.deniedPermissions) {
+                deniedPerms[perm] = count;
+            }
+            byApp[appId] = { checks: entry.checks, denied: entry.denied, deniedPermissions: deniedPerms };
         }
         const byPermission: { [permission: string]: { checks: number; denied: number } } = {};
         for (const [perm, entry] of this.permissionByPerm) {

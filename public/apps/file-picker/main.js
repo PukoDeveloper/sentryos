@@ -13,6 +13,8 @@ var state = {
   namespaces: [],
   currentNamespace: null,
   saveName: '',
+  newFolderMode: false,
+  newFolderName: '',
 };
 
 // ── Init from fileArgs ──────────────────────────────────────
@@ -26,6 +28,12 @@ function onFileOpen(args) {
   if (args.mode) state.mode = args.mode;
   if (args.extensions) state.extensions = args.extensions;
   if (args.title) state.title = args.title;
+  // 預設檔案名稱（Save 模式下使用）
+  if (args.defaultPath) {
+    var dp = String(args.defaultPath);
+    var lastSlash = dp.lastIndexOf('/');
+    state.saveName = lastSlash >= 0 ? dp.slice(lastSlash + 1) : dp;
+  }
   loadEntries();
   app.rerender();
 }
@@ -274,11 +282,74 @@ function render(s, self) {
         value: s.saveName,
         placeholder: '輸入檔案名稱',
         style: inputStyle,
-        onChange: function (e) {
-          state.saveName = e.value || '';
+        onChange: function (v) {
+          state.saveName = v || '';
         },
       }),
     ], { alignItems: 'center', gap: '6px', padding: '4px 12px' }));
+  }
+
+  // ── Save mode: create folder button ──
+  if (s.mode === 'save') {
+    children.push(UI.row([
+      UI.button('📁+ 新增資料夾', {
+        onClick: function () {
+          state.newFolderMode = !state.newFolderMode;
+          state.newFolderName = '';
+          self.rerender();
+        },
+        style: Object.assign({}, btnStyle, {
+          background: 'rgba(103,184,255,0.1)', color: accent, fontSize: '11px',
+        }),
+      }),
+    ], { padding: '0 12px 4px', gap: '6px' }));
+
+    if (s.newFolderMode) {
+      children.push(UI.row([
+        UI.input({
+          value: s.newFolderName || '',
+          placeholder: '資料夾名稱',
+          style: inputStyle,
+          onChange: function (v) {
+            state.newFolderName = v || '';
+          },
+        }),
+        UI.button('建立', {
+          onClick: function () {
+            var folderName = (state.newFolderName || '').trim();
+            if (!folderName) {
+              OS.notification.notify('請輸入資料夾名稱', '', 'warning');
+              return;
+            }
+            var fullName = s.currentNamespace ? s.currentNamespace + '/' + folderName : folderName;
+            var path = 'user:' + fullName + '/.folder';
+            var result = OS.storage.writeFile(path, null, { overwrite: false });
+            if (!result.success) {
+              if (result.error === 'AlreadyExists') {
+                OS.notification.notify('資料夾「' + folderName + '」已存在', '', 'warning');
+              } else {
+                OS.notification.notify('建立失敗', result.error || '未知錯誤', 'error');
+              }
+              return;
+            }
+            state.newFolderMode = false;
+            state.newFolderName = '';
+            state.currentNamespace = fullName;
+            loadEntries();
+            self.rerender();
+          },
+          style: Object.assign({}, btnStyle, { background: accent, color: '#0a0e14', fontWeight: 'bold' }),
+        }),
+        UI.button('取消', {
+          onClick: function () {
+            state.newFolderMode = false;
+            state.newFolderName = '';
+            self.rerender();
+          },
+          style: Object.assign({}, btnStyle, { background: 'rgba(255,255,255,0.06)', color: 'rgba(216,232,255,0.6)' }),
+        }),
+      ], { alignItems: 'center', gap: '6px', padding: '0 12px 4px' }));
+    }
   }
 
   // ── Footer buttons ──

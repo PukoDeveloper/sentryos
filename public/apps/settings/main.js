@@ -16,14 +16,24 @@ var wallpapers = [
 ];
 
 var accents = [
-  { name: '天藍', primary: '#6dd5ff', secondary: '#3f8efc' },
-  { name: '翠綠', primary: '#6be68a', secondary: '#22c55e' },
-  { name: '紫羅蘭', primary: '#c084fc', secondary: '#8b5cf6' },
-  { name: '珊瑚橙', primary: '#fb923c', secondary: '#f97316' },
-  { name: '玫瑰粉', primary: '#fb7185', secondary: '#e11d48' },
-  { name: '金黃', primary: '#fbbf24', secondary: '#d97706' },
-  { name: '冰白', primary: '#e2e8f0', secondary: '#94a3b8' },
-  { name: '霓虹青', primary: '#22d3ee', secondary: '#06b6d4' },
+  // ── 暗色系 ──
+  { name: '天藍', primary: '#6dd5ff', secondary: '#3f8efc', mode: 'dark' },
+  { name: '翠綠', primary: '#6be68a', secondary: '#22c55e', mode: 'dark' },
+  { name: '紫羅蘭', primary: '#c084fc', secondary: '#8b5cf6', mode: 'dark' },
+  { name: '珊瑚橙', primary: '#fb923c', secondary: '#f97316', mode: 'dark' },
+  { name: '玫瑰粉', primary: '#fb7185', secondary: '#e11d48', mode: 'dark' },
+  { name: '金黃', primary: '#fbbf24', secondary: '#d97706', mode: 'dark' },
+  { name: '冰白', primary: '#e2e8f0', secondary: '#94a3b8', mode: 'dark' },
+  { name: '霓虹青', primary: '#22d3ee', secondary: '#06b6d4', mode: 'dark' },
+  // ── 亮色系 ──
+  { name: '晴空藍', primary: '#76b6ff', secondary: '#3b82f6', mode: 'light' },
+  { name: '薄荷綠', primary: '#86efac', secondary: '#22c55e', mode: 'light' },
+  { name: '薰衣草', primary: '#d8b4fe', secondary: '#a855f7', mode: 'light' },
+  { name: '蜜桃', primary: '#fdba74', secondary: '#f97316', mode: 'light' },
+  { name: '櫻花粉', primary: '#ff7888', secondary: '#f43f5e', mode: 'light' },
+  { name: '奶油黃', primary: '#fde68a', secondary: '#eab308', mode: 'light' },
+  { name: '雲霧白', primary: '#f1f5f9', secondary: '#64748b', mode: 'light' },
+  { name: '淺碧青', primary: '#a5f3fc', secondary: '#06b6d4', mode: 'light' },
 ];
 
 var opacitySteps = [
@@ -66,7 +76,7 @@ if (saved.success && saved.data) {
     if (wallpapers[i].value === d.wallpaper) { selectedWallpaper = i; break; }
   }
   for (var i = 0; i < accents.length; i++) {
-    if (accents[i].primary === d.accentPrimary) { selectedAccent = i; break; }
+    if (accents[i].primary === d.accentPrimary && accents[i].mode === (d.accentMode || 'dark')) { selectedAccent = i; break; }
   }
   for (var i = 0; i < opacitySteps.length; i++) {
     if (opacitySteps[i].value === d.taskbarOpacity) { selectedOpacity = i; break; }
@@ -205,6 +215,7 @@ function buildThemeObject() {
     tint: 'none',
     accentPrimary: accents[selectedAccent].primary,
     accentSecondary: accents[selectedAccent].secondary,
+    accentMode: accents[selectedAccent].mode,
     taskbarOpacity: opacitySteps[selectedOpacity].value,
     taskbarMode: taskbarModes[selectedTaskbarMode].value,
     startMenuWidth: startMenuWidth,
@@ -1389,12 +1400,6 @@ var app = UI.createApp({
   width: 700,
   height: 560,
   resizable: true,
-  style: {
-    background: 'linear-gradient(180deg, rgba(10,14,20,0.97), rgba(6,10,14,0.94))',
-    color: '#ecf4ff',
-    border: '1px solid rgba(118,185,255,0.26)',
-    boxShadow: '0 24px 60px rgba(0,0,0,0.34)',
-  },
   state: {},
   render: function (s, self) {
     // Build sidebar nav

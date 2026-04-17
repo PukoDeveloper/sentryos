@@ -16,6 +16,7 @@ import type {
     HostApiValue,
     HostApiFunction,
     RuntimeProcess,
+    RuntimeMemoryUsage,
     ResponseType,
 } from './types';
 
@@ -116,6 +117,49 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         for (const pid of Array.from(this.processStates.keys())) {
             this.destroyProcessRuntime(pid);
         }
+    }
+
+    // ── 記憶體使用量 ────────────────────────────────────────
+
+    getMemoryUsage(): RuntimeMemoryUsage {
+        let totalModuleCache = 0;
+        let totalTimers = 0;
+        let estimatedBytes = 0;
+        const engineMemory: Record<string, number> = {};
+
+        for (const [pid, state] of this.processStates) {
+            const rp = state as RuntimeProcess;
+            totalModuleCache += rp.moduleCache.size;
+            totalTimers += rp.timers.size;
+
+            // 使用 QuickJS dumpMemoryUsage 取得引擎堆資訊
+            try {
+                const dump = rp.runtime.dumpMemoryUsage();
+                const memUsed = this.parseMemoryUsedFromDump(dump);
+                if (memUsed > 0) {
+                    engineMemory[`pid_${pid}_heap`] = memUsed;
+                    estimatedBytes += memUsed;
+                }
+            } catch { /* runtime may already be disposed */ }
+        }
+
+        engineMemory['moduleCacheEntries'] = totalModuleCache;
+        engineMemory['activeTimers'] = totalTimers;
+
+        return {
+            engineName: 'quickjs',
+            activeProcesses: this.processStates.size,
+            totalModuleCacheEntries: totalModuleCache,
+            totalTimers,
+            engineMemory,
+            estimatedBytes,
+        };
+    }
+
+    private parseMemoryUsedFromDump(dump: string): number {
+        // QuickJS dumpMemoryUsage 格式包含 "memory_used_size: 12345" 行
+        const match = dump.match(/memory_used_size:\s*(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
     }
 
     // ── QuickJS Runtime 管理 ─────────────────────────────────
@@ -221,9 +265,13 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 return code;
             }
             else if (type === 'json') {
-                return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
-                    return "export const " + k + " = " + JSON.stringify(v) + ";";
-                }).join("\n") + "\nexport default " + code + ";";
+                try {
+                    return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
+                        return "export const " + k + " = " + JSON.stringify(v) + ";";
+                    }).join("\n") + "\nexport default " + code + ";";
+                } catch {
+                    return throwImportError(`imports('${moduleName}'): invalid JSON at '${resolvedPath}'`);
+                }
             }
             else {
                 return "const code = " + JSON.stringify(code) + "; export default code;";
@@ -312,13 +360,19 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             context.newFunction(repeat ? 'setInterval' : 'setTimeout', (...args: any[]) => {
                 if (args.length === 0) return context.undefined;
                 const callbackHandle = args[0];
-                if (typeof context.typeof(callbackHandle) !== 'string' || context.typeof(callbackHandle) !== 'function') {
-                    // 嘗試當作 function handle 使用，即使 typeof 不精確也放行
+                if (context.typeof(callbackHandle) !== 'function') {
+                    return context.undefined;
                 }
                 const delay = args.length > 1 ? (context.dump(args[1]) ?? 0) : 0;
 
                 const callbackDup = callbackHandle.dup();
-                const guestId = runtimeProcess.timerNextId++;
+                // 回收已釋放的 guest ID，避免 ID 無限遞增
+                let guestId: number;
+                if (runtimeProcess.timerFreeIds && runtimeProcess.timerFreeIds.length > 0) {
+                    guestId = runtimeProcess.timerFreeIds.pop()!;
+                } else {
+                    guestId = runtimeProcess.timerNextId++;
+                }
 
                 const hostFn = repeat ? window.setInterval : window.setTimeout;
                 const hostId = hostFn(() => {
@@ -336,13 +390,27 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                             result.value.dispose();
                         }
                         context.runtime.executePendingJobs();
-                    } catch (err) { console.warn('[Runtime] timer callback error (context may be disposed):', err); }
+                    } catch (err) {
+                        console.warn('[Runtime] timer callback error (context may be disposed):', err);
+                        // 若回呼出錯且為 repeat timer，清理資源避免 handle 洩漏
+                        if (repeat) {
+                            window.clearInterval(hostId);
+                            runtimeProcess.timers.delete(hostId);
+                            runtimeProcess.timerMap.delete(guestId);
+                            runtimeProcess.timerCallbacks.delete(guestId);
+                            if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                            runtimeProcess.timerFreeIds.push(guestId);
+                            try { callbackDup.dispose(); } catch { /* noop */ }
+                        }
+                    }
 
                     // 單次 timer 觸發後自動清理
                     if (!repeat) {
                         runtimeProcess.timers.delete(hostId);
                         runtimeProcess.timerMap.delete(guestId);
                         runtimeProcess.timerCallbacks.delete(guestId);
+                        if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                        runtimeProcess.timerFreeIds.push(guestId);
                         try { callbackDup.dispose(); } catch { /* noop */ }
                     }
                 }, delay) as unknown as number;
@@ -368,6 +436,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                     const cb = runtimeProcess.timerCallbacks.get(guestId);
                     if (cb) { try { cb.dispose(); } catch { /* noop */ } }
                     runtimeProcess.timerCallbacks.delete(guestId);
+                    if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                    runtimeProcess.timerFreeIds.push(guestId);
                 }
                 return context.undefined;
             });

@@ -1,12 +1,12 @@
 {
     "name": "Example",
-    "version": "1.0.0",
     "description": "An example application package for SentryOS.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "example-app",
             "name": "Example App",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Window",
             "icon": "icon.svg",
@@ -22,6 +22,7 @@
         {
             "id": "example-storage",
             "name": "儲存空間範例",
+            "version": "1.0.0",
             "main": "storage-demo.js",
             "icon": "🛢️",
             "type": "Window",
@@ -41,6 +42,7 @@
         {
             "id": "example-notification",
             "name": "通知範例",
+            "version": "1.0.0",
             "main": "notification-demo.js",
             "type": "Window",
             "permissions": [
@@ -55,6 +57,7 @@
         {
             "id": "example-monitor",
             "name": "系統監控範例",
+            "version": "1.0.0",
             "main": "monitor-demo.js",
             "type": "Window",
             "permissions": [
@@ -69,6 +72,7 @@
         {
             "id": "example-env",
             "name": "環境變數範例",
+            "version": "1.0.0",
             "main": "env-demo.js",
             "type": "Window",
             "permissions": [

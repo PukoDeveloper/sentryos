@@ -1,17 +1,56 @@
 {
     "name": "Development Tools",
-    "version": "1.0.0",
     "description": "A collection of development tools for SentryOS.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "Console",
             "name": "控制台",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Console",
             "permissions": [
                 "*"
             ],
+            "maxInstances": 1
+        },
+        {
+            "id": "Catch",
+            "name": "異常故意觸發器",
+            "version": "1.0.0",
+            "main": "catch.js",
+            "type": "Console",
+            "icon": "icon.svg",
+            "permissions": [
+                "*"
+            ]
+        },
+        {
+            "id": "lua-tester",
+            "name": "Lua 測試器",
+            "version": "1.0.0",
+            "main": "luatest.lua",
+            "type": "Console",
+            "icon": "icon.svg",
+            "permissions": [
+                "*"
+            ],
+            "engine": "lua"
+        },
+        {
+            "id": "lua-window-demo",
+            "name": "Lua 視窗 Demo",
+            "version": "1.0.0",
+            "main": "lua-window-demo.lua",
+            "type": "Window",
+            "icon": "icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "notification.send"
+            ],
+            "engine": "lua",
             "maxInstances": 1
         }
     ]

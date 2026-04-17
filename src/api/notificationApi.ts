@@ -2,13 +2,13 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerNotificationApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const appManager = kernel.resolve('appManager');
   const processManager = kernel.resolve('processManager');
   const notificationManager = kernel.resolve('notificationManager');
 
-  runtime.registerApi('notificationApi', ({ process }) => ({
+  runtimeRegistry.registerApi('notificationApi', ({ process }) => ({
     notify: (title: unknown, body?: unknown, type?: unknown, duration?: unknown) => {
       if (!permissions.has(process.processAppId, Permissions.NOTIFICATION_SEND)) {
         return { success: false, error: 'PermissionDenied' };

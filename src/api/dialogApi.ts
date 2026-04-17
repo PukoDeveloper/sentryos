@@ -3,7 +3,7 @@ import type { DialogMode } from '../dialog/DialogManager';
 import { Permissions } from '../kernel/constants';
 
 export function registerDialogApi(kernel: Kernel): void {
-	const runtime = kernel.resolve('runtime');
+	const runtimeRegistry = kernel.resolve('runtimeRegistry');
 	const permissions = kernel.resolve('permissions');
 	const dialogManager = kernel.resolve('dialogManager');
 	const windowManager = kernel.resolve('windowManager');
@@ -12,7 +12,7 @@ export function registerDialogApi(kernel: Kernel): void {
 
 	// ── Caller-side API (任何 App 都可呼叫) ──────────────────
 
-	runtime.registerApi('dialogApi', ({ process }) => {
+	runtimeRegistry.registerApi('dialogApi', ({ process }) => {
 		const appId = process.processAppId;
 
 		return {
@@ -74,7 +74,7 @@ export function registerDialogApi(kernel: Kernel): void {
 
 	// ── Picker-side API (僅 file-picker App 使用) ────────────
 
-	runtime.registerApi('dialogResolveApi', ({ process }) => {
+	runtimeRegistry.registerApi('dialogResolveApi', ({ process }) => {
 		return {
 			/**
 			 * Picker 自我註冊到 dialog，用於視窗關閉時自動取消。

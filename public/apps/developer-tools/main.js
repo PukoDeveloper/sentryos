@@ -12,7 +12,7 @@ function traverseObject(obj, depth = 0) {
       console.log(`${indent}[Method] ${key}: f()`);
     } else if (type === 'object' && value !== null) {
       // 顯示物件層級並遞歸
-      console.log(`${indent}[Node] ${key}:`);
+      console.log(`\x1b[38;2;0;255;0m${indent}[Node] ${key}:\x1b[0m`);
       traverseObject(value, depth + 1);
     } else {
       // 顯示基本數值

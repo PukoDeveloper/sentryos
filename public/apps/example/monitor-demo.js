@@ -26,12 +26,6 @@ var app = UI.createApp({
   title: '系統監控範例',
   width: 520,
   height: 520,
-  style: {
-    background: 'linear-gradient(180deg, rgba(10, 14, 20, 0.96), rgba(6, 10, 14, 0.92))',
-    color: '#ecf4ff',
-    border: '1px solid rgba(118, 185, 255, 0.26)',
-    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.34)',
-  },
   state: {},
   render: function (state, self) {
     // ── 取得快照 ──
@@ -96,7 +90,17 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('事件統計'),
           UI.text(
-            '已發布: ' + (evtData.totalEmitted || 0) + '  |  訂閱: ' + (evtData.activeSubscriptions || 0),
+            (function() {
+              var totalEmitted = 0;
+              var activeSubs = 0;
+              if (Array.isArray(evtData)) {
+                for (var i = 0; i < evtData.length; i++) {
+                  totalEmitted += (evtData[i].emitCount || 0);
+                  activeSubs += (evtData[i].subscriberCount || 0);
+                }
+              }
+              return '已發布: ' + totalEmitted + '  |  訂閱: ' + activeSubs;
+            })(),
             { fontSize: '13px', color: '#67b8ff' }
           ),
         ], { gap: '4px' }),
@@ -107,7 +111,15 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('API 統計'),
           UI.text(
-            '總呼叫: ' + (apiData.totalCalls || 0) + '  |  拒絕: ' + (apiData.totalDenied || 0),
+            (function() {
+              var totalCalls = 0;
+              if (Array.isArray(apiData)) {
+                for (var i = 0; i < apiData.length; i++) {
+                  totalCalls += (apiData[i].callCount || 0);
+                }
+              }
+              return '總呼叫: ' + totalCalls;
+            })(),
             { fontSize: '13px', color: '#ffb74d' }
           ),
         ], { gap: '4px' }),
@@ -118,7 +130,7 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('權限統計'),
           UI.text(
-            '允許: ' + (permData.totalGranted || 0) + '  |  拒絕: ' + (permData.totalDenied || 0),
+            '允許: ' + ((permData.totalChecks || 0) - (permData.totalDenied || 0)) + '  |  拒絕: ' + (permData.totalDenied || 0),
             { fontSize: '13px', color: '#c084fc' }
           ),
         ], { gap: '4px' }),

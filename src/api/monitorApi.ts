@@ -2,12 +2,12 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerMonitorApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const processManager = kernel.resolve('processManager');
   const systemMonitor = kernel.resolve('systemMonitor');
 
-  runtime.registerApi('monitorApi', ({ process }) => ({
+  runtimeRegistry.registerApi('monitorApi', ({ process }) => ({
     snapshot: () => {
       if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
         return { success: false, error: 'PermissionDenied' };
@@ -52,6 +52,12 @@ export function registerMonitorApi(kernel: Kernel): void {
         return { success: false, error: 'PermissionDenied' };
       }
       return { success: true, data: systemMonitor.getProcessHistory() };
+    },
+    memoryUsage: () => {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return { success: true, data: systemMonitor.getMemorySnapshot() };
     },
   }), ['monitor'], 'monitor');
 }

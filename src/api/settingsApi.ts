@@ -1,8 +1,37 @@
 import type { Kernel } from '../kernel/Kernel';
 import type { ThemeSettings, TaskbarMode } from '../ui/DesktopShell';
-import { Permissions } from '../kernel/constants';
+import { Permissions, Events } from '../kernel/constants';
 
 const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const;
+
+const COLOR_TOKEN_KEYS: (keyof ThemeSettings)[] = [
+  'colorSurface', 'colorSurfaceAlt', 'colorSurfaceInput', 'colorSurfaceHover',
+  'colorBorder', 'colorBorderFocus',
+  'colorText', 'colorTextSecondary',
+  'colorAccent', 'colorAccentGlow',
+  'colorShadow', 'colorShadowHeavy',
+  'colorTaskbar', 'colorTaskbarBorder',
+];
+
+function sanitizeTheme(theme: Record<string, unknown>): ThemeSettings {
+  const safe: ThemeSettings = {};
+  if (typeof theme.wallpaper === 'string') safe.wallpaper = theme.wallpaper;
+  if (typeof theme.tint === 'string') safe.tint = theme.tint;
+  if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
+  if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
+  if (theme.accentMode === 'dark' || theme.accentMode === 'light') safe.accentMode = theme.accentMode;
+  if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
+  if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
+  if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
+  if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
+  if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
+  for (const key of COLOR_TOKEN_KEYS) {
+    if (typeof theme[key] === 'string') {
+      (safe as any)[key] = theme[key];
+    }
+  }
+  return safe;
+}
 
 const SETTINGS_KEY = 'system-theme';
 const NOTIFICATION_SETTINGS_KEY = 'notification-settings';
@@ -10,7 +39,7 @@ const LANGUAGE_SETTINGS_KEY = 'system-language';
 const SETTINGS_TIER = 'sys' as const;
 
 export function registerSettingsApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const desktopShell = kernel.resolve('desktopShell');
   const fileSystem = kernel.resolve('fileSystem');
@@ -19,11 +48,12 @@ export function registerSettingsApi(kernel: Kernel): void {
   const environmentManager = kernel.resolve('environmentManager');
   const notificationManager = kernel.resolve('notificationManager');
   const languageManager = kernel.resolve('languageManager');
+  const eventBus = kernel.resolve('eventBus');
   const systemAppId = kernel.get('systemAppId');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
 
-  runtime.registerApi('settingsApi', ({ process }) => ({
+  runtimeRegistry.registerApi('settingsApi', ({ process }) => ({
     getTheme: () => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
         return { success: false, error: 'PermissionDenied' };
@@ -34,34 +64,18 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const safe: ThemeSettings = {};
-      if (typeof theme.wallpaper === 'string') safe.wallpaper = theme.wallpaper;
-      if (typeof theme.tint === 'string') safe.tint = theme.tint;
-      if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
-      if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
-      if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
-      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
-      if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
-      if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
-      if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
+      const safe = sanitizeTheme(theme);
       desktopShell.applyTheme(safe);
+      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
       return { success: true, data: null };
     },
     saveTheme: (theme: Record<string, unknown>) => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const safe: ThemeSettings = {};
-      if (typeof theme.wallpaper === 'string') safe.wallpaper = theme.wallpaper;
-      if (typeof theme.tint === 'string') safe.tint = theme.tint;
-      if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
-      if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
-      if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
-      if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
-      if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
-      if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
-      if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
+      const safe = sanitizeTheme(theme);
       desktopShell.applyTheme(safe);
+      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },
     loadSavedTheme: () => {

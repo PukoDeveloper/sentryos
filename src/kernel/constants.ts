@@ -26,13 +26,13 @@ export const DEFAULT_CONSOLE_HEIGHT = 440;
 export const NOTIFICATION_DEFAULT_DURATION_MS = 4000;
 export const NOTIFICATION_MAX_VISIBLE = 5;
 
-// ── Storage Capacities ──────────────────────────────────────
-export const STORAGE_TOTAL_CAPACITY = 1024;
+// ── Storage Capacities (bytes) ───────────────────────────────
+export const STORAGE_TOTAL_CAPACITY = 16 * 1024 * 1024; // 16 MB
 export const STORAGE_TIER_CAPACITIES = {
-  sys: 256,
-  app: 384,
-  user: 256,
-  cache: 128,
+  sys: 4 * 1024 * 1024,   // 4 MB
+  app: 6 * 1024 * 1024,   // 6 MB
+  user: 4 * 1024 * 1024,  // 4 MB
+  cache: 2 * 1024 * 1024, // 2 MB
 } as const;
 
 // ── ID Prefixes ─────────────────────────────────────────────

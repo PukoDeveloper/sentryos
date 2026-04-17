@@ -14,18 +14,24 @@ type ApplicationCatalogResult<TData> = Result<TData, ApplicationCatalogError> & 
 /** 新格式：套件清單，每個套件可包含多個應用程式 */
 type PackageManifest = {
     name: string;
-    version: string;
+    version?: string;
     description?: string;
     author?: string;
-    permissions?: string[];
     apps: AppEntryManifest[];
 };
 
 /** 套件內的單一應用程式定義 */
+type ManifestCommand = {
+    name: string;
+    description: string;
+    usage?: string;
+};
+
 type AppEntryManifest = {
     id: string;
     name: string;
     main: string;
+    version?: string;
     type?: AppType;
     icon?: string;
     permissions?: string[];
@@ -35,6 +41,8 @@ type AppEntryManifest = {
     /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
      *  省略時預設使用 'quickjs'。 */
     engine?: string;
+    /** Library 可在 manifest 中靜態宣告命令，開機時直接註冊。 */
+    commands?: ManifestCommand[];
 };
 
 /** 舊格式：單一應用程式清單（向下相容） */
@@ -66,6 +74,8 @@ type RegisteredApplication = Application & {
     /** 執行此應用程式所使用的 Runtime 引擎識別字串（例如 'quickjs'）。
      *  省略時預設使用 'quickjs'。 */
     engine?: string;
+    /** manifest 中靜態宣告的命令 */
+    commands?: ManifestCommand[];
 };
 
 // ── Catalog Loader ──────────────────────────────────────────
@@ -82,22 +92,33 @@ async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<Regist
             return { success: false, error: 'InvalidManifest' };
         }
 
+        // 並行載入所有 manifest，個別失敗不影響其他 App
+        const manifestPaths = entries.map(normalizeCatalogEntry);
+        const results = await Promise.allSettled(
+            manifestPaths.map(async (manifestPath) => {
+                const manifestResponse = await fetch(manifestPath);
+                if (!manifestResponse.ok) {
+                    throw new Error(`Manifest not found: ${manifestPath}`);
+                }
+                const raw = await manifestResponse.json();
+                const basePath = manifestPath.slice(0, manifestPath.lastIndexOf('/'));
+                return { raw, basePath };
+            })
+        );
+
         const applications: RegisteredApplication[] = [];
-        for (const entry of entries) {
-            const manifestPath = normalizeCatalogEntry(entry);
-            const manifestResponse = await fetch(manifestPath);
-            if (!manifestResponse.ok) {
-                return { success: false, error: 'ManifestNotFound' };
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                console.warn('[ApplicationCatalog]', result.reason);
+                continue;
             }
-
-            const raw = await manifestResponse.json();
-            const basePath = manifestPath.slice(0, manifestPath.lastIndexOf('/'));
-
+            const { raw, basePath } = result.value;
             if (isPackageManifest(raw)) {
                 const pkg = raw as PackageManifest;
                 for (const app of pkg.apps) {
                     if (!isValidAppEntry(app)) {
-                        return { success: false, error: 'InvalidManifest' };
+                        console.warn('[ApplicationCatalog] Invalid app entry in package:', pkg.name);
+                        continue;
                     }
                     applications.push(toRegisteredApp(pkg, app, basePath));
                 }
@@ -105,7 +126,7 @@ async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<Regist
                 const legacy = raw as LegacyManifest;
                 applications.push(legacyToRegisteredApp(legacy, basePath));
             } else {
-                return { success: false, error: 'InvalidManifest' };
+                console.warn('[ApplicationCatalog] Unknown manifest format in:', basePath);
             }
         }
 
@@ -132,8 +153,7 @@ function isPackageManifest(raw: unknown): raw is PackageManifest {
     if (typeof raw !== 'object' || raw === null) return false;
     const obj = raw as Record<string, unknown>;
     return Array.isArray(obj.apps)
-        && typeof obj.name === 'string'
-        && typeof obj.version === 'string';
+        && typeof obj.name === 'string';
 }
 
 function isLegacyManifest(raw: unknown): raw is LegacyManifest {
@@ -177,8 +197,8 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
     const runtimeType: AppType = entry.type ?? 'Window';
     return {
         name: entry.name,
-        version: pkg.version,
-        permissions: entry.permissions ?? pkg.permissions ?? [],
+        version: entry.version ?? pkg.version ?? '1.0.0',
+        permissions: entry.permissions ?? [],
         maxInstances: entry.maxInstances,
         packageName: pkg.name,
         manifestId: entry.id,
@@ -191,6 +211,7 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
         autoStart: entry.autoStart ?? defaultAutoStart(runtimeType),
         hidden: entry.hidden === true,
         engine: entry.engine,
+        commands: entry.commands,
     };
 }
 

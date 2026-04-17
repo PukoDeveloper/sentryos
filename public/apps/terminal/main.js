@@ -1,7 +1,10 @@
 // Terminal — SentryOS terminal application
 
-OS.console.writeLine('=== SentryOS Terminal ===');
-OS.console.writeLine('Type "help" for available commands.');
+var A = OS.console.ANSI || {};
+var RST = A.RESET || '';
+
+OS.console.writeLine(A.CYAN + A.BOLD + '=== SentryOS Terminal ===' + RST);
+OS.console.writeLine('Type ' + A.YELLOW + '"help"' + RST + ' for available commands.');
 OS.console.writeLine('');
 
 function onKeyboardEvent(e) {
@@ -23,28 +26,29 @@ function onConsoleInput(line) {
     var args = parts.slice(1);
 
     if (cmd === 'help') {
-        OS.console.writeLine('Application commands:');
-        OS.console.writeLine('  help              - Show this help message');
-        OS.console.writeLine('  echo <msg>        - Echo a message');
-        OS.console.writeLine('  clear             - Clear the console');
-        OS.console.writeLine('  eval <expr>       - Evaluate a JavaScript expression');
-        OS.console.writeLine('  exit              - Terminate this app');
+        OS.console.writeLine(A.BOLD + A.CYAN + 'Application commands:' + RST);
+        OS.console.writeLine('  ' + A.GREEN + 'help' + RST + '              - Show this help message');
+        OS.console.writeLine('  ' + A.GREEN + 'echo' + RST + ' <msg>        - Echo a message');
+        OS.console.writeLine('  ' + A.GREEN + 'clear' + RST + '             - Clear the console');
+        OS.console.writeLine('  ' + A.GREEN + 'eval' + RST + ' <expr>       - Evaluate a JavaScript expression');
+        OS.console.writeLine('  ' + A.GREEN + 'exit' + RST + '              - Terminate this app');
         OS.console.writeLine('');
-        OS.console.writeLine('Library commands:');
-        OS.console.writeLine('  libs              - List available libraries');
-        OS.console.writeLine('  load <lib>        - Load a library into this session');
+        OS.console.writeLine(A.BOLD + A.CYAN + 'Library commands:' + RST);
+        OS.console.writeLine('  ' + A.GREEN + 'libs' + RST + '              - List available libraries');
+        OS.console.writeLine('  ' + A.GREEN + 'load' + RST + ' <lib>        - Load a library into this session');
         OS.console.writeLine('');
-        OS.console.writeLine('System commands:');
-        OS.console.writeLine('  ps                - List running processes');
-        OS.console.writeLine('  kill <pid>        - Terminate a process');
-        OS.console.writeLine('  apps              - List installed applications');
-        OS.console.writeLine('  launch <name|id>  - Launch an application');
-        OS.console.writeLine('  windows           - List open windows');
-        OS.console.writeLine('  sysinfo           - Show system information');
-        OS.console.writeLine('  commands          - List registered CLI commands');
+        OS.console.writeLine(A.BOLD + A.CYAN + 'System commands:' + RST);
+        OS.console.writeLine('  ' + A.GREEN + 'ps' + RST + '                - List running processes');
+        OS.console.writeLine('  ' + A.GREEN + 'kill' + RST + ' <pid>        - Terminate a process');
+        OS.console.writeLine('  ' + A.GREEN + 'apps' + RST + '              - List installed applications');
+        OS.console.writeLine('  ' + A.GREEN + 'launch' + RST + ' <name|id>  - Launch an application');
+        OS.console.writeLine('  ' + A.GREEN + 'windows' + RST + '           - List open windows');
+        OS.console.writeLine('  ' + A.GREEN + 'sysinfo' + RST + '           - Show system information');
+        OS.console.writeLine('  ' + A.GREEN + 'commands' + RST + '          - List registered CLI commands');
+        OS.console.writeLine('  ' + A.GREEN + 'colors' + RST + '            - Show ANSI color demo');
         OS.console.writeLine('');
         OS.console.writeLine('CLI commands from libraries can be invoked directly.');
-        OS.console.writeLine('Example: factorial 10, reverse hello');
+        OS.console.writeLine('Example: ' + A.YELLOW + 'factorial 10' + RST + ', ' + A.YELLOW + 'reverse hello' + RST);
     } else if (cmd === 'echo') {
         OS.console.writeLine(args.join(' '));
     } else if (cmd === 'clear') {
@@ -188,8 +192,66 @@ function onConsoleInput(line) {
         OS.console.writeLine('  Commands:    ' + info.commands + ' registered');
         OS.console.writeLine('  Apps:        ' + info.apps + ' installed');
     } else if (cmd === 'exit') {
-        OS.console.writeLine('Goodbye!');
+        OS.console.writeLine(A.YELLOW + 'Goodbye!' + RST);
         OS.terminateSelf();
+    } else if (cmd === 'colors') {
+        OS.console.writeLine(A.BOLD + A.CYAN + '── ANSI Color Demo ──' + RST);
+        OS.console.writeLine('');
+        // Standard foreground colors
+        OS.console.writeLine(A.BOLD + 'Standard colors:' + RST);
+        var names = ['BLACK','RED','GREEN','YELLOW','BLUE','MAGENTA','CYAN','WHITE'];
+        var line = '';
+        for (var ci = 0; ci < names.length; ci++) {
+            line += (A[names[ci]] || '') + ' ' + padRight(names[ci], 10) + RST;
+        }
+        OS.console.writeLine(line);
+        // Bright foreground colors
+        OS.console.writeLine(A.BOLD + 'Bright colors:' + RST);
+        var bnames = ['BRIGHT_BLACK','BRIGHT_RED','BRIGHT_GREEN','BRIGHT_YELLOW','BRIGHT_BLUE','BRIGHT_MAGENTA','BRIGHT_CYAN','BRIGHT_WHITE'];
+        line = '';
+        for (var ci = 0; ci < bnames.length; ci++) {
+            line += (A[bnames[ci]] || '') + ' ' + padRight(bnames[ci], 16) + RST;
+        }
+        OS.console.writeLine(line);
+        // Background colors
+        OS.console.writeLine('');
+        OS.console.writeLine(A.BOLD + 'Background colors:' + RST);
+        var bgnames = ['BG_BLACK','BG_RED','BG_GREEN','BG_YELLOW','BG_BLUE','BG_MAGENTA','BG_CYAN','BG_WHITE'];
+        line = '';
+        for (var ci = 0; ci < bgnames.length; ci++) {
+            line += (A[bgnames[ci]] || '') + ' ' + padRight(bgnames[ci], 12) + RST + ' ';
+        }
+        OS.console.writeLine(line);
+        // Text decorations
+        OS.console.writeLine('');
+        OS.console.writeLine(A.BOLD + 'Text decorations:' + RST);
+        OS.console.writeLine('  ' + A.BOLD + 'Bold text' + RST + '   ' + A.DIM + 'Dim text' + RST + '   ' + A.ITALIC + 'Italic text' + RST + '   ' + A.UNDERLINE + 'Underline' + RST + '   ' + A.STRIKETHROUGH + 'Strikethrough' + RST + '   ' + A.INVERSE + 'Inverse' + RST);
+        // 256 color samples
+        OS.console.writeLine('');
+        OS.console.writeLine(A.BOLD + '256-color palette (sample):' + RST);
+        line = '';
+        for (var ci = 0; ci < 16; ci++) {
+            line += OS.console.bg256(ci) + '  ' + RST;
+        }
+        OS.console.writeLine(line);
+        line = '';
+        for (var ci = 16; ci < 52; ci++) {
+            line += OS.console.bg256(ci) + '  ' + RST;
+        }
+        OS.console.writeLine(line);
+        // RGB gradient
+        OS.console.writeLine('');
+        OS.console.writeLine(A.BOLD + 'RGB gradient:' + RST);
+        line = '';
+        for (var ci = 0; ci < 24; ci++) {
+            var r = Math.round(255 * ci / 23);
+            var g = Math.round(255 * (23 - ci) / 23);
+            line += OS.console.bgRgb(r, g, 128) + '  ' + RST;
+        }
+        OS.console.writeLine(line);
+        OS.console.writeLine('');
+        OS.console.writeLine('Use ' + A.YELLOW + 'OS.console.ANSI.*' + RST + ' constants in your apps.');
+        OS.console.writeLine('Helpers: ' + A.YELLOW + 'OS.console.fg256(n)' + RST + ', ' + A.YELLOW + 'OS.console.bgRgb(r,g,b)' + RST + ', ' + A.YELLOW + 'OS.console.colorize(text, color)' + RST);
     } else if (cmd === 'commands') {
         var cmdResult = OS.shell.listCommands();
         if (!cmdResult.success) {
@@ -233,8 +295,8 @@ function onConsoleInput(line) {
                 OS.console.writeLine('Command handler not found: ' + cmd);
             }
         } else {
-            OS.console.writeLine('Unknown command: ' + cmd);
-            OS.console.writeLine('Type "help" or "commands" for available commands.');
+            OS.console.writeLine(A.RED + 'Unknown command: ' + RST + cmd);
+            OS.console.writeLine('Type ' + A.YELLOW + '"help"' + RST + ' or ' + A.YELLOW + '"commands"' + RST + ' for available commands.');
         }
     }
 }

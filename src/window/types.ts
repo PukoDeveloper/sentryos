@@ -28,7 +28,8 @@ type WindowSystemError =
     | 'WindowNotFound'
     | 'NodeNotFound'
     | 'Closed'
-    | 'InvalidOperation';
+    | 'InvalidOperation'
+    | 'RateLimitExceeded';
 
 type WindowSystemResult<TData = unknown> = {
     success: boolean;
@@ -49,6 +50,15 @@ interface WindowStyle {
     borderRadius?: string;
     border?: string;
     boxShadow?: string;
+    titlebar?: {
+        background?: string;
+        color?: string;
+        borderBottom?: string;
+    };
+}
+
+interface InitializeUiOptions {
+    preserveScroll?: boolean;
 }
 
 interface WindowInitOptions {
@@ -238,6 +248,7 @@ export type {
     ContextMenuEntry,
     ContextMenuItem,
     ContextMenuSeparator,
+    InitializeUiOptions,
     WindowBounds,
     WindowButtonNode,
     WindowCheckboxNode,
