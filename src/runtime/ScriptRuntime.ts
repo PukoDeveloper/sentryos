@@ -16,6 +16,7 @@ import type {
     HostApiValue,
     HostApiFunction,
     RuntimeProcess,
+    RuntimeMemoryUsage,
     ResponseType,
 } from './types';
 
@@ -116,6 +117,49 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         for (const pid of Array.from(this.processStates.keys())) {
             this.destroyProcessRuntime(pid);
         }
+    }
+
+    // ── 記憶體使用量 ────────────────────────────────────────
+
+    getMemoryUsage(): RuntimeMemoryUsage {
+        let totalModuleCache = 0;
+        let totalTimers = 0;
+        let estimatedBytes = 0;
+        const engineMemory: Record<string, number> = {};
+
+        for (const [pid, state] of this.processStates) {
+            const rp = state as RuntimeProcess;
+            totalModuleCache += rp.moduleCache.size;
+            totalTimers += rp.timers.size;
+
+            // 使用 QuickJS dumpMemoryUsage 取得引擎堆資訊
+            try {
+                const dump = rp.runtime.dumpMemoryUsage();
+                const memUsed = this.parseMemoryUsedFromDump(dump);
+                if (memUsed > 0) {
+                    engineMemory[`pid_${pid}_heap`] = memUsed;
+                    estimatedBytes += memUsed;
+                }
+            } catch { /* runtime may already be disposed */ }
+        }
+
+        engineMemory['moduleCacheEntries'] = totalModuleCache;
+        engineMemory['activeTimers'] = totalTimers;
+
+        return {
+            engineName: 'quickjs',
+            activeProcesses: this.processStates.size,
+            totalModuleCacheEntries: totalModuleCache,
+            totalTimers,
+            engineMemory,
+            estimatedBytes,
+        };
+    }
+
+    private parseMemoryUsedFromDump(dump: string): number {
+        // QuickJS dumpMemoryUsage 格式包含 "memory_used_size: 12345" 行
+        const match = dump.match(/memory_used_size:\s*(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
     }
 
     // ── QuickJS Runtime 管理 ─────────────────────────────────

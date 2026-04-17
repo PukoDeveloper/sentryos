@@ -18,6 +18,7 @@ import type {
     ApiFactory,
     Message,
     BaseProcessState,
+    RuntimeMemoryUsage,
 } from './types';
 
 abstract class BaseRuntime implements IRuntime {
@@ -55,6 +56,7 @@ abstract class BaseRuntime implements IRuntime {
     abstract evaluateInContext(pid: number, code: string): RuntimeResult<unknown>;
     abstract destroyProcessRuntime(pid: number): void;
     abstract destroyAll(): void;
+    abstract getMemoryUsage(): RuntimeMemoryUsage;
 
     // ── IRuntime: 事件派發 ──────────────────────────────────
 

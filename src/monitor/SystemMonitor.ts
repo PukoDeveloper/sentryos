@@ -88,6 +88,29 @@ export interface SystemSnapshot {
         totalExecutions: number;
         recentExecutions: Array<{ pid: number; duration: number; timestamp: number }>;
     };
+    memory: MemorySnapshot;
+}
+
+export interface MemorySnapshot {
+    /** 瀏覽器 JS 堆資訊（僅 Chromium 可用） */
+    jsHeap: {
+        usedBytes: number | null;
+        totalBytes: number | null;
+        limitBytes: number | null;
+    };
+    /** 各 Runtime 引擎的記憶體使用量 */
+    runtimes: RuntimeMemorySnapshotEntry[];
+    /** 所有 Runtime 引擎的記憶體占用合計（位元組） */
+    runtimeTotalBytes: number;
+}
+
+export interface RuntimeMemorySnapshotEntry {
+    engineName: string;
+    activeProcesses: number;
+    totalModuleCacheEntries: number;
+    totalTimers: number;
+    engineMemory: Record<string, number>;
+    estimatedBytes: number;
 }
 
 const MAX_RECENT_EVENTS = 200;
@@ -128,9 +151,16 @@ class SystemMonitor {
     private totalExecutions = 0;
 
     private readonly bootTime: number;
+    /** 提供 Runtime 記憶體使用量的回呼（由外部注入以避免循環依賴） */
+    private runtimeMemoryProvider: (() => RuntimeMemorySnapshotEntry[]) | null = null;
 
     constructor(bootTime: number) {
         this.bootTime = bootTime;
+    }
+
+    /** 設定 Runtime 記憶體使用量提供者。 */
+    setRuntimeMemoryProvider(provider: () => RuntimeMemorySnapshotEntry[]): void {
+        this.runtimeMemoryProvider = provider;
     }
 
     // ── Event hooks ──────────────────────────────────────────
@@ -327,7 +357,32 @@ class SystemMonitor {
                 totalExecutions: this.totalExecutions,
                 recentExecutions: [...this.executionDurations].reverse(),
             },
+            memory: this.buildMemorySnapshot(),
         };
+    }
+
+    // ── Memory ───────────────────────────────────────────────
+
+    buildMemorySnapshot(): MemorySnapshot {
+        // 瀏覽器 JS 堆（Chromium 專屬）
+        const perf = performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } };
+        const jsHeap = {
+            usedBytes: perf.memory?.usedJSHeapSize ?? null,
+            totalBytes: perf.memory?.totalJSHeapSize ?? null,
+            limitBytes: perf.memory?.jsHeapSizeLimit ?? null,
+        };
+
+        const runtimes: RuntimeMemorySnapshotEntry[] = this.runtimeMemoryProvider?.() ?? [];
+        let runtimeTotalBytes = 0;
+        for (const r of runtimes) {
+            runtimeTotalBytes += r.estimatedBytes;
+        }
+
+        return { jsHeap, runtimes, runtimeTotalBytes };
+    }
+
+    getMemorySnapshot(): MemorySnapshot {
+        return this.buildMemorySnapshot();
     }
 
     // ── Partial queries (for lighter API calls) ──────────────

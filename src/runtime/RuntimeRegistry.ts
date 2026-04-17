@@ -4,7 +4,7 @@
 // 路由到正確的 Runtime 實例。
 
 import type { IRuntime } from './IRuntime';
-import type { ApiFactory } from './types';
+import type { ApiFactory, RuntimeMemoryUsage } from './types';
 
 /** 預設 Runtime 引擎的識別字串（QuickJS-emscripten） */
 const DEFAULT_ENGINE = 'quickjs';
@@ -105,6 +105,17 @@ class RuntimeRegistry {
     getForProcessAppId(processAppId: string): IRuntime {
         const engine = this.appIdEngines.get(processAppId) ?? this.defaultEngine;
         return this.runtimes.get(engine) ?? this.getDefault();
+    }
+
+    // ── 記憶體使用量 ────────────────────────────────────────
+
+    /** 取得所有已註冊引擎的記憶體使用量快照。 */
+    getAllMemoryUsage(): RuntimeMemoryUsage[] {
+        const result: RuntimeMemoryUsage[] = [];
+        for (const [, runtime] of this.runtimes) {
+            result.push(runtime.getMemoryUsage());
+        }
+        return result;
     }
 }
 

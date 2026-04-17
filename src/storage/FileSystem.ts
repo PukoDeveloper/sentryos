@@ -26,9 +26,10 @@ interface StorageEntry<TData extends StorageData = StorageData> {
 }
 
 interface StorageUsage {
+	totalBytes: number;
+	totalCapacityBytes: number;
 	totalEntries: number;
-	totalCapacity: number;
-	tiers: Record<StorageTier, { used: number; capacity: number }>;
+	tiers: Record<StorageTier, { usedBytes: number; capacityBytes: number; entries: number }>;
 }
 
 type StorageError =
@@ -105,6 +106,28 @@ function isValidKey(key: string): boolean {
 	return key.trim().length > 0 && !key.includes('..');
 }
 
+const textEncoder = new TextEncoder();
+
+function utf8ByteLength(str: string): number {
+	return textEncoder.encode(str).length;
+}
+
+function calculateDataByteSize(data: StorageData): number {
+	return utf8ByteLength(JSON.stringify(data));
+}
+
+function calculateEntryByteSize(entry: StorageEntry): number {
+	let size = utf8ByteLength(entry.key);
+	size += utf8ByteLength(entry.ownerAppId);
+	size += utf8ByteLength(entry.tier);
+	size += calculateDataByteSize(entry.data);
+	if (entry.metadata) {
+		size += utf8ByteLength(JSON.stringify(entry.metadata));
+	}
+	size += 16; // createdAt + updatedAt (two 8-byte timestamps)
+	return size;
+}
+
 class WebFileSystemAdapter implements FileSystemAdapter {
 	private readonly kernel: Kernel;
 	private readonly totalCapacity: number;
@@ -168,9 +191,12 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			return { success: false, error: 'AlreadyExists' };
 		}
 
-		const willCreate = !existingEntry;
-		if (willCreate) {
-			const capacityCheck = this.checkCapacity(tier);
+		const incomingBytes = calculateDataByteSize(data) + utf8ByteLength(key) + utf8ByteLength(options.ownerLabel ?? appId) + utf8ByteLength(tier) + 16
+			+ (options.metadata ? utf8ByteLength(JSON.stringify(options.metadata)) : 0);
+		const existingBytes = existingEntry ? calculateEntryByteSize(existingEntry) : 0;
+		const netBytes = incomingBytes - existingBytes;
+		if (netBytes > 0) {
+			const capacityCheck = this.checkCapacity(tier, netBytes);
 			if (!capacityCheck.success) {
 				return { success: false, error: capacityCheck.error };
 			}
@@ -274,25 +300,32 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	}
 
 	usage(appId: string): StorageResult<StorageUsage> {
-		const tiers = {} as Record<StorageTier, { used: number; capacity: number }>;
+		const tiers = {} as Record<StorageTier, { usedBytes: number; capacityBytes: number; entries: number }>;
+		let totalBytes = 0;
 		let totalEntries = 0;
 
 		for (const tier of STORAGE_TIERS) {
 			if (!this.permissions.has(appId, makeStoragePermission('list', tier))) {
-				tiers[tier] = { used: 0, capacity: this.tierCapacities[tier] };
+				tiers[tier] = { usedBytes: 0, capacityBytes: this.tierCapacities[tier], entries: 0 };
 				continue;
 			}
 
-			const used = this.storage.get(tier)!.size;
-			tiers[tier] = { used, capacity: this.tierCapacities[tier] };
-			totalEntries += used;
+			const tierMap = this.storage.get(tier)!;
+			let tierBytes = 0;
+			for (const entry of tierMap.values()) {
+				tierBytes += calculateEntryByteSize(entry);
+			}
+			tiers[tier] = { usedBytes: tierBytes, capacityBytes: this.tierCapacities[tier], entries: tierMap.size };
+			totalBytes += tierBytes;
+			totalEntries += tierMap.size;
 		}
 
 		return {
 			success: true,
 			data: {
+				totalBytes,
+				totalCapacityBytes: this.totalCapacity,
 				totalEntries,
-				totalCapacity: this.totalCapacity,
 				tiers,
 			},
 		};
@@ -365,14 +398,23 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		return { success: true };
 	}
 
-	private checkCapacity(tier: StorageTier): StorageGuardResult {
-		const totalUsed = STORAGE_TIERS.reduce((count, currentTier) => count + this.storage.get(currentTier)!.size, 0);
-		if (totalUsed >= this.totalCapacity) {
+	private checkCapacity(tier: StorageTier, incomingBytes = 0): StorageGuardResult {
+		let totalUsedBytes = 0;
+		let tierUsedBytes = 0;
+		for (const t of STORAGE_TIERS) {
+			const tierMap = this.storage.get(t)!;
+			for (const entry of tierMap.values()) {
+				const entrySize = calculateEntryByteSize(entry);
+				totalUsedBytes += entrySize;
+				if (t === tier) tierUsedBytes += entrySize;
+			}
+		}
+
+		if (totalUsedBytes + incomingBytes > this.totalCapacity) {
 			return { success: false, error: 'CapacityExceeded' };
 		}
 
-		const tierUsed = this.storage.get(tier)!.size;
-		if (tierUsed >= this.tierCapacities[tier]) {
+		if (tierUsedBytes + incomingBytes > this.tierCapacities[tier]) {
 			return { success: false, error: 'CapacityExceeded' };
 		}
 
@@ -432,4 +474,6 @@ export {
 	WebFileSystemAdapter,
 	makeStoragePermission,
 	isStorageRecord,
+	calculateDataByteSize,
+	calculateEntryByteSize,
 };

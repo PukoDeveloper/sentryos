@@ -64,6 +64,13 @@ function barColor(ratio) {
   return '#6be68a';
 }
 
+function fmtBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
 function fmtMs(ms) {
   if (ms < 1) return '<1ms';
   if (ms < 1000) return ms.toFixed(1) + 'ms';
@@ -118,6 +125,7 @@ function renderTabBar() {
     { id: 'permissions', label: '權限' },
     { id: 'performance', label: '效能' },
     { id: 'storage',   label: '儲存' },
+    { id: 'memory',    label: '記憶體' },
   ];
   var items = [];
   for (var i = 0; i < tabs.length; i++) {
@@ -613,20 +621,20 @@ function renderStorageTab() {
   var tierKeys = ['sys', 'app', 'user', 'cache'];
 
   var totalUsed = 0;
-  var totalCap = data.totalCapacity;
+  var totalCap = data.totalCapacityBytes;
   var cards = [];
   for (var i = 0; i < tierKeys.length; i++) {
     var k = tierKeys[i];
     var t = tiers[k];
-    totalUsed += t.used;
-    var ratio = pct(t.used, t.capacity);
+    totalUsed += t.usedBytes;
+    var ratio = pct(t.usedBytes, t.capacityBytes);
     var bColor = barColor(ratio);
 
     cards.push(OS.ui.panel([
       OS.ui.stack([
         OS.ui.stack([
           OS.ui.label(tierNames[k], { fontSize: '13px', color: tierColors[k], fontWeight: 'bold' }),
-          OS.ui.label(t.used + ' / ' + t.capacity + ' 筆', S.subText),
+          OS.ui.label(fmtBytes(t.usedBytes) + ' / ' + fmtBytes(t.capacityBytes) + '  (' + t.entries + ' 筆)', S.subText),
         ], { gap: '4px', flex: '1' }),
         OS.ui.label(ratio + '%', { fontSize: '20px', color: bColor, fontWeight: 'bold', width: '60px', textAlign: 'right' }),
       ], { flexDirection: 'row', alignItems: 'center', gap: '12px' }),
@@ -638,7 +646,7 @@ function renderStorageTab() {
   var total = OS.ui.panel([
     OS.ui.stack([
       OS.ui.label('總容量', { fontSize: '13px', color: '#d8e8ff', fontWeight: 'bold' }),
-      OS.ui.label(totalUsed + ' / ' + totalCap + ' 筆  (' + totalRatio + '%)', S.subText),
+      OS.ui.label(fmtBytes(totalUsed) + ' / ' + fmtBytes(totalCap) + '  (' + totalRatio + '%)', S.subText),
     ], { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }),
     progressBar(totalRatio, 'linear-gradient(90deg, #67b8ff, #a78bfa)', '8px'),
   ], S.cardHighlight);
@@ -651,7 +659,116 @@ function renderStorageTab() {
     ], S.statusBar),
   ], { gap: '10px', flexDirection: 'column', flex: '1', padding: '8px 0' });
 }
+// ── Memory Tab ────────────────────────────────────────
+function renderMemoryTab() {
+  var memResult = OS.monitor.memoryUsage();
+  if (!memResult.success) {
+    return OS.ui.panel([
+      OS.ui.label('無法取得記憶體資訊: ' + (memResult.error || '未知錯誤'), {
+        fontSize: '13px', color: '#ff6b6b', padding: '24px', textAlign: 'center',
+      })
+    ], { flex: '1' });
+  }
 
+  var mem = memResult.data;
+  var sections = [];
+
+  // ── JS Heap ──
+  var heap = mem.jsHeap;
+  if (heap.usedBytes !== null && heap.totalBytes !== null) {
+    var heapPct = pct(heap.usedBytes, heap.limitBytes || heap.totalBytes);
+    var heapColor = barColor(heapPct);
+    sections.push(OS.ui.panel([
+      OS.ui.stack([
+        OS.ui.stack([
+          OS.ui.label('🧠 瀏覽器 JS Heap', { fontSize: '13px', color: '#67b8ff', fontWeight: 'bold' }),
+          OS.ui.label(fmtBytes(heap.usedBytes) + ' / ' + fmtBytes(heap.totalBytes) + (heap.limitBytes ? '  (上限 ' + fmtBytes(heap.limitBytes) + ')' : ''), S.subText),
+        ], { gap: '4px', flex: '1' }),
+        OS.ui.label(heapPct + '%', { fontSize: '20px', color: heapColor, fontWeight: 'bold', width: '60px', textAlign: 'right' }),
+      ], { flexDirection: 'row', alignItems: 'center', gap: '12px' }),
+      progressBar(heapPct, heapColor, '6px'),
+    ], S.card));
+  } else {
+    sections.push(OS.ui.panel([
+      OS.ui.label('🧠 瀏覽器 JS Heap', { fontSize: '13px', color: '#67b8ff', fontWeight: 'bold' }),
+      OS.ui.label('無法取得（僅 Chromium 瀏覽器支援）', S.dimText),
+    ], S.card));
+  }
+
+  // ── Runtime Engines ──
+  var runtimes = mem.runtimes || [];
+  if (runtimes.length > 0) {
+    for (var ri = 0; ri < runtimes.length; ri++) {
+      var rt = runtimes[ri];
+      var engineRows = [];
+
+      // Engine header
+      engineRows.push(OS.ui.stack([
+        OS.ui.label('⚙️ ' + rt.engineName.toUpperCase() + ' Runtime', { fontSize: '13px', color: '#a78bfa', fontWeight: 'bold' }),
+        OS.ui.label(rt.estimatedBytes > 0 ? fmtBytes(rt.estimatedBytes) : '—', { fontSize: '16px', color: '#a78bfa', fontWeight: 'bold' }),
+      ], { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }));
+
+      // Summary stats
+      engineRows.push(OS.ui.stack([
+        OS.ui.label('活躍程序: ' + rt.activeProcesses, S.subText),
+        OS.ui.label('模組快取: ' + rt.totalModuleCacheEntries, S.subText),
+        OS.ui.label('計時器: ' + rt.totalTimers, S.subText),
+      ], { flexDirection: 'row', gap: '16px' }));
+
+      // Per-process heap breakdown
+      var engineMem = rt.engineMemory || {};
+      var heapKeys = [];
+      for (var ek in engineMem) {
+        if (ek.indexOf('pid_') === 0 && ek.indexOf('_heap') > 0) {
+          heapKeys.push(ek);
+        }
+      }
+
+      if (heapKeys.length > 0) {
+        var procRows = [];
+        for (var hi = 0; hi < heapKeys.length; hi++) {
+          var hk = heapKeys[hi];
+          var pidNum = hk.replace('pid_', '').replace('_heap', '');
+          var heapBytes = engineMem[hk];
+          procRows.push(OS.ui.stack([
+            OS.ui.label('PID ' + pidNum, { fontSize: '11px', color: 'rgba(216,232,255,0.7)', width: '70px' }),
+            OS.ui.panel([
+              OS.ui.panel([], {
+                width: (rt.estimatedBytes > 0 ? Math.max(Math.round(heapBytes / rt.estimatedBytes * 100), 2) : 2) + '%',
+                height: '100%',
+                background: '#a78bfa',
+                borderRadius: '2px',
+              })
+            ], {
+              height: '4px', flex: '1',
+              background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden',
+            }),
+            OS.ui.label(fmtBytes(heapBytes), { fontSize: '11px', color: 'rgba(216,232,255,0.5)', width: '80px', textAlign: 'right' }),
+          ], { flexDirection: 'row', alignItems: 'center', gap: '8px' }));
+        }
+        engineRows.push(OS.ui.stack(procRows, { gap: '4px' }));
+      }
+
+      sections.push(OS.ui.panel(engineRows, Object.assign({}, S.card, { gap: '8px', display: 'flex', flexDirection: 'column' })));
+    }
+
+    // Runtime total
+    if (mem.runtimeTotalBytes > 0) {
+      sections.push(OS.ui.panel([
+        OS.ui.stack([
+          OS.ui.label('Runtime 總記憶體占用', { fontSize: '12px', color: 'rgba(216,232,255,0.6)' }),
+          OS.ui.label(fmtBytes(mem.runtimeTotalBytes), { fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }),
+        ], { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }),
+      ], S.statusBar));
+    }
+  } else {
+    sections.push(OS.ui.panel([
+      OS.ui.label('無活躍的 Runtime 引擎', S.dimText),
+    ], S.card));
+  }
+
+  return OS.ui.stack(sections, { gap: '8px', flexDirection: 'column', flex: '1', padding: '8px 0' });
+}
 // ── Main render ─────────────────────────────────────────────
 function render() {
   if (!win.success) return;
@@ -667,6 +784,8 @@ function render() {
     tabContent = renderPerformanceTab();
   } else if (activeTab === 'storage') {
     tabContent = renderStorageTab();
+  } else if (activeTab === 'memory') {
+    tabContent = renderMemoryTab();
   } else {
     tabContent = renderProcessesTab();
   }

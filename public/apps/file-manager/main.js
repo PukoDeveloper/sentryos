@@ -416,16 +416,23 @@ function renderHeader(s, self) {
 }
 
 // ── Usage Bar ───────────────────────────────────────────────
+function fmtBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
 function renderUsageBar(s) {
   if (!s.usage) return UI.text('無法取得使用量', { fontSize: '11px', color: 'rgba(216,232,255,0.4)' });
   var tier = s.usage.tiers[s.currentTier];
-  var pct = tier.capacity > 0 ? Math.round((tier.used / tier.capacity) * 100) : 0;
+  var pct = tier.capacityBytes > 0 ? Math.round((tier.usedBytes / tier.capacityBytes) * 100) : 0;
   var color = tierColors[s.currentTier] || accent;
 
   return UI.column([
     UI.row([
       UI.text(s.currentTier.toUpperCase() + ' 層', { fontSize: '12px', fontWeight: 'bold', color: color }),
-      UI.text(tier.used + ' / ' + tier.capacity + ' 項目 (' + pct + '%)', {
+      UI.text(fmtBytes(tier.usedBytes) + ' / ' + fmtBytes(tier.capacityBytes) + ' (' + tier.entries + ' 項, ' + pct + '%)', {
         fontSize: '11px', color: 'rgba(216,232,255,0.5)', marginLeft: 'auto',
       }),
     ], { alignItems: 'center' }),

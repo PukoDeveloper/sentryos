@@ -5,7 +5,7 @@
 
 import type { Kernel } from '../kernel/Kernel';
 import { BaseRuntime } from './BaseRuntime';
-import type { RuntimeResult, RuntimeAdapter, BaseProcessState } from './types';
+import type { RuntimeResult, RuntimeAdapter, BaseProcessState, RuntimeMemoryUsage } from './types';
 
 class AdapterRuntime extends BaseRuntime {
     private readonly adapter: RuntimeAdapter;
@@ -82,6 +82,19 @@ class AdapterRuntime extends BaseRuntime {
         for (const pid of Array.from(this.sandboxes.keys())) {
             this.destroyProcessRuntime(pid);
         }
+    }
+
+    // ── 記憶體使用量 ────────────────────────────────────────
+
+    getMemoryUsage(): RuntimeMemoryUsage {
+        return {
+            engineName: 'adapter',
+            activeProcesses: this.sandboxes.size,
+            totalModuleCacheEntries: 0,
+            totalTimers: 0,
+            engineMemory: {},
+            estimatedBytes: 0,
+        };
     }
 
     // ── 事件派發：覆寫 invokeHandler ─────────────────────────

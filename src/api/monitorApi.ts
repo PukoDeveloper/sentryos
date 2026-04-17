@@ -53,5 +53,11 @@ export function registerMonitorApi(kernel: Kernel): void {
       }
       return { success: true, data: systemMonitor.getProcessHistory() };
     },
+    memoryUsage: () => {
+      if (!permissions.has(process.processAppId, Permissions.MONITOR_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return { success: true, data: systemMonitor.getMemorySnapshot() };
+    },
   }), ['monitor'], 'monitor');
 }

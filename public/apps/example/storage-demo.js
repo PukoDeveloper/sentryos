@@ -106,7 +106,9 @@ var app = UI.createApp({
                 var result = OS.storage.storageUsage();
                 if (result.success && result.data) {
                   var d = result.data;
-                  statusMsg = '使用: ' + d.used + ' / ' + d.quota + ' 項';
+                  var kb = (d.totalBytes / 1024).toFixed(1);
+                  var capKb = (d.totalCapacityBytes / 1024).toFixed(1);
+                  statusMsg = '使用: ' + kb + ' KB / ' + capKb + ' KB (' + d.totalEntries + ' 項)';
                 } else {
                   statusMsg = '✗ ' + (result.error || '查詢失敗');
                 }

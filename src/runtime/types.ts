@@ -103,6 +103,18 @@ type RuntimeAdapter = {
     callHandler(sandbox: unknown, handlerName: string, arg: unknown): unknown;
 };
 
+/** 單一 Runtime 引擎的記憶體使用量快照。 */
+type RuntimeMemoryUsage = {
+    engineName: string;
+    activeProcesses: number;
+    totalModuleCacheEntries: number;
+    totalTimers: number;
+    /** 引擎專屬的記憶體詳情（例如 QuickJS 堆資訊） */
+    engineMemory: Record<string, number>;
+    /** 估算的總記憶體占用（位元組） */
+    estimatedBytes: number;
+};
+
 export type {
     ProcessType,
     RuntimeError,
@@ -117,5 +129,6 @@ export type {
     RuntimeProcess,
     ResponseType,
     RuntimeAdapter,
+    RuntimeMemoryUsage,
 
 };

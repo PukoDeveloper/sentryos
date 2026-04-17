@@ -3,7 +3,7 @@
 // 新增 Runtime 引擎（例如 Lua、Python）只需實作此介面，
 // 即可透過 RuntimeRegistry 接入現有的應用程式生命週期管理。
 
-import type { RuntimeResult } from './types';
+import type { RuntimeResult, RuntimeMemoryUsage } from './types';
 
 interface IRuntime {
     // ── 程式碼執行 ──────────────────────────────────────────
@@ -15,6 +15,10 @@ interface IRuntime {
     // ── 程序生命週期 ────────────────────────────────────────
     destroyProcessRuntime(pid: number): void;
     destroyAll(): void;
+
+    // ── 記憶體使用量 ────────────────────────────────────────
+    /** 回傳此 Runtime 引擎的記憶體使用量估算。 */
+    getMemoryUsage(): RuntimeMemoryUsage;
 
     // ── 事件派發 ────────────────────────────────────────────
     dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown>;

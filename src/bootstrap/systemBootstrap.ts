@@ -226,6 +226,9 @@ async function bootstrapSystem(): Promise<void> {
   // 6. Register all Host APIs via modular registrars
   registerAllHostApis(kernel);
 
+  // 6.5. Wire runtime memory provider to system monitor
+  systemMonitor.setRuntimeMemoryProvider(() => runtimeRegistry.getAllMemoryUsage());
+
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
     windowManager.focusWindow(processAppId, windowId);
