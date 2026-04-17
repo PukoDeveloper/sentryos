@@ -2,7 +2,9 @@
 
 **檔案**：`src/runtime/ScriptRuntime.ts`（繼承 `BaseRuntime`，型別定義：`src/runtime/types.ts`）
 
-基於 QuickJS-emscripten 的沙箱執行引擎。負責建立 QuickJS Runtime/Context、注入 OS API、Timer 函式、模組載入（`imports()`）以及程序資源釋放。
+基於 QuickJS-emscripten 的沙箱執行引擎。繼承 `BaseRuntime` 取得共用邏輯（IPC、事件訂閱、API 表面建構）。負責建立 QuickJS Runtime/Context、注入 OS API、Timer 函式、模組載入（`imports()`）以及程序資源釋放。
+
+> Host API 的註冊與管理已移至 [RuntimeRegistry](runtime-registry.md)。`ScriptRuntime` 透過 `BaseRuntime.buildApiSurface()` 自動合併內建 API 與中央 API。
 
 ---
 

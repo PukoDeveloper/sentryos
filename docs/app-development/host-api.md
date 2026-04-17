@@ -2,7 +2,9 @@
 
 **檔案**：`src/api/` 目錄
 
-Host API 是沙箱應用程式透過 `OS` 全域物件存取的系統功能。每個 API 模組由 `runtime.registerApi()` 注入。
+Host API 是沙箱應用程式透過 `OS` 全域物件存取的系統功能。所有 Host API 模組統一註冊在 `RuntimeRegistry`（中央 API 註冊表），在每個程序啟動時，`BaseRuntime.buildApiSurface()` 會合併內建 API 與中央 API，建構該程序的 `OS` 物件。
+
+> **插件也可以透過 `context.registerApi()` 註冊新的 Host API**，見[插件開發指南](../plugin-development/guide.md)。
 
 ---
 

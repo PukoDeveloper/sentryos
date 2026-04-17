@@ -2,8 +2,10 @@ import type { Kernel } from '../kernel/Kernel';
 import type { EventBusResult } from '../kernel/types';
 import type { UiComponentRenderer, UiComponentApiBuilder } from '../window/UiComponentRegistry';
 import { uiComponentRegistry } from '../window/UiComponentRegistry';
-import type { ApiFactory } from '../runtime/types';
+import type { ApiFactory, RuntimeAdapter } from '../runtime/types';
 import type { IRuntime } from '../runtime/IRuntime';
+import { BaseRuntime } from '../runtime/BaseRuntime';
+import { AdapterRuntime } from '../runtime/AdapterRuntime';
 
 /**
  * 每個插件在 setup/teardown 時取得的上下文。
@@ -95,6 +97,47 @@ export class PluginContext {
       if (idx !== -1) this.registeredUiComponents.splice(idx, 1);
     }
     return result;
+  }
+
+  // ── Runtime 建立 ──────────────────────────────────────────
+
+  /**
+   * 以 adapter 模式快速建立一個 Runtime 引擎。
+   * 只需提供沙箱的建立/注入/執行/銷毀邏輯，
+   * IPC、事件訂閱、API 表面建構等由系統自動處理。
+   *
+   * @example
+   * ```js
+   * const runtime = context.createRuntime({
+   *   createSandbox(pid) { return new LuaVM(); },
+   *   injectGlobals(vm, api) { vm.global.set('OS', api); },
+   *   execute(vm, code) { return vm.doString(code); },
+   *   destroy(vm) { vm.close(); },
+   * });
+   * context.registerRuntime('lua', runtime);
+   * ```
+   */
+  createRuntime(adapter: RuntimeAdapter): IRuntime {
+    return new AdapterRuntime(this.kernel, adapter);
+  }
+
+  /**
+   * BaseRuntime 類別參考，供進階插件直接繼承。
+   * 繼承後需自行實作 execute / evaluateInContext / destroyProcessRuntime / destroyAll。
+   *
+   * @example
+   * ```js
+   * class MyRuntime extends context.BaseRuntime {
+   *   execute(pid, code, timeoutMs, entryPath) { ... }
+   *   evaluateInContext(pid, code) { ... }
+   *   destroyProcessRuntime(pid) { ... }
+   *   destroyAll() { ... }
+   * }
+   * context.registerRuntime('my-engine', new MyRuntime(context.resolve('kernel')));
+   * ```
+   */
+  get BaseRuntime() {
+    return BaseRuntime;
   }
 
   // ── Runtime 引擎註冊 ──────────────────────────────────────

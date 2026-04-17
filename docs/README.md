@@ -3,11 +3,12 @@
 ## 目錄
 
 ### 架構
-- [架構概覽](architecture/overview.md)
+- [架構概覽](architecture/overview.md) — 系統分層、Kernel、開機流程、Runtime 架構、權限系統
 
 ### 核心模組
-- [WindowManager](core/window-manager.md) — 視窗管理
+- [RuntimeRegistry](core/runtime-registry.md) — 中央 API 管理 + 多引擎
 - [ScriptRuntime](core/script-runtime.md) — QuickJS 沙箱執行引擎
+- [WindowManager](core/window-manager.md) — 視窗管理
 - [PermissionsManager](core/permissions-manager.md) — 權限管理
 - [ApplicationCatalog](core/application-catalog.md) — 應用程式清單載入
 - [ApplicationManager](core/application-manager.md) — 應用程式登錄
@@ -27,10 +28,11 @@
 ### 視窗系統
 - [視窗系統型別](window-system/window-system.md)
 
-### 應用程式開發
-- [開發指南](app-development/guide.md)
-- [Host API](app-development/host-api.md)
-- [Manifest 格式](app-development/manifest.md)
+### 開發指南
+- [應用程式開發](app-development/guide.md) — 四種應用類型的開發方式
+- [插件開發](plugin-development/guide.md) — 插件結構、PluginContext API、範例
+- [Host API 參考](app-development/host-api.md) — 沙箱中 OS.* 所有方法
+- [Manifest 格式](app-development/manifest.md) — manifest.json 欄位說明
 
 ### 型別定義
 - [types/](types/README.md) — Plugin SDK 型別定義檔（`sentryos-plugin.d.ts`）

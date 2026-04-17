@@ -133,6 +133,24 @@ export interface PluginContext {
    */
   unregisterRuntime(engine: string): boolean;
 
+  // ── Runtime 建立（工廠 + 類別）─────────────────────────
+
+  /**
+   * 以 adapter 模式快速建立 Runtime 引擎（推薦）。
+   * 只需提供沙箱的建立/注入/執行/銷毀邏輯，
+   * IPC、事件訂閱、API 表面建構等由系統自動處理。
+   *
+   * @param adapter - 沙箱適配器
+   * @returns 完整的 IRuntime 實例，可直接傳給 registerRuntime()
+   */
+  createRuntime(adapter: RuntimeAdapter): IRuntime;
+
+  /**
+   * BaseRuntime 類別參考，供進階插件直接繼承。
+   * 繼承後需自行實作 execute / evaluateInContext / destroyProcessRuntime / destroyAll。
+   */
+  readonly BaseRuntime: typeof BaseRuntime;
+
   // ── Logging ─────────────────────────────────────────────
 
   /** 記錄日誌（自動帶 `[plugin:名稱]` 前綴） */
@@ -293,15 +311,11 @@ export interface RuntimeResult<T> {
 }
 
 /**
- * 所有 Script Runtime 引擎必須實作的公開介面。
- * 新增 Runtime 引擎（例如 Lua、Python）只需實作此介面，
- * 即可透過 RuntimeRegistry 接入現有的應用程式生命週期管理。
+ * 所有 Runtime 引擎必須實作的公開介面。
+ * Host API 的註冊/管理已移至 RuntimeRegistry（中央註冊表），
+ * IRuntime 僅負責程式碼執行與事件派發。
  */
 export interface IRuntime {
-  /** 註冊 Host API 到此引擎 */
-  registerApi(name: string, factory: ApiFactory, gates?: string[], group?: string): void;
-  /** 反註冊 Host API */
-  unregisterApi(name: string): boolean;
   /** 在指定 PID 的沙箱中執行程式碼 */
   execute(pid: number, code: string, timeoutMs?: number, entryPath?: string): RuntimeResult<unknown>;
   /** 在已存在的程序上下文中評估程式碼（不重新注入 API） */
@@ -320,6 +334,66 @@ export interface IRuntime {
   dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown>;
   /** 派發對話框結果到指定程序 */
   dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown>;
+}
+
+// ── RuntimeAdapter Interface ────────────────────────────────
+// 用於 context.createRuntime() 工廠模式。
+
+/**
+ * 插件用的 Runtime 適配器介面。
+ * 只需提供沙箱的建立/注入/執行/銷毀邏輯，
+ * 其餘（IPC、事件訂閱、API 表面建構）由 AdapterRuntime 自動處理。
+ */
+export interface RuntimeAdapter {
+  /** 建立新的沙箱/VM 實例 */
+  createSandbox(pid: number): unknown;
+  /**
+   * 將完整的 OS API 表面注入沙箱。
+   * 實作者應將 `apiSurface` 掛載為沙箱中的 `OS` 全域物件。
+   */
+  injectGlobals(sandbox: unknown, apiSurface: Record<string, HostApiValue>): void;
+  /** 在沙箱中執行程式碼並回傳結果 */
+  execute(sandbox: unknown, code: string, timeoutMs?: number): unknown;
+  /** 銷毀沙箱實例並釋放所有資源 */
+  destroy(sandbox: unknown): void;
+}
+
+// ── BaseRuntime Abstract Class ──────────────────────────────
+// 供進階插件直接繼承。
+
+/**
+ * 引擎無關的抽象基底類別。
+ * 繼承後需實作 execute / evaluateInContext / destroyProcessRuntime / destroyAll。
+ * 提供的共用邏輯：
+ * - 內建 API 註冊（process, event, ipc, service）
+ * - API 表面建構（buildApiSurface）
+ * - IPC 路由（sendToParent, sendToChild, broadcastChildren）
+ * - 事件訂閱/取消（subscribeProcessEvent, unsubscribeProcessEvent）
+ * - 事件派發（dispatchUiEvent, dispatchConsoleInput 等）
+ */
+export declare abstract class BaseRuntime implements IRuntime {
+  protected readonly kernel: any;
+  protected readonly processStates: Map<number, any>;
+
+  constructor(kernel: any);
+
+  abstract execute(pid: number, code: string, timeoutMs?: number, entryPath?: string): RuntimeResult<unknown>;
+  abstract evaluateInContext(pid: number, code: string): RuntimeResult<unknown>;
+  abstract destroyProcessRuntime(pid: number): void;
+  abstract destroyAll(): void;
+
+  dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown>;
+  dispatchConsoleInput(processAppId: string, line: string): RuntimeResult<unknown>;
+  dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown>;
+  dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown>;
+  dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown>;
+
+  /** 根據程序權限建構完整的 Host API 表面（引擎內建 + 中央 Host API） */
+  protected buildApiSurface(process: ProcessView): Record<string, HostApiValue>;
+  /** 正規化回傳值為可序列化的 HostApiValue */
+  protected normalizeReturnValue(value: unknown): HostApiValue;
+  /** 取得程序資訊 */
+  protected getProcess(pid: number): ProcessView | undefined;
 }
 
 // ── Kernel Service Types ────────────────────────────────────
@@ -746,12 +820,40 @@ export interface PluginManager {
 // ── RuntimeRegistry ─────────────────────────────────────────
 
 export interface RuntimeRegistry {
+  // ── Host API 管理（中央註冊表） ────────────────────────
+
+  /** 註冊 Host API 到中央註冊表。所有 Runtime 引擎共用。 */
+  registerApi(name: string, factory: ApiFactory, gates?: string[], group?: string): void;
+  /** 反註冊 Host API */
+  unregisterApi(name: string): boolean;
+  /** 取得所有已註冊的 Host API 條目 */
+  getHostApiEntries(): ReadonlyMap<string, { factory: ApiFactory; gates: string[]; group?: string }>;
+
+  // ── 引擎管理 ──────────────────────────────────────────
+
+  /** 註冊 Runtime 引擎 */
   register(engine: string, runtime: IRuntime): void;
+  /** 取得指定引擎 */
   get(engine: string): IRuntime | undefined;
+  /** 取得預設引擎 */
   getDefault(): IRuntime;
+  /** 設定預設引擎 */
   setDefault(engine: string): void;
+  /** 檢查引擎是否存在 */
   has(engine: string): boolean;
+  /** 移除引擎 */
   unregister(engine: string): boolean;
+
+  // ── 程序路由 ──────────────────────────────────────────
+
+  /** 綁定程序到引擎 */
+  bindProcess(pid: number, processAppId: string, engine: string): void;
+  /** 解除程序綁定 */
+  unbindProcess(pid: number, processAppId: string): void;
+  /** 根據 PID 取得負責的 Runtime */
+  getForPid(pid: number): IRuntime;
+  /** 根據 processAppId 取得負責的 Runtime */
+  getForProcessAppId(processAppId: string): IRuntime;
 }
 
 // ── LanguageManager ─────────────────────────────────────────

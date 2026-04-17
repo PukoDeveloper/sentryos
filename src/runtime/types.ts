@@ -77,6 +77,25 @@ type RuntimeProcess = BaseProcessState & {
 
 type ResponseType = 'text' | 'json' | 'javascript';
 
+/**
+ * 插件用的 Runtime 適配器介面。
+ * 只需提供沙箱的建立/注入/執行/銷毀，
+ * 其餘邏輯（IPC、事件訂閱、API 表面建構）由 AdapterRuntime 自動處理。
+ */
+type RuntimeAdapter = {
+    /** 建立新的沙箱/VM 實例 */
+    createSandbox(pid: number): unknown;
+    /**
+     * 將完整的 OS API 表面注入沙箱。
+     * 實作者應將 `apiSurface` 掛載為沙箱中的 `OS` 全域物件。
+     */
+    injectGlobals(sandbox: unknown, apiSurface: Record<string, HostApiValue>): void;
+    /** 在沙箱中執行程式碼並回傳結果 */
+    execute(sandbox: unknown, code: string, timeoutMs?: number): unknown;
+    /** 銷毀沙箱實例並釋放所有資源 */
+    destroy(sandbox: unknown): void;
+};
+
 export type {
     ProcessType,
     RuntimeError,
@@ -90,5 +109,6 @@ export type {
     BaseProcessState,
     RuntimeProcess,
     ResponseType,
+    RuntimeAdapter,
 
 };
