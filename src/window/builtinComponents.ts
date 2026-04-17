@@ -6,6 +6,16 @@ import { uiComponentRegistry } from './UiComponentRegistry';
 import type { UiComponentRenderer } from './UiComponentRegistry';
 import type { WindowUiNode } from './types';
 
+/** Safely convert a value to an iterable array.
+ *  Wasmoon converts empty Lua tables `{}` to plain JS `{}` (not `[]`),
+ *  which breaks `for...of`. This helper normalises the value. */
+function toIterable<T>(v: T[] | Iterable<T> | null | undefined | Record<string, unknown>): T[] {
+    if (v == null) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof (v as any)[Symbol.iterator] === 'function') return Array.from(v as Iterable<T>);
+    return [];
+}
+
 // ── label ─────────────────────────────────────────────────
 
 const labelRenderer: UiComponentRenderer = {
@@ -200,7 +210,7 @@ const selectRenderer: UiComponentRenderer = {
         if (n.id) { select.dataset.controlId = n.id; select.name = n.id; }
         ctx.applyStyle(select, n.style);
 
-        for (const opt of n.options ?? []) {
+        for (const opt of toIterable(n.options)) {
             const option = document.createElement('option');
             option.value = opt.value;
             option.textContent = opt.label;
@@ -223,7 +233,7 @@ const selectRenderer: UiComponentRenderer = {
         if (patch.options !== undefined) {
             const current = select.value;
             select.replaceChildren();
-            for (const opt of patch.options) {
+            for (const opt of toIterable(patch.options)) {
                 const option = document.createElement('option');
                 option.value = opt.value;
                 option.textContent = opt.label;
@@ -337,14 +347,14 @@ const listRenderer: UiComponentRenderer = {
         if (n.id) el.dataset.controlId = n.id;
         el.classList.add('window-ui-list');
         ctx.applyStyle(el, n.style);
-        for (const child of n.children ?? []) el.appendChild(ctx.renderChild(child));
+        for (const child of toIterable(n.children)) el.appendChild(ctx.renderChild(child));
         ctx.registerNode(n.id, el);
         return el;
     },
     patch(element, patch, ctx) {
         if (patch.children !== undefined) {
             element.replaceChildren();
-            for (const child of patch.children) element.appendChild(ctx.renderChild(child));
+            for (const child of toIterable(patch.children)) element.appendChild(ctx.renderChild(child));
             return true;
         }
         return false;
@@ -366,14 +376,14 @@ const panelRenderer: UiComponentRenderer = {
         if (n.id) el.dataset.controlId = n.id;
         el.classList.add('window-ui-panel');
         ctx.applyStyle(el, n.style);
-        for (const child of n.children ?? []) el.appendChild(ctx.renderChild(child));
+        for (const child of toIterable(n.children)) el.appendChild(ctx.renderChild(child));
         ctx.registerNode(n.id, el);
         return el;
     },
     patch(element, patch, ctx) {
         if (patch.children !== undefined) {
             element.replaceChildren();
-            for (const child of patch.children) element.appendChild(ctx.renderChild(child));
+            for (const child of toIterable(patch.children)) element.appendChild(ctx.renderChild(child));
             return true;
         }
         return false;
@@ -399,14 +409,14 @@ const stackRenderer: UiComponentRenderer = {
             el.style.flexDirection = 'column';
         }
         ctx.applyStyle(el, n.style);
-        for (const child of n.children ?? []) el.appendChild(ctx.renderChild(child));
+        for (const child of toIterable(n.children)) el.appendChild(ctx.renderChild(child));
         ctx.registerNode(n.id, el);
         return el;
     },
     patch(element, patch, ctx) {
         if (patch.children !== undefined) {
             element.replaceChildren();
-            for (const child of patch.children) element.appendChild(ctx.renderChild(child));
+            for (const child of toIterable(patch.children)) element.appendChild(ctx.renderChild(child));
             return true;
         }
         return false;

@@ -83,6 +83,21 @@ class AdapterRuntime extends BaseRuntime {
             this.destroyProcessRuntime(pid);
         }
     }
+
+    // ── 事件派發：覆寫 invokeHandler ─────────────────────────
+    // 使用 adapter.callHandler 直接呼叫沙箱中的全域函式，
+    // 取代 BaseRuntime 預設的 JS 程式碼字串執行。
+
+    protected override invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown> {
+        const sandbox = this.sandboxes.get(pid);
+        if (!sandbox) return { success: false, error: 'ProcessNotFound' };
+        try {
+            const result = this.adapter.callHandler(sandbox, handlerName, arg);
+            return { success: true, data: this.normalizeReturnValue(result) };
+        } catch (err) {
+            return { success: false, error: 'RuntimeError', data: err instanceof Error ? err.message : String(err) };
+        }
+    }
 }
 
 export { AdapterRuntime };

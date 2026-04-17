@@ -34,6 +34,21 @@
                 "*"
             ],
             "engine": "lua"
+        },
+        {
+            "id": "lua-window-demo",
+            "name": "Lua 視窗 Demo",
+            "main": "lua-window-demo.lua",
+            "type": "Window",
+            "icon": "icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "notification.send"
+            ],
+            "engine": "lua",
+            "maxInstances": 1
         }
     ]
 }

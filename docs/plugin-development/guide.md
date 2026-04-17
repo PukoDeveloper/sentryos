@@ -261,7 +261,7 @@ SentryOS 提供兩種方式建立自訂 Runtime 引擎：
 
 #### 方式 A：Adapter 模式（推薦）
 
-使用 `context.createRuntime(adapter)` 工廠函式，只需提供沙箱的 4 個核心操作。IPC、事件訂閱、API 表面建構等引擎無關的邏輯由系統自動處理。
+使用 `context.createRuntime(adapter)` 工廠函式，只需提供沙箱的 5 個核心操作。IPC、事件訂閱、API 表面建構等引擎無關的邏輯由系統自動處理。
 
 ```javascript
 function setup(context) {
@@ -283,6 +283,12 @@ function setup(context) {
             // 釋放 VM 資源
             vm.close();
         },
+        callHandler(vm, handlerName, arg) {
+            // 直接呼叫沙箱中的全域函式（用於事件派發）
+            // 系統會透過此方法觸發 onWindowEvent、onConsoleInput 等回呼
+            const fn = vm.global.get(handlerName);
+            if (typeof fn === 'function') return fn(arg);
+        },
     });
     context.registerRuntime('lua', runtime);
 }
@@ -296,8 +302,14 @@ interface RuntimeAdapter {
     injectGlobals(sandbox: unknown, apiSurface: Record<string, HostApiValue>): void;
     execute(sandbox: unknown, code: string, timeoutMs?: number): unknown;
     destroy(sandbox: unknown): void;
+    /** 直接呼叫沙箱中的全域函式（用於事件派發） */
+    callHandler(sandbox: unknown, handlerName: string, arg: unknown): unknown;
 }
 ```
+
+`callHandler` 是必要方法。當系統需要派發事件（如 `onWindowEvent`、`onConsoleInput`）時，
+AdapterRuntime 透過此方法直接呼叫沙箱中的全域函式，
+而非產生語言特定的程式碼字串。若函式不存在，應靜默回傳 `undefined`。
 
 #### 方式 B：繼承 BaseRuntime（進階）
 
@@ -373,12 +385,13 @@ function setup(context) {
 | `unsubscribeProcessEvent(pid, appId, event)` | 取消程序事件訂閱 |
 | `pushMessage(from, to, channel, payload)` | 推送 IPC 訊息 |
 | `readInbox(pid)` | 讀取並清空程序收件箱 |
+| `invokeHandler(pid, name, arg)` | 事件派發核心（可覆寫） |
 
 **兩種方式的對比：**
 
 | | Adapter 模式 | 繼承 BaseRuntime |
 |---|---|---|
-| 複雜度 | 低（4 個方法） | 高（4 個抽象方法 + 狀態管理） |
+| 複雜度 | 低（5 個方法） | 高（4 個抽象方法 + invokeHandler + 狀態管理） |
 | 彈性 | 標準流程 | 完全自訂 |
 | 適用場景 | 一般語言引擎 | 需要自訂 IPC、module loader 等 |
 | 事件/IPC | 自動處理 | 需自行管理清理 |
@@ -515,6 +528,11 @@ async function setup(context) {
         destroy(lua) {
             lua.global.close();
         },
+        callHandler(lua, handlerName, arg) {
+            // 直接呼叫 Lua 全域函式（用於事件派發）
+            const fn = lua.global.get(handlerName);
+            if (typeof fn === 'function') return fn(arg);
+        },
     });
 
     context.registerRuntime('lua', runtime);
@@ -535,7 +553,7 @@ export default {
 };
 ```
 
-使用 Adapter 模式時，IPC 路由、事件訂閱/取消、API 表面建構（buildApiSurface）等全部由 `AdapterRuntime` 自動處理，插件只需專注於沙箱本身的操作。
+使用 Adapter 模式時，IPC 路由、事件訂閱/取消、API 表面建構（buildApiSurface）等全部由 `AdapterRuntime` 自動處理。事件派發（如 `onWindowEvent`）透過 `callHandler` 直接呼叫沙箱中的函式，不會產生任何語言特定的程式碼字串。
 
 ---
 

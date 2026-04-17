@@ -24,6 +24,14 @@ import type { RenderContext } from './UiComponentRegistry';
 import { renderAnsiLine } from '../console/AnsiParser';
 import './builtinComponents';
 
+/** See builtinComponents.ts — normalises Lua proxy objects to JS arrays. */
+function toIterable<T>(v: T[] | Iterable<T> | null | undefined | Record<string, unknown>): T[] {
+    if (v == null) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof (v as any)[Symbol.iterator] === 'function') return Array.from(v as Iterable<T>);
+    return [];
+}
+
 const ANIM_CLOSE_MS    = 220;
 const ANIM_MINIMIZE_MS = 280;
 const ANIM_RESTORE_MS  = 300;
@@ -240,7 +248,7 @@ class WindowManager {
         const nodeMap = new Map<string, HTMLElement>();
         this.windowNodeMaps.set(windowId, nodeMap);
 
-        for (const node of tree) {
+        for (const node of toIterable(tree)) {
             const rendered = this.renderNode(windowDescriptor, processAppId, node);
             windowDescriptor.content.appendChild(rendered);
         }
@@ -342,7 +350,7 @@ class WindowManager {
             return { success: false, error: 'NodeNotFound' };
         }
 
-        for (const node of nodes) {
+        for (const node of toIterable(nodes)) {
             const rendered = this.renderNode(descriptor.data!, processAppId, node);
             parent.appendChild(rendered);
         }
@@ -535,7 +543,7 @@ class WindowManager {
         const menu = document.createElement('div');
         menu.className = 'desktop-context-menu';
 
-        for (const entry of items) {
+        for (const entry of toIterable(items)) {
             if ('separator' in entry && entry.separator) {
                 const sep = document.createElement('div');
                 sep.className = 'desktop-context-menu-separator';
@@ -760,7 +768,7 @@ class WindowManager {
         const events = (node as any).events as WindowUiEvent['type'][] | undefined;
         if (!events || !node.id) return;
 
-        for (const evt of events) {
+        for (const evt of toIterable(events)) {
             // Skip events already handled natively by the component renderer
             if (evt === 'click' && node.type === 'button') continue;
             if ((evt === 'change' || evt === 'submit') && ['input', 'textarea', 'checkbox', 'select'].includes(node.type)) continue;

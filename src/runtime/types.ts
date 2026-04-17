@@ -94,6 +94,13 @@ type RuntimeAdapter = {
     execute(sandbox: unknown, code: string, timeoutMs?: number): unknown;
     /** 銷毀沙箱實例並釋放所有資源 */
     destroy(sandbox: unknown): void;
+    /**
+     * 直接呼叫沙箱中的全域函式（用於事件派發）。
+     * AdapterRuntime 透過此方法觸發 onWindowEvent、onConsoleInput 等回呼，
+     * 避免產生語言特定的程式碼字串。
+     * 若指定函式不存在，應靜默回傳 `undefined`（不拋出錯誤）。
+     */
+    callHandler(sandbox: unknown, handlerName: string, arg: unknown): unknown;
 };
 
 export type {

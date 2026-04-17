@@ -56,42 +56,49 @@ abstract class BaseRuntime implements IRuntime {
     abstract destroyProcessRuntime(pid: number): void;
     abstract destroyAll(): void;
 
-    // ── IRuntime: 事件派發（路由至 execute）────────────────
+    // ── IRuntime: 事件派發 ──────────────────────────────────
 
-    /** 共用輔助：在指定 processAppId 的執行中程序上執行一段程式碼。 */
-    private dispatchToProcess(processAppId: string, code: string): RuntimeResult<unknown> {
+    /**
+     * 語言無關的事件派發核心。
+     * 在指定 PID 的沙箱中呼叫全域 handler 函式。
+     * 預設實作產生 JavaScript 程式碼字串（適用於 QuickJS/ScriptRuntime），
+     * 非 JS 引擎（如 Lua）的子類別應覆寫此方法以使用原生函式呼叫。
+     */
+    protected invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown> {
+        const payload = JSON.stringify(arg);
+        const code = `if(typeof ${handlerName}==='function'){${handlerName}(${payload})}`;
+        return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
+    }
+
+    /** 在指定 processAppId 的執行中程序上呼叫 handler。 */
+    private dispatchToHandler(processAppId: string, handlerName: string, arg: unknown): RuntimeResult<unknown> {
         for (const [pid] of this.processStates) {
             const proc = this.getProcess(pid);
             if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
+                return this.invokeHandler(pid, handlerName, arg);
             }
         }
         return { success: false, error: 'ProcessNotFound' };
     }
 
     dispatchUiEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(event);
-        return this.dispatchToProcess(processAppId, `if(typeof onWindowEvent==='function'){onWindowEvent(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onWindowEvent', event);
     }
 
     dispatchConsoleInput(processAppId: string, line: string): RuntimeResult<unknown> {
-        const escaped = JSON.stringify(line);
-        return this.dispatchToProcess(processAppId, `if(typeof onConsoleInput==='function'){onConsoleInput(${escaped})}`);
+        return this.dispatchToHandler(processAppId, 'onConsoleInput', line);
     }
 
     dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(event);
-        return this.dispatchToProcess(processAppId, `if(typeof onKeyboardEvent==='function'){onKeyboardEvent(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onKeyboardEvent', event);
     }
 
     dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(fileInfo);
-        return this.dispatchToProcess(processAppId, `if(typeof onFileOpen==='function'){onFileOpen(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onFileOpen', fileInfo);
     }
 
     dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown> {
-        const payload = JSON.stringify(result);
-        return this.dispatchToProcess(processAppId, `if(typeof onDialogResult==='function'){onDialogResult(${payload})}`);
+        return this.dispatchToHandler(processAppId, 'onDialogResult', result);
     }
 
     // ── 內建 API 註冊 ───────────────────────────────────────

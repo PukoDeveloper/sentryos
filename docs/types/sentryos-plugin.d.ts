@@ -341,7 +341,7 @@ export interface IRuntime {
 
 /**
  * 插件用的 Runtime 適配器介面。
- * 只需提供沙箱的建立/注入/執行/銷毀邏輯，
+ * 提供沙箱的建立/注入/執行/銷毀/呼叫邏輯，
  * 其餘（IPC、事件訂閱、API 表面建構）由 AdapterRuntime 自動處理。
  */
 export interface RuntimeAdapter {
@@ -356,6 +356,12 @@ export interface RuntimeAdapter {
   execute(sandbox: unknown, code: string, timeoutMs?: number): unknown;
   /** 銷毀沙箱實例並釋放所有資源 */
   destroy(sandbox: unknown): void;
+  /**
+   * 直接呼叫沙箱中的全域函式（用於事件派發）。
+   * AdapterRuntime 透過此方法觸發 onWindowEvent、onConsoleInput 等回呼。
+   * 若指定函式不存在，應靜默回傳 `undefined`（不拋出錯誤）。
+   */
+  callHandler(sandbox: unknown, handlerName: string, arg: unknown): unknown;
 }
 
 // ── BaseRuntime Abstract Class ──────────────────────────────
@@ -369,7 +375,7 @@ export interface RuntimeAdapter {
  * - API 表面建構（buildApiSurface）
  * - IPC 路由（sendToParent, sendToChild, broadcastChildren）
  * - 事件訂閱/取消（subscribeProcessEvent, unsubscribeProcessEvent）
- * - 事件派發（dispatchUiEvent, dispatchConsoleInput 等）
+ * - 事件派發（dispatchUiEvent, dispatchConsoleInput 等），透過 invokeHandler 路由
  */
 export declare abstract class BaseRuntime implements IRuntime {
   protected readonly kernel: any;
@@ -388,6 +394,13 @@ export declare abstract class BaseRuntime implements IRuntime {
   dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown>;
   dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown>;
 
+  /**
+   * 事件派發核心（Template Method）。
+   * 在指定 PID 的沙箱中呼叫全域 handler 函式。
+   * 預設實作產生 JavaScript 程式碼字串（適用於 QuickJS/ScriptRuntime），
+   * 非 JS 引擎的子類別應覆寫此方法以使用原生函式呼叫。
+   */
+  protected invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown>;
   /** 根據程序權限建構完整的 Host API 表面（引擎內建 + 中央 Host API） */
   protected buildApiSurface(process: ProcessView): Record<string, HostApiValue>;
   /** 正規化回傳值為可序列化的 HostApiValue */
