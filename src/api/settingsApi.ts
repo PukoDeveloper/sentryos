@@ -1,6 +1,6 @@
 import type { Kernel } from '../kernel/Kernel';
 import type { ThemeSettings, TaskbarMode } from '../ui/DesktopShell';
-import { Permissions } from '../kernel/constants';
+import { Permissions, Events } from '../kernel/constants';
 
 const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const;
 
@@ -19,6 +19,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   const environmentManager = kernel.resolve('environmentManager');
   const notificationManager = kernel.resolve('notificationManager');
   const languageManager = kernel.resolve('languageManager');
+  const eventBus = kernel.resolve('eventBus');
   const systemAppId = kernel.get('systemAppId');
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
@@ -45,6 +46,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
       desktopShell.applyTheme(safe);
+      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
       return { success: true, data: null };
     },
     saveTheme: (theme: Record<string, unknown>) => {
@@ -62,6 +64,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
       if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;
       desktopShell.applyTheme(safe);
+      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },
     loadSavedTheme: () => {

@@ -92,6 +92,7 @@ export const Events = {
   NOTIFICATION: 'notification',
   KEYBOARD: 'keyboard',
   LANGUAGE_CHANGED: 'language.changed',
+  THEME_CHANGED: 'theme.changed',
 } as const;
 
 // ── User Default Permissions ────────────────────────────────

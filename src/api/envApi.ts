@@ -53,7 +53,11 @@ export function registerEnvApi(kernel: Kernel): void {
       }
       const code = environmentManager.getLibraryCode(libraryId);
       if (!code) return { success: false, error: 'LibraryNotFound' };
-      return runtime.evaluateInContext(pid, code);
+      // Strip ES module export statements for script-mode evaluation.
+      // Library files may contain `export` declarations for import-mode
+      // compatibility; these are invalid in evalCode (script context).
+      const scriptCode = code.replace(/^export\s+(var|const|let|function|class|default)\b[^\n]*/gm, '');
+      return runtime.evaluateInContext(pid, scriptCode);
     },
     listLibraries: () => {
       return { success: true, data: environmentManager.getLibraryIds() };

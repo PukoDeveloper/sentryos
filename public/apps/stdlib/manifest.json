@@ -3,9 +3,6 @@
     "version": "1.0.0",
     "description": "SentryOS standard library — reusable utility modules.",
     "author": "SentryOS Team",
-    "permissions": [
-        "env.library.load"
-    ],
     "apps": [
         {
             "id": "stdlib-math",
