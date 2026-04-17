@@ -292,7 +292,13 @@ function onWindowEvent(event)
     elseif id == "btn-theme" then
         if theme == "dark" then theme = "light" else theme = "dark" end
         pushHistory("Theme → " .. theme)
-        -- 全畫面重繪
-        OS.ui.initialize(windowId, { buildUI() })
+        -- 更新視窗框架色彩
+        OS.ui.setWindowStyle(windowId, {
+            background = c().bg,
+            color      = c().text,
+            border     = "1px solid " .. c().border,
+        })
+        -- 全畫面重繪（保留捲動位置）
+        OS.ui.initialize(windowId, { buildUI() }, { preserveScroll = true })
     end
 end

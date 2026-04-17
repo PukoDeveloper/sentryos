@@ -285,7 +285,6 @@ function createFile(name, content) {
 
 // ── Styles ───────────────────────────────────────────────────
 var accent = '#67b8ff';
-var bg = 'linear-gradient(180deg, rgba(10,14,20,0.96), rgba(6,10,14,0.92))';
 var cardBg = 'rgba(255,255,255,0.03)';
 var cardBorder = '1px solid rgba(255,255,255,0.06)';
 
@@ -354,12 +353,6 @@ var app = UI.createApp({
   width: 720,
   height: 560,
   resizable: true,
-  style: {
-    background: bg,
-    color: '#ecf4ff',
-    border: '1px solid rgba(118,185,255,0.26)',
-    boxShadow: '0 24px 60px rgba(0,0,0,0.34)',
-  },
   state: state,
   render: function (s, self) {
     loadUsage();

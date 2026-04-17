@@ -7,11 +7,13 @@ import {
 import type {
     WindowBounds,
     ContextMenuEntry,
+    InitializeUiOptions,
     WindowDescriptor,
     WindowInitOptions,
     WindowLifecycleEvent,
     WindowProcessContext,
     WindowState,
+    WindowStyle,
     WindowSystemResult,
     WindowUiEvent,
     WindowUiNode,
@@ -125,9 +127,10 @@ class WindowManager {
 
         const frame = document.createElement('div');
         frame.className = options.useDefaultFrame === false ? 'window-frame window-frame-unstyled' : 'window-frame';
+        if (options.style) frame.classList.add('window-frame-custom');
 
         const titleBar = document.createElement('div');
-        titleBar.className = 'window-titlebar';
+        titleBar.className = options.style ? 'window-titlebar-custom' : 'window-titlebar';
 
         const titleLabel = document.createElement('div');
         titleLabel.className = 'window-title';
@@ -218,7 +221,7 @@ class WindowManager {
         return { success: true, data: windowId };
     }
 
-    initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[]): WindowSystemResult<string> {
+    initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[], options?: InitializeUiOptions): WindowSystemResult<string> {
         const descriptor = this.getOwnedWindow(processAppId, windowId);
         if (!descriptor.success) {
             return { success: false, error: descriptor.error };
@@ -239,6 +242,19 @@ class WindowManager {
             if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) {
                 focusCursorStart = activeEl.selectionStart;
                 focusCursorEnd = activeEl.selectionEnd;
+            }
+        }
+
+        // Save scroll positions before re-render
+        const scrollMap = new Map<string, { top: number; left: number }>();
+        let contentScroll: { top: number; left: number } | null = null;
+        if (options?.preserveScroll) {
+            contentScroll = { top: windowDescriptor.content.scrollTop, left: windowDescriptor.content.scrollLeft };
+            const scrollable = windowDescriptor.content.querySelectorAll<HTMLElement>('[data-control-id]');
+            for (const el of scrollable) {
+                if (el.scrollTop !== 0 || el.scrollLeft !== 0) {
+                    scrollMap.set(el.dataset.controlId!, { top: el.scrollTop, left: el.scrollLeft });
+                }
             }
         }
 
@@ -265,6 +281,21 @@ class WindowManager {
                 } else {
                     const inner = target.querySelector('input') as HTMLElement | null;
                     (inner ?? target).focus();
+                }
+            }
+        }
+
+        // Restore scroll positions
+        if (options?.preserveScroll) {
+            if (contentScroll) {
+                windowDescriptor.content.scrollTop = contentScroll.top;
+                windowDescriptor.content.scrollLeft = contentScroll.left;
+            }
+            for (const [controlId, scroll] of scrollMap) {
+                const el = nodeMap.get(controlId);
+                if (el) {
+                    el.scrollTop = scroll.top;
+                    el.scrollLeft = scroll.left;
                 }
             }
         }
@@ -379,6 +410,24 @@ class WindowManager {
 
         setTimeout(() => current.root.remove(), ANIM_CLOSE_MS);
 
+        return { success: true, data: windowId };
+    }
+
+    setWindowStyle(processAppId: string, windowId: string, style: WindowStyle): WindowSystemResult<string> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const current = descriptor.data!;
+        current.style = { ...current.style, ...style };
+        current.frame.classList.add('window-frame-custom');
+        const tb = current.frame.querySelector('.window-titlebar') as HTMLElement | null;
+        if (tb) {
+            tb.classList.remove('window-titlebar');
+            tb.classList.add('window-titlebar-custom');
+        }
+        this.applyWindowLayout(current);
         return { success: true, data: windowId };
     }
 
@@ -621,12 +670,6 @@ class WindowManager {
             width: DEFAULT_CONSOLE_WIDTH,
             height: DEFAULT_CONSOLE_HEIGHT,
             useDefaultFrame: true,
-            style: {
-                background: 'rgba(6, 8, 14, 0.98)',
-                color: '#c8d8e8',
-                border: '1px solid rgba(100, 160, 220, 0.18)',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
-            },
         });
 
         if (!result.success || !result.data) {
@@ -898,6 +941,13 @@ class WindowManager {
         }
         if (descriptor.style?.boxShadow) {
             descriptor.frame.style.boxShadow = descriptor.style.boxShadow;
+        }
+        // Apply titlebar custom styles
+        const tb = descriptor.frame.querySelector('.window-titlebar, .window-titlebar-custom') as HTMLElement | null;
+        if (tb && descriptor.style?.titlebar) {
+            if (descriptor.style.titlebar.background) tb.style.background = descriptor.style.titlebar.background;
+            if (descriptor.style.titlebar.color) tb.style.color = descriptor.style.titlebar.color;
+            if (descriptor.style.titlebar.borderBottom) tb.style.borderBottom = descriptor.style.titlebar.borderBottom;
         }
     }
 

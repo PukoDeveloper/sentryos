@@ -559,6 +559,15 @@ export interface WindowStyle {
   borderRadius?: string;
   border?: string;
   boxShadow?: string;
+  titlebar?: {
+    background?: string;
+    color?: string;
+    borderBottom?: string;
+  };
+}
+
+export interface InitializeUiOptions {
+  preserveScroll?: boolean;
 }
 
 export interface WindowInitOptions {
@@ -611,10 +620,11 @@ export interface ConsoleWindowController {
 export interface WindowManager {
   setWindowChangeListener(listener: (event: WindowLifecycleEvent) => void): void;
   createWindow(context: WindowProcessContext, options: WindowInitOptions): WindowSystemResult<string>;
-  initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[]): WindowSystemResult<string>;
+  initializeUi(processAppId: string, windowId: string, tree: WindowUiNode[], options?: InitializeUiOptions): WindowSystemResult<string>;
   updateUi(processAppId: string, windowId: string, nodeId: string, patch: WindowUiNodePatch): WindowSystemResult<string>;
   removeUiNode(processAppId: string, windowId: string, nodeId: string): WindowSystemResult<string>;
   appendUiNode(processAppId: string, windowId: string, parentId: string, nodes: WindowUiNode[]): WindowSystemResult<string>;
+  setWindowStyle(processAppId: string, windowId: string, style: WindowStyle): WindowSystemResult<string>;
   closeWindow(processAppId: string, windowId: string): WindowSystemResult<string>;
   minimizeWindow(processAppId: string, windowId: string): WindowSystemResult<string>;
   maximizeWindow(processAppId: string, windowId: string): WindowSystemResult<string>;

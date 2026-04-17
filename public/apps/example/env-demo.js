@@ -13,12 +13,6 @@ var app = UI.createApp({
   title: '環境變數範例',
   width: 500,
   height: 500,
-  style: {
-    background: 'linear-gradient(180deg, rgba(10, 14, 20, 0.96), rgba(6, 10, 14, 0.92))',
-    color: '#ecf4ff',
-    border: '1px solid rgba(118, 185, 255, 0.26)',
-    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.34)',
-  },
   state: {},
   render: function (state, self) {
     // 取得所有變數

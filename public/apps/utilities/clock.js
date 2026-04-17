@@ -18,9 +18,6 @@ function getDateString() {
   return d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日　星期' + DAYS[d.getDay()];
 }
 
-// ── Styles ───────────────────────────────────────────────────
-var bg = 'linear-gradient(180deg, rgba(10,14,20,0.97), rgba(6,10,14,0.94))';
-
 // ── Stopwatch state ─────────────────────────────────────────
 var swRunning = false;
 var swStart = 0;
@@ -39,12 +36,6 @@ var app = UI.createApp({
   title: '時鐘',
   width: 360,
   height: 480,
-  style: {
-    background: bg,
-    color: '#ecf4ff',
-    border: '1px solid rgba(118,185,255,0.26)',
-    boxShadow: '0 24px 60px rgba(0,0,0,0.34)',
-  },
   state: {},
   render: function (s, self) {
     var swBtnStyle = {

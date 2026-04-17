@@ -14,10 +14,9 @@ type ApplicationCatalogResult<TData> = Result<TData, ApplicationCatalogError> & 
 /** 新格式：套件清單，每個套件可包含多個應用程式 */
 type PackageManifest = {
     name: string;
-    version: string;
+    version?: string;
     description?: string;
     author?: string;
-    permissions?: string[];
     apps: AppEntryManifest[];
 };
 
@@ -32,6 +31,7 @@ type AppEntryManifest = {
     id: string;
     name: string;
     main: string;
+    version?: string;
     type?: AppType;
     icon?: string;
     permissions?: string[];
@@ -153,8 +153,7 @@ function isPackageManifest(raw: unknown): raw is PackageManifest {
     if (typeof raw !== 'object' || raw === null) return false;
     const obj = raw as Record<string, unknown>;
     return Array.isArray(obj.apps)
-        && typeof obj.name === 'string'
-        && typeof obj.version === 'string';
+        && typeof obj.name === 'string';
 }
 
 function isLegacyManifest(raw: unknown): raw is LegacyManifest {
@@ -198,8 +197,8 @@ function toRegisteredApp(pkg: PackageManifest, entry: AppEntryManifest, basePath
     const runtimeType: AppType = entry.type ?? 'Window';
     return {
         name: entry.name,
-        version: pkg.version,
-        permissions: entry.permissions ?? pkg.permissions ?? [],
+        version: entry.version ?? pkg.version ?? '1.0.0',
+        permissions: entry.permissions ?? [],
         maxInstances: entry.maxInstances,
         packageName: pkg.name,
         manifestId: entry.id,

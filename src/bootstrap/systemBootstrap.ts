@@ -141,6 +141,16 @@ async function bootstrapSystem(): Promise<void> {
 
   desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 
+  // Restore persisted theme settings
+  {
+    const fs = kernel.resolve('fileSystem');
+    const sysId = kernel.get('systemAppId');
+    const savedTheme = fs.read(sysId, 'sys', 'system-theme');
+    if (savedTheme.success && savedTheme.data) {
+      desktopShell.applyTheme(savedTheme.data.data as Parameters<typeof desktopShell.applyTheme>[0]);
+    }
+  }
+
   // Register notification overlay
   const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });

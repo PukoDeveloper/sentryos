@@ -37,6 +37,11 @@ var win = OS.ui.createWindow({
     background: 'rgba(10, 14, 20, 0.96)',
     color: '#ecf4ff',
     border: '1px solid rgba(118, 185, 255, 0.26)',
+    titlebar: {
+      background: 'rgba(255, 255, 255, 0.05)',
+      color: '#d8e8ff',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    },
   }
 });
 
@@ -47,11 +52,11 @@ var count = 0;
 function render() {
   if (!win.success) return;
   OS.ui.initialize(win.data, [
-    OS.ui.stack({ children: [
-      OS.ui.label({ text: 'Count: ' + count }),
-      OS.ui.button({ id: 'increment', text: '+1' }),
-    ], style: { padding: '16px', gap: '8px' } })
-  ]);
+    OS.ui.stack([
+      OS.ui.label('Count: ' + count),
+      OS.ui.button('+1', undefined, 'increment'),
+    ], { padding: '16px', gap: '8px' })
+  ], { preserveScroll: true });
 }
 
 // 4. 初始渲染
@@ -209,7 +214,7 @@ globalThis.__commands['fib'] = function(args) {
 所有 UI 以純資料節點描述，每次狀態變更時呼叫 `render()` 重新建立完整 UI tree 並交由 `OS.ui.initialize()` 替換 DOM。
 
 ```
-  狀態變更 → render() → OS.ui.initialize(windowId, newTree) → DOM 更新
+  狀態變更 → render() → OS.ui.initialize(windowId, newTree, { preserveScroll: true }) → DOM 更新
 ```
 
 **優點**：
@@ -217,15 +222,18 @@ globalThis.__commands['fib'] = function(args) {
 - 無需手動操作 DOM
 - 邏輯簡單可預測
 
-**注意**：每次 `OS.ui.initialize()` 都會完全替換 `.window-content` 下的所有子元素。
+**注意**：
+- 每次 `OS.ui.initialize()` 都會完全替換 `.window-content` 下的所有子元素
+- 傳入 `{ preserveScroll: true }` 可在重新渲染時保留捲動位置，避免使用者體驗中斷
+- stdlib 的 `UI.createApp` 在 `rerender()` 時會自動啟用 `preserveScroll`
 
 ### 事件 ID 匹配
 
-透過 `OS.ui.button({ id, text })` 的 `id` 屬性指定控制項 ID，在 `onWindowEvent` 中以 `event.controlId` 比對。
+透過 `OS.ui.button(text, style?, id?)` 的 `id` 參數指定控制項 ID，在 `onWindowEvent` 中以 `event.controlId` 比對。
 
 ```javascript
 // 建立按鈕時指定 id
-OS.ui.button({ id: 'submit-btn', text: 'Submit' })
+OS.ui.button('Submit', undefined, 'submit-btn')
 
 // 事件處理時比對
 globalThis.onWindowEvent = function(event) {
@@ -300,14 +308,14 @@ var log = [];
 function render() {
   if (!win.success) return;
   OS.ui.initialize(win.data, [
-    OS.ui.stack({ children: [
-      OS.ui.label({ text: log.join('\n') || '(no actions yet)' }),
-      OS.ui.stack({ children: [
-        OS.ui.button({ id: 'action-a', text: 'Action A' }),
-        OS.ui.button({ id: 'action-b', text: 'Action B' }),
-        OS.ui.button({ id: 'clear', text: 'Clear' }),
-      ], style: { flexDirection: 'row', gap: '8px' } })
-    ], style: { padding: '16px', gap: '12px' } })
+    OS.ui.stack([
+      OS.ui.label(log.join('\n') || '(no actions yet)'),
+      OS.ui.stack([
+        OS.ui.button('Action A', undefined, 'action-a'),
+        OS.ui.button('Action B', undefined, 'action-b'),
+        OS.ui.button('Clear', undefined, 'clear'),
+      ], { flexDirection: 'row', gap: '8px' })
+    ], { padding: '16px', gap: '12px' })
   ]);
 }
 

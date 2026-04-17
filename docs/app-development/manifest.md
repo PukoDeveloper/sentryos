@@ -9,18 +9,17 @@
 ```json
 {
   "name": "my-package",
-  "version": "1.0.0",
   "description": "套件說明",
   "author": "Author Name",
-  "permissions": ["file.read.app", "file.write.app"],
   "apps": [
     {
       "id": "my-app",
       "name": "My App",
+      "version": "1.0.0",
       "main": "main.js",
       "type": "Window",
       "icon": "icon.svg",
-      "permissions": ["window.create"],
+      "permissions": ["window.create", "file.read.app"],
       "maxInstances": 0,
       "autoStart": false,
       "hidden": false,
@@ -44,10 +43,9 @@
 | 欄位 | 型別 | 必填 | 說明 |
 |------|------|------|------|
 | `name` | string | ✓ | 套件名稱 |
-| `version` | string | ✓ | 版本號 |
+| `version` | string | | 套件版本號（選填，僅供參考） |
 | `description` | string | | 套件說明 |
 | `author` | string | | 作者 |
-| `permissions` | string[] | | 套件層級預設權限（各 app 未定義時繼承） |
 | `apps` | AppEntry[] | ✓ | 包含的應用程式列表 |
 
 **應用程式層級：**
@@ -56,10 +54,11 @@
 |------|------|------|--------|------|
 | `id` | string | ✓ | | 應用程式 ID（manifest 內唯一） |
 | `name` | string | ✓ | | 顯示名稱 |
+| `version` | string | | `'1.0.0'` | 應用程式版本號 |
 | `main` | string | ✓ | | 主程式檔案路徑 |
 | `type` | AppType | | `'Window'` | 應用程式類型 |
 | `icon` | string | | | 圖示檔案路徑 |
-| `permissions` | string[] | | 繼承套件 | 應用程式專屬權限 |
+| `permissions` | string[] | | `[]` | 應用程式權限列表 |
 | `maxInstances` | number | | 不限 | 最大實例數（1 = 單例） |
 | `autoStart` | boolean | | Service/Library: true | 是否自動啟動 |
 | `hidden` | boolean | | `false` | 隱藏於啟動選單 |
@@ -101,8 +100,8 @@ type AppType = 'Service' | 'Window' | 'Console' | 'Library';
 
 ---
 
-## 權限繼承
+## 權限
 
-解析順序：`app.permissions` → `package.permissions` → `[]`
+每個 app 自行宣告所需權限，不再從套件層級繼承。
 
-若 app 層級有定義 `permissions`，則忽略套件層級。
+若 app 未定義 `permissions`，預設為空陣列 `[]`。

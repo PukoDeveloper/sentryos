@@ -16,11 +16,27 @@ type ThemeSettings = {
   tint?: string;
   accentPrimary?: string;
   accentSecondary?: string;
+  accentMode?: 'dark' | 'light';
   taskbarOpacity?: number;
   taskbarMode?: TaskbarMode;
   startMenuWidth?: number;
   startMenuHeight?: number;
   startMenuGroupByPackage?: boolean;
+  // ── Color tokens ───────────────────────────────────────
+  colorSurface?: string;
+  colorSurfaceAlt?: string;
+  colorSurfaceInput?: string;
+  colorSurfaceHover?: string;
+  colorBorder?: string;
+  colorBorderFocus?: string;
+  colorText?: string;
+  colorTextSecondary?: string;
+  colorAccent?: string;
+  colorAccentGlow?: string;
+  colorShadow?: string;
+  colorShadowHeavy?: string;
+  colorTaskbar?: string;
+  colorTaskbarBorder?: string;
 };
 
 type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
@@ -353,10 +369,66 @@ class DesktopShell {
     }
     if (theme.accentPrimary !== undefined && theme.accentSecondary !== undefined && this.startButtonEl) {
       this.startButtonEl.style.background = `linear-gradient(135deg, ${theme.accentPrimary}, ${theme.accentSecondary})`;
+      // Derive system-wide color tokens from accent, giving all surfaces a cohesive tint
+      const hex = theme.accentPrimary.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        const root = document.documentElement;
+        const light = theme.accentMode === 'light';
+        if (light) {
+          // Light mode: bright surfaces tinted with accent
+          const sr = Math.round(245 + (r - 245) * 0.06);
+          const sg = Math.round(245 + (g - 245) * 0.06);
+          const sb = Math.round(245 + (b - 245) * 0.06);
+          root.style.setProperty('--sos-color-surface',        `rgba(${sr}, ${sg}, ${sb}, 0.86)`);
+          // Titlebar: blend accent into a lighter base for visible contrast
+          const tr = Math.round(230 + (r - 230) * 0.50);
+          const tg = Math.round(230 + (g - 230) * 0.50);
+          const tb = Math.round(230 + (b - 230) * 0.50);
+          root.style.setProperty('--sos-color-surface-alt',    `rgb(${tr}, ${tg}, ${tb})`);
+          root.style.setProperty('--sos-color-surface-input',  `rgba(${r}, ${g}, ${b}, 0.08)`);
+          root.style.setProperty('--sos-color-surface-hover',  `rgba(${r}, ${g}, ${b}, 0.12)`);
+          root.style.setProperty('--sos-color-border',         `rgba(${r}, ${g}, ${b}, 0.20)`);
+          root.style.setProperty('--sos-color-border-focus',   `rgba(${r}, ${g}, ${b}, 0.50)`);
+          root.style.setProperty('--sos-color-text',           '#1a1a2e');
+          root.style.setProperty('--sos-color-text-secondary', 'rgba(0, 0, 0, 0.45)');
+          root.style.setProperty('--sos-color-accent',         theme.accentSecondary);
+          root.style.setProperty('--sos-color-accent-glow',    `rgba(${r}, ${g}, ${b}, 0.25)`);
+          root.style.setProperty('--sos-color-shadow',         `rgba(${r}, ${g}, ${b}, 0.12)`);
+          root.style.setProperty('--sos-color-shadow-heavy',   `rgba(${r}, ${g}, ${b}, 0.22)`);
+          root.style.setProperty('--sos-color-taskbar',        `rgba(${sr}, ${sg}, ${sb}, 0.82)`);
+          root.style.setProperty('--sos-color-taskbar-border', `rgba(${r}, ${g}, ${b}, 0.15)`);
+        } else {
+          // Dark mode: dark surfaces tinted with accent
+          const dr = Math.round(r * 0.08);
+          const dg = Math.round(g * 0.08);
+          const db = Math.round(b * 0.08);
+          root.style.setProperty('--sos-color-surface',        `rgba(${dr}, ${dg}, ${db}, 0.92)`);
+          root.style.setProperty('--sos-color-surface-alt',    `rgba(${r}, ${g}, ${b}, 0.07)`);
+          root.style.setProperty('--sos-color-surface-input',  `rgba(${r}, ${g}, ${b}, 0.06)`);
+          root.style.setProperty('--sos-color-surface-hover',  `rgba(${r}, ${g}, ${b}, 0.10)`);
+          root.style.setProperty('--sos-color-border',         `rgba(${r}, ${g}, ${b}, 0.18)`);
+          root.style.setProperty('--sos-color-border-focus',   `rgba(${r}, ${g}, ${b}, 0.42)`);
+          root.style.setProperty('--sos-color-text',           '#f4f7fb');
+          root.style.setProperty('--sos-color-text-secondary', 'rgba(255, 255, 255, 0.3)');
+          root.style.setProperty('--sos-color-accent',         theme.accentPrimary);
+          root.style.setProperty('--sos-color-accent-glow',    `rgba(${r}, ${g}, ${b}, 0.35)`);
+          root.style.setProperty('--sos-color-shadow',         `rgba(${dr}, ${dg}, ${db}, 0.35)`);
+          root.style.setProperty('--sos-color-shadow-heavy',   `rgba(${dr}, ${dg}, ${db}, 0.50)`);
+          root.style.setProperty('--sos-color-taskbar-border', `rgba(${r}, ${g}, ${b}, 0.18)`);
+        }
+      }
     }
-    if (theme.taskbarOpacity !== undefined && this.taskbarEl) {
+    if (theme.taskbarOpacity !== undefined) {
       const opacity = Math.max(0, Math.min(1, theme.taskbarOpacity));
-      this.taskbarEl.style.background = `rgba(7, 12, 20, ${opacity})`;
+      const mode = theme.accentMode ?? this.currentTheme.accentMode;
+      if (mode === 'light') {
+        document.documentElement.style.setProperty('--sos-color-taskbar', `rgba(240, 240, 245, ${opacity})`);
+      } else {
+        document.documentElement.style.setProperty('--sos-color-taskbar', `rgba(7, 12, 20, ${opacity})`);
+      }
     }
     if (theme.startMenuWidth !== undefined && this.startPanel) {
       const w = Math.max(280, Math.min(640, theme.startMenuWidth));
@@ -372,6 +444,32 @@ class DesktopShell {
     if (theme.startMenuGroupByPackage !== undefined) {
       this.expandedPackage = null;
     }
+
+    // ── Apply color tokens as CSS variables ──────────────
+    const colorMap: [keyof ThemeSettings, string][] = [
+      ['colorSurface',       '--sos-color-surface'],
+      ['colorSurfaceAlt',    '--sos-color-surface-alt'],
+      ['colorSurfaceInput',  '--sos-color-surface-input'],
+      ['colorSurfaceHover',  '--sos-color-surface-hover'],
+      ['colorBorder',        '--sos-color-border'],
+      ['colorBorderFocus',   '--sos-color-border-focus'],
+      ['colorText',          '--sos-color-text'],
+      ['colorTextSecondary', '--sos-color-text-secondary'],
+      ['colorAccent',        '--sos-color-accent'],
+      ['colorAccentGlow',    '--sos-color-accent-glow'],
+      ['colorShadow',        '--sos-color-shadow'],
+      ['colorShadowHeavy',   '--sos-color-shadow-heavy'],
+      ['colorTaskbar',       '--sos-color-taskbar'],
+      ['colorTaskbarBorder', '--sos-color-taskbar-border'],
+    ];
+    const root = document.documentElement;
+    for (const [key, cssVar] of colorMap) {
+      const val = theme[key];
+      if (typeof val === 'string') {
+        root.style.setProperty(cssVar, val);
+      }
+    }
+
     Object.assign(this.currentTheme, theme);
     if (theme.startMenuGroupByPackage !== undefined) {
       this.renderStartMenu();

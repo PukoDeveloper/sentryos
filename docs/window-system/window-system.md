@@ -49,8 +49,15 @@ interface WindowStyle {
   borderRadius?: string;
   border?: string;
   boxShadow?: string;
+  titlebar?: {
+    background?: string;
+    color?: string;
+    borderBottom?: string;
+  };
 }
 ```
+
+`titlebar` 子物件用於自訂標題列樣式。當透過 `setWindowStyle()` 設定時，視窗會被標記為自訂樣式模式，不再套用系統預設的聚焦/失焦效果。
 
 ---
 
@@ -64,6 +71,18 @@ interface WindowBounds {
   y: number;
 }
 ```
+
+---
+
+## InitializeUiOptions
+
+```typescript
+interface InitializeUiOptions {
+  preserveScroll?: boolean;   // 重新初始化時保留捲動位置
+}
+```
+
+傳递給 `OS.ui.initialize()` 的第三個參數。當 `preserveScroll` 為 `true` 時，重新渲染會保留視窗內容區的捲動位置。stdlib 的 `UI.createApp` 在 `rerender()` 時會自動啟用此選項。
 
 ---
 

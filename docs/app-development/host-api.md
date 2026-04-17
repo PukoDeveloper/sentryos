@@ -215,6 +215,11 @@ const result = OS.ui.createWindow({
   style: {                // 選填，視窗外框樣式
     background: '#1a1f2a',
     color: '#fff',
+    titlebar: {           // 選填，自訂標題列樣式
+      background: 'rgba(255, 255, 255, 0.05)',
+      color: '#d8e8ff',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    },
   }
 });
 // result: { success: true, data: 'win_xxxxx' }
@@ -222,17 +227,28 @@ const result = OS.ui.createWindow({
 
 > **速率限制**：每個程序每秒最多建立 10 個視窗，超過回傳 `RateLimitExceeded`。
 
-### initialize(windowId, tree)
+### initialize(windowId, tree, options?)
 
 以 UI node 陣列初始化（或替換）視窗內容。每次呼叫會完全替換 `.window-content` 下的所有子元素。
 
 ```javascript
 OS.ui.initialize(windowId, [
-  OS.ui.panel({ id: 'main', children: [
-    OS.ui.label({ id: 'title', text: 'Hello World' }),
-    OS.ui.button({ id: 'btn', text: 'Click Me' }),
-  ]})
+  OS.ui.panel([
+    OS.ui.label('Hello World', undefined, 'title'),
+    OS.ui.button('Click Me', undefined, 'btn'),
+  ], undefined, 'main')
 ]);
+```
+
+**options**（選填）：
+
+| 屬性 | 型別 | 說明 |
+|------|------|------|
+| `preserveScroll` | `boolean` | 若為 `true`，重新初始化時保留捲動位置。適合頻繁 re-render 的場景 |
+
+```javascript
+// 保留捲動位置的重新渲染
+OS.ui.initialize(windowId, newTree, { preserveScroll: true });
 ```
 
 ### update(windowId, nodeId, patch)
@@ -269,9 +285,44 @@ OS.ui.update(windowId, 'btn', { style: { color: 'red' } });
 
 ```javascript
 OS.ui.append(windowId, 'main', [
-  OS.ui.label({ id: 'new-item', text: 'Added!' })
+  OS.ui.label('Added!', undefined, 'new-item')
 ]);
 ```
+
+### setWindowStyle(windowId, style)
+
+動態更新視窗外框樣式。需要 `window.create` 權限。
+
+```javascript
+OS.ui.setWindowStyle(windowId, {
+  background: 'rgba(20, 26, 40, 0.98)',
+  color: '#ecf4ff',
+  border: '1px solid rgba(118, 185, 255, 0.3)',
+  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+  borderRadius: '16px',
+  titlebar: {
+    background: 'rgba(255, 255, 255, 0.05)',
+    color: '#d8e8ff',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+});
+```
+
+**WindowStyle 屬性**：
+
+| 屬性 | 型別 | 說明 |
+|------|------|------|
+| `background` | `string?` | 視窗背景 |
+| `color` | `string?` | 視窗文字色彩 |
+| `borderRadius` | `string?` | 邊角圓角 |
+| `border` | `string?` | 邊框 |
+| `boxShadow` | `string?` | 陰影 |
+| `titlebar` | `object?` | 標題列自訂樣式 |
+| `titlebar.background` | `string?` | 標題列背景 |
+| `titlebar.color` | `string?` | 標題列文字色彩 |
+| `titlebar.borderBottom` | `string?` | 標題列下邊框 |
+
+> 呼叫 `setWindowStyle()` 會將視窗標記為自訂樣式模式（`.window-frame-custom`），不再套用系統預設的聚焦/失焦邊框與陰影效果。
 
 ### showContextMenu(windowId, controlId, x, y, items)
 
@@ -294,18 +345,18 @@ OS.ui.showContextMenu(windowId, 'file-list', event.x, event.y, [
 透過 `UiComponentRegistry` 動態註冊的節點建構函式。內建元件：
 
 ```javascript
-OS.ui.label({ id, text, style, events })
-OS.ui.button({ id, text, style, events, eventType })
-OS.ui.panel({ id, children, style, events })
-OS.ui.stack({ id, children, style, events })
-OS.ui.input({ id, value, placeholder, style, events })
-OS.ui.textarea({ id, value, placeholder, rows, style, events })
-OS.ui.checkbox({ id, checked, label, style, events })
-OS.ui.select({ id, options: [{value, label}], value, style, events })
-OS.ui.image({ id, src, alt, style, events })
-OS.ui.separator({ id, style })
-OS.ui.progress({ id, value, color, style })
-OS.ui.list({ id, children, style, events })
+OS.ui.label(text, style?, id?, events?)
+OS.ui.button(text, style?, id?)
+OS.ui.panel(children, style?, id?, events?)
+OS.ui.stack(children, style?, id?, events?)
+OS.ui.input(value?, placeholder?, style?, id?)
+OS.ui.textarea(value?, placeholder?, rows?, style?, id?)
+OS.ui.checkbox(checked?, label?, style?, id?)
+OS.ui.select(options, value?, style?, id?)
+OS.ui.image(src, alt?, style?, id?)
+OS.ui.separator(style?, id?)
+OS.ui.progress(value, color?, style?, id?)
+OS.ui.list(children, style?, id?, events?)
 ```
 
 > 插件可透過 `context.registerUiComponent()` 新增自訂元件類型。
@@ -999,10 +1050,25 @@ var result = OS.dialog.pickFile({
   mode: 'file',           // 'file' | 'folder' | 'save'
   title: '選擇檔案',
   extensions: ['.txt', '.md'],  // 選填，篩選副檔名
-  defaultPath: '/docs',         // 選填，預設路徑
+  defaultPath: 'docs/readme.md', // 選填，預設路徑（save 模式下自動填入檔名）
 });
 // { success: true, data: dialogId }
 ```
+
+| 參數 | 型別 | 說明 |
+|------|------|------|
+| `mode` | `'file' \| 'folder' \| 'save'` | 對話框模式，預設 `'file'` |
+| `title` | `string?` | 對話框標題 |
+| `extensions` | `string[]?` | 篩選副檔名，例如 `['.txt', '.md']` |
+| `defaultPath` | `string?` | 預設路徑。在 `save` 模式下，系統會自動取出檔名部分填入儲存欄位 |
+
+**模式說明**：
+
+| 模式 | 行為 |
+|------|------|
+| `'file'` | 瀏覽並選擇單一檔案 |
+| `'folder'` | 瀏覽並選擇資料夾（命名空間） |
+| `'save'` | 輸入（或選擇）檔案名稱進行儲存。支援新增資料夾。若提供 `defaultPath`，會預先填入檔名 |
 
 使用者選擇結果透過 `globalThis.onDialogResult` 回呼接收：
 
@@ -1015,6 +1081,26 @@ globalThis.onDialogResult = function(result) {
   }
 };
 ```
+
+**Save 模式完整範例**：
+
+```javascript
+// 開啟儲存對話框，預設檔名為 'document.txt'
+OS.dialog.pickFile({
+  mode: 'save',
+  title: '儲存檔案',
+  extensions: ['.txt', '.md'],
+  defaultPath: 'document.txt',
+});
+
+globalThis.onDialogResult = function(result) {
+  if (result.cancelled) return;
+  var savePath = result.tier + ':' + result.path;
+  OS.storage.writeFile(savePath, myContent, { overwrite: true });
+};
+```
+
+> **注意**：Save 模式下使用者可以在對話框中新增資料夾，方便在儲存前建立目錄結構。
 
 ---
 

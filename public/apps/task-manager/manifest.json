@@ -1,12 +1,12 @@
 {
     "name": "工作管理員",
-    "version": "1.0.0",
     "description": "系統級工作管理員，檢視與管理所有執行中的程序。",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "task-manager-app",
             "name": "工作管理員",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Window",
             "icon": "icon.svg",

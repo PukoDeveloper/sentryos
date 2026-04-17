@@ -1,12 +1,12 @@
 {
     "name": "Settings",
-    "version": "1.0.0",
-    "description": "SentryOS system settings – wallpaper, accent colour, taskbar opacity.",
+    "description": "SentryOS system settings \u2013 wallpaper, accent colour, taskbar opacity.",
     "author": "SentryOS Team",
     "apps": [
         {
             "id": "settings-app",
             "name": "系統設定",
+            "version": "1.0.0",
             "main": "main.js",
             "type": "Window",
             "icon": "icon.svg",

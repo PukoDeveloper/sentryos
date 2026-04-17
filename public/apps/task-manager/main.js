@@ -5,12 +5,6 @@ var win = OS.ui.createWindow({
   height: 540,
   useDefaultFrame: true,
   resizable: true,
-  style: {
-    background: 'linear-gradient(180deg, rgba(8, 12, 20, 0.97), rgba(4, 8, 14, 0.95))',
-    color: '#d8e8ff',
-    border: '1px solid rgba(74, 144, 217, 0.22)',
-    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.4)',
-  }
 });
 
 var activeTab = 'processes';
