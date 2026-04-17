@@ -2,12 +2,12 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerEnvApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const environmentManager = kernel.resolve('environmentManager');
   const catalogApps = kernel.get('catalogApps');
 
-  runtime.registerApi('envApi', ({ pid, process }) => ({
+  runtimeRegistry.registerApi('envApi', ({ pid, process }) => ({
     getVariable: (key: string) => {
       if (!permissions.has(process.processAppId, Permissions.ENV_READ)) {
         return { success: false, error: 'PermissionDenied' };
@@ -57,7 +57,7 @@ export function registerEnvApi(kernel: Kernel): void {
       // Library files may contain `export` declarations for import-mode
       // compatibility; these are invalid in evalCode (script context).
       const scriptCode = code.replace(/^export\s+(var|const|let|function|class|default)\b[^\n]*/gm, '');
-      return runtime.evaluateInContext(pid, scriptCode);
+      return runtimeRegistry.getForPid(pid).evaluateInContext(pid, scriptCode);
     },
     listLibraries: () => {
       return { success: true, data: environmentManager.getLibraryIds() };

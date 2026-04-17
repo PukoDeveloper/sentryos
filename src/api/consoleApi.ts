@@ -38,11 +38,11 @@ const ANSI_CODES: Record<string, string> = {
 };
 
 export function registerConsoleApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const launcher = kernel.resolve('applicationLauncher');
 
-  runtime.registerApi('consoleApi', ({ process }) => {
+  runtimeRegistry.registerApi('consoleApi', ({ process }) => {
     const controller = launcher.getConsoleControllers().get(process.processAppId);
     return {
       writeLine: (text: unknown) => {

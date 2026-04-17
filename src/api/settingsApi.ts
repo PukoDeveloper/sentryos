@@ -10,7 +10,7 @@ const LANGUAGE_SETTINGS_KEY = 'system-language';
 const SETTINGS_TIER = 'sys' as const;
 
 export function registerSettingsApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const desktopShell = kernel.resolve('desktopShell');
   const fileSystem = kernel.resolve('fileSystem');
@@ -24,7 +24,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
 
-  runtime.registerApi('settingsApi', ({ process }) => ({
+  runtimeRegistry.registerApi('settingsApi', ({ process }) => ({
     getTheme: () => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
         return { success: false, error: 'PermissionDenied' };

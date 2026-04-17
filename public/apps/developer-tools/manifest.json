@@ -23,6 +23,17 @@
             "permissions": [
                 "*"
             ]
+        },
+        {
+            "id": "lua-tester",
+            "name": "Lua 測試器",
+            "main": "luatest.lua",
+            "type": "Console",
+            "icon": "icon.svg",
+            "permissions": [
+                "*"
+            ],
+            "engine": "lua"
         }
     ]
 }

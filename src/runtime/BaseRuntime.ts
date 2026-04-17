@@ -26,7 +26,8 @@ abstract class BaseRuntime implements IRuntime {
      *  子類別可在同一個 Map 中存放更豐富的物件（例如 RuntimeProcess），
      *  因為它們結構上是 BaseProcessState 的超集。 */
     protected readonly processStates: Map<number, BaseProcessState> = new Map();
-    private readonly apiEntries: Map<string, { factory: ApiFactory; gates: string[]; group?: string }> = new Map();
+    /** 引擎內建 API（process, event, ipc 等依賴 runtime 實例狀態的 API） */
+    private readonly builtinApiEntries: Map<string, { factory: ApiFactory; gates: string[]; group?: string }> = new Map();
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
@@ -41,14 +42,11 @@ abstract class BaseRuntime implements IRuntime {
     protected get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
     protected get environmentManager() { return this.kernel.resolve('environmentManager'); }
 
-    // ── IRuntime: API 管理 ──────────────────────────────────
+    // ── 內建 API 註冊（僅供 registerBuiltinApis 使用）───────
 
-    registerApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
-        this.apiEntries.set(name, { factory, gates, group });
-    }
-
-    unregisterApi(name: string): boolean {
-        return this.apiEntries.delete(name);
+    /** 註冊引擎內建 API（依賴 runtime 實例狀態，不進入中央註冊表）。 */
+    private registerBuiltinApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
+        this.builtinApiEntries.set(name, { factory, gates, group });
     }
 
     // ── IRuntime: 抽象方法（由引擎子類別實作）──────────────
@@ -99,7 +97,7 @@ abstract class BaseRuntime implements IRuntime {
     // ── 內建 API 註冊 ───────────────────────────────────────
 
     private registerBuiltinApis(): void {
-        this.registerApi('process', ({ pid, process }) => ({
+        this.registerBuiltinApi('process', ({ pid, process }) => ({
             pid,
             appDefId: process.appDefId,
             appId: process.processAppId,
@@ -143,21 +141,21 @@ abstract class BaseRuntime implements IRuntime {
                 this.processManager.terminate(process.processAppId, targetPid),
         }));
 
-        this.registerApi('event', ({ pid, process }) => ({
+        this.registerBuiltinApi('event', ({ pid, process }) => ({
             subscribe: (eventName: string) => this.subscribeProcessEvent(pid, process.processAppId, eventName),
             unsubscribe: (eventName: string) => this.unsubscribeProcessEvent(pid, process.processAppId, eventName),
             emit: (eventName: string, payload?: unknown): EventBusResult =>
                 this.eventBus.emit(process.processAppId, eventName, payload)
         }));
 
-        this.registerApi('ipc', ({ pid, process }) => ({
+        this.registerBuiltinApi('ipc', ({ pid, process }) => ({
             sendToParent: (payload: unknown) => this.sendToParent(process, payload),
             sendToChild: (childPid: number, payload: unknown) => this.sendToChild(process, childPid, payload),
             broadcastChildren: (payload: unknown) => this.broadcastChildren(process, payload),
             receive: () => this.readInbox(pid)
         }));
 
-        this.registerApi('serviceApi', ({ pid, process }) => ({
+        this.registerBuiltinApi('serviceApi', ({ pid, process }) => ({
             publishHealth: (health: unknown) => {
                 if (!this.permissions.has(process.processAppId, Permissions.SERVICE_PUBLISH_HEALTH)) {
                     return { success: false, error: 'PermissionDenied' };
@@ -169,7 +167,7 @@ abstract class BaseRuntime implements IRuntime {
             }
         }), ['service'], 'service');
 
-        this.registerApi('windowApi', ({ pid, process }) => ({
+        this.registerBuiltinApi('windowApi', ({ pid, process }) => ({
             postUiEvent: (name: string, payload?: unknown) =>
                 this.eventBus.emit(process.processAppId, Events.WINDOW_UI, {
                     pid,
@@ -178,7 +176,7 @@ abstract class BaseRuntime implements IRuntime {
                 })
         }), ['window'], 'window');
 
-        this.registerApi('consoleApi', ({ pid, process }) => ({
+        this.registerBuiltinApi('consoleApi', ({ pid, process }) => ({
             writeLine: (text: unknown) => {
                 if (!this.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
                     return { success: false, error: 'PermissionDenied' };
@@ -195,7 +193,8 @@ abstract class BaseRuntime implements IRuntime {
 
     // ── API 表面建構 ────────────────────────────────────────
 
-    /** 根據程序的權限建構完整的 Host API 表面（純 JS 物件，引擎無關）。 */
+    /** 根據程序的權限建構完整的 Host API 表面（純 JS 物件，引擎無關）。
+     *  合併來源：引擎內建 API（builtinApiEntries）+ 中央 Host API（RuntimeRegistry.hostApiEntries）。 */
     protected buildApiSurface(process: ProcessView): Record<string, HostApiValue> {
         const ctx: ApiFactoryContext = {
             pid: process.pid,
@@ -203,7 +202,13 @@ abstract class BaseRuntime implements IRuntime {
         };
         const merged: Record<string, HostApiValue> = {};
 
-        for (const [name, { factory, gates, group }] of this.apiEntries) {
+        // 合併引擎內建 API + 中央 Host API（中央 API 優先覆蓋同名內建 API）
+        const allEntries: [string, { factory: ApiFactory; gates: string[]; group?: string }][] = [
+            ...this.builtinApiEntries,
+            ...this.kernel.resolve('runtimeRegistry').getHostApiEntries(),
+        ];
+
+        for (const [name, { factory, gates, group }] of allEntries) {
             if (gates.length > 0 && !gates.some(g => this.permissions.hasAnyUnder(process.processAppId, g))) {
                 continue;
             }

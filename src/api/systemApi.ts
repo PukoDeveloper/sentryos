@@ -2,12 +2,12 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerSystemApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const processManager = kernel.resolve('processManager');
   const launcher = kernel.resolve('applicationLauncher');
 
-  runtime.registerApi('systemApi', ({ pid, process }) => ({
+  runtimeRegistry.registerApi('systemApi', ({ pid, process }) => ({
     terminateProcess: (targetPid: number) => {
       if (!permissions.has(process.processAppId, Permissions.PROCESS_TERMINATE)) {
         return { success: false, error: 'PermissionDenied' };

@@ -5,7 +5,7 @@ const NETWORK_SETTINGS_KEY = 'network-settings';
 const NETWORK_TIER = 'sys' as const;
 
 export function registerNetworkApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const networkManager = kernel.resolve('networkManager');
   const fileSystem = kernel.resolve('fileSystem');
@@ -18,7 +18,7 @@ export function registerNetworkApi(kernel: Kernel): void {
     }
   }
 
-  runtime.registerApi('networkApi', ({ process }) => ({
+  runtimeRegistry.registerApi('networkApi', ({ process }) => ({
     // ── Request ──────────────────────────────────────────────
     request: async (url: unknown, options?: Record<string, unknown>) => {
       if (!permissions.has(process.processAppId, Permissions.NETWORK_REQUEST)) {

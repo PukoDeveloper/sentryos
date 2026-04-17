@@ -66,7 +66,7 @@ function stripNamespaceFromKey(key: string, namespace: string, tier: StorageTier
 }
 
 export function registerStorageApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const fileSystem = kernel.resolve('fileSystem');
   const catalogApps = kernel.get('catalogApps');
@@ -77,7 +77,7 @@ export function registerStorageApi(kernel: Kernel): void {
     return entry?.manifestId ?? appDefId;
   }
 
-  runtime.registerApi('storageApi', ({ process }) => {
+  runtimeRegistry.registerApi('storageApi', ({ process }) => {
     const appId = process.processAppId;           // 權限檢查用
     const storageId = resolveStorageId(process.appDefId);  // 儲存命名空間用
 

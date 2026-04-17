@@ -2,11 +2,11 @@ import type { Kernel } from '../kernel/Kernel';
 import { Permissions } from '../kernel/constants';
 
 export function registerRegistryApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const registry = kernel.resolve('systemRegistry');
 
-  runtime.registerApi('registryApi', ({ process }) => ({
+  runtimeRegistry.registerApi('registryApi', ({ process }) => ({
     /** 取得某系統角色的預設應用程式 appDefId */
     getDefaultApp: (role: unknown) => {
       if (!permissions.has(process.processAppId, Permissions.REGISTRY_READ)) {

@@ -3,13 +3,13 @@ import { Permissions, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT } from '../ker
 import { uiComponentRegistry } from '../window/UiComponentRegistry';
 
 export function registerUiApi(kernel: Kernel): void {
-  const runtime = kernel.resolve('runtime');
+  const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
   const appManager = kernel.resolve('appManager');
   const windowManager = kernel.resolve('windowManager');
   const iconMap = kernel.get('iconMap');
 
-  runtime.registerApi('ui', ({ process }) => {
+  runtimeRegistry.registerApi('ui', ({ process }) => {
     const app = appManager.get(process.appDefId);
     if (!app) {
       return {};

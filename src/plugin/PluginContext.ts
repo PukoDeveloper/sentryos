@@ -67,14 +67,14 @@ export class PluginContext {
   // ── Runtime API registration ──────────────────────────────
 
   registerApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
-    const runtime = this.kernel.resolve('runtime');
-    runtime.registerApi(name, factory, gates, group);
+    const runtimeRegistry = this.kernel.resolve('runtimeRegistry');
+    runtimeRegistry.registerApi(name, factory, gates, group);
     this.registeredApis.push(name);
   }
 
   unregisterApi(name: string): boolean {
-    const runtime = this.kernel.resolve('runtime');
-    const result = runtime.unregisterApi(name);
+    const runtimeRegistry = this.kernel.resolve('runtimeRegistry');
+    const result = runtimeRegistry.unregisterApi(name);
     if (result) {
       const idx = this.registeredApis.indexOf(name);
       if (idx !== -1) this.registeredApis.splice(idx, 1);
@@ -155,9 +155,9 @@ export class PluginContext {
     this.eventListeners.length = 0;
 
     // Remove registered APIs
-    const runtime = this.kernel.resolve('runtime');
+    const runtimeRegistry = this.kernel.resolve('runtimeRegistry');
     for (const name of this.registeredApis) {
-      runtime.unregisterApi(name);
+      runtimeRegistry.unregisterApi(name);
     }
     this.registeredApis.length = 0;
 
@@ -168,7 +168,6 @@ export class PluginContext {
     this.registeredUiComponents.length = 0;
 
     // Remove registered runtime engines
-    const runtimeRegistry = this.kernel.resolve('runtimeRegistry');
     for (const engine of this.registeredRuntimes) {
       runtimeRegistry.unregister(engine);
     }

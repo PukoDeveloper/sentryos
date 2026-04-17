@@ -4,9 +4,13 @@
 // 路由到正確的 Runtime 實例。
 
 import type { IRuntime } from './IRuntime';
+import type { ApiFactory } from './types';
 
 /** 預設 Runtime 引擎的識別字串（QuickJS-emscripten） */
 const DEFAULT_ENGINE = 'quickjs';
+
+/** 單一 Host API 條目 */
+type ApiEntry = { factory: ApiFactory; gates: string[]; group?: string };
 
 class RuntimeRegistry {
     private readonly runtimes = new Map<string, IRuntime>();
@@ -15,6 +19,26 @@ class RuntimeRegistry {
     /** processAppId → engine 名稱 */
     private readonly appIdEngines = new Map<string, string>();
     private defaultEngine = DEFAULT_ENGINE;
+
+    /** 中央 Host API 註冊表（所有 runtime 共用） */
+    private readonly hostApiEntries = new Map<string, ApiEntry>();
+
+    // ── Host API 管理 ────────────────────────────────────────
+
+    /** 將 Host API 註冊到中央註冊表，所有 Runtime 引擎自動共用。 */
+    registerApi(name: string, factory: ApiFactory, gates: string[] = [], group?: string): void {
+        this.hostApiEntries.set(name, { factory, gates, group });
+    }
+
+    /** 從中央註冊表移除 Host API。 */
+    unregisterApi(name: string): boolean {
+        return this.hostApiEntries.delete(name);
+    }
+
+    /** 取得所有已註冊的 Host API 條目（供 BaseRuntime.buildApiSurface 使用）。 */
+    getHostApiEntries(): ReadonlyMap<string, Readonly<ApiEntry>> {
+        return this.hostApiEntries;
+    }
 
     // ── 引擎管理 ────────────────────────────────────────────
 
