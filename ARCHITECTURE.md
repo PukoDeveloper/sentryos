@@ -20,6 +20,7 @@
 | | [EnvironmentManager](./docs/core/environment-manager.md) | 環境變數、程式庫快取、命令註冊表 |
 | | [NotificationManager](./docs/core/notification-manager.md) | 全域通知系統 |
 | | [SystemMonitor](./docs/core/system-monitor.md) | 系統監控追蹤器 |
+| | [NetworkManager](./docs/core/network-manager.md) | 網路管理 |
 | | [共用型別](./docs/core/types.md) | Result / Error 型別 |
 | **視窗系統** | [視窗系統](./docs/window-system/window-system.md) | 狀態機、拖曳、Z-Index、DOM |
 | **UI 層** | [DesktopShell](./docs/ui/desktop-shell.md) | 工作列、開始選單、覆蓋層 |
@@ -28,6 +29,7 @@
 | | [Manifest](./docs/app-development/manifest.md) | manifest.json 規格 |
 | | [開發指南](./docs/app-development/guide.md) | 新增 App 步驟與範本 |
 | **資料流** | [資料流](./docs/data-flow/data-flow.md) | 啟動、事件、關閉、IPC 流程 |
+| **型別定義** | [types/](./docs/types/README.md) | Plugin SDK 型別定義檔 |
 
 ---
 
@@ -41,7 +43,7 @@
 | **Bootstrap** | `src/bootstrap/` | 流程編排，不持有業務狀態 |
 | **Kernel** | `src/kernel/` | 服務容器、共用型別與系統常數 |
 | **API** | `src/api/` | Host API 註冊層，橋接核心服務與沙箱 |
-| **Core Modules** | `src/application/`, `src/process/`, `src/runtime/`, `src/permissions/`, `src/events/`, `src/environment/`, `src/storage/`, `src/monitor/`, `src/notification/`, `src/network/` | 各自獨立的系統模組 |
+| **Core Modules** | `src/application/`, `src/process/`, `src/runtime/`, `src/permissions/`, `src/events/`, `src/environment/`, `src/storage/`, `src/monitor/`, `src/notification/`, `src/network/`, `src/dialog/`, `src/registry/`, `src/language/`, `src/console/`, `src/plugin/` | 各自獨立的系統模組 |
 | **Window** | `src/window/` | 視窗生命週期、UI 渲染 |
 | **UI** | `src/ui/` | 桌面 DOM 組裝與互動 |
 | **Public Apps** | `public/apps/` | 只透過 Host API 與系統溝通 |
@@ -51,7 +53,7 @@
 1. `main.ts` → `bootstrapSystem()`
 2. 初始化 Core 服務 → 載入 App Catalog → 掛載 DesktopShell
 3. 建立 WindowManager → 註冊通知覆蓋層
-4. `registerAllHostApis()` — 註冊 10 個 API 模組（ui、system、storage、env、console、shell、notification、monitor、settings、network），扁平化注入至 `OS` 全域物件
+4. `registerAllHostApis()` — 註冊 12 個 API 模組（ui、system、storage、env、console、shell、notification、monitor、settings、network、registry、dialog），扁平化注入至 `OS` 全域物件
 5. 逐一啟動 App（Library → Service → Window/Console）
 
 ### 新增 App 速查

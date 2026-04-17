@@ -28,7 +28,8 @@ type WindowSystemError =
     | 'WindowNotFound'
     | 'NodeNotFound'
     | 'Closed'
-    | 'InvalidOperation';
+    | 'InvalidOperation'
+    | 'RateLimitExceeded';
 
 type WindowSystemResult<TData = unknown> = {
     success: boolean;

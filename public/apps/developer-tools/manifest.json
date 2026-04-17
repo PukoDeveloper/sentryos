@@ -13,6 +13,16 @@
                 "*"
             ],
             "maxInstances": 1
+        },
+        {
+            "id": "Catch",
+            "name": "異常故意觸發器",
+            "main": "catch.js",
+            "type": "Console",
+            "icon": "icon.svg",
+            "permissions": [
+                "*"
+            ]
         }
     ]
 }

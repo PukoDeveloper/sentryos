@@ -47,6 +47,10 @@ class WindowManager {
     private maximizedTaskbarHeight = MAXIMIZED_TASKBAR_HEIGHT;
     /** 被 modal 鎖定的視窗 → 遮罩元素 */
     private readonly blockedOverlays = new Map<string, HTMLElement>();
+    /** 每個程序的視窗建立時間戳（用於速率限制） */
+    private readonly windowCreationTimes = new Map<string, number[]>();
+    private static readonly WINDOW_RATE_LIMIT = 10;
+    private static readonly WINDOW_RATE_WINDOW_MS = 1000;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -92,6 +96,20 @@ class WindowManager {
     }
 
     createWindow(context: WindowProcessContext, options: WindowInitOptions): WindowSystemResult<string> {
+        // 速率限制：每個程序每秒最多建立 N 個視窗
+        const now = Date.now();
+        if (!this.windowCreationTimes.has(context.processAppId)) {
+            this.windowCreationTimes.set(context.processAppId, []);
+        }
+        const times = this.windowCreationTimes.get(context.processAppId)!;
+        while (times.length > 0 && times[0] < now - WindowManager.WINDOW_RATE_WINDOW_MS) {
+            times.shift();
+        }
+        if (times.length >= WindowManager.WINDOW_RATE_LIMIT) {
+            return { success: false, error: 'RateLimitExceeded' };
+        }
+        times.push(now);
+
         const windowId = `window_${Date.now()}_${this.windowCounter++}`;
         const root = document.createElement('div');
         root.className = 'window-shell';

@@ -318,7 +318,13 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 const delay = args.length > 1 ? (context.dump(args[1]) ?? 0) : 0;
 
                 const callbackDup = callbackHandle.dup();
-                const guestId = runtimeProcess.timerNextId++;
+                // 回收已釋放的 guest ID，避免 ID 無限遞增
+                let guestId: number;
+                if (runtimeProcess.timerFreeIds && runtimeProcess.timerFreeIds.length > 0) {
+                    guestId = runtimeProcess.timerFreeIds.pop()!;
+                } else {
+                    guestId = runtimeProcess.timerNextId++;
+                }
 
                 const hostFn = repeat ? window.setInterval : window.setTimeout;
                 const hostId = hostFn(() => {
@@ -343,6 +349,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                         runtimeProcess.timers.delete(hostId);
                         runtimeProcess.timerMap.delete(guestId);
                         runtimeProcess.timerCallbacks.delete(guestId);
+                        if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                        runtimeProcess.timerFreeIds.push(guestId);
                         try { callbackDup.dispose(); } catch { /* noop */ }
                     }
                 }, delay) as unknown as number;
@@ -368,6 +376,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                     const cb = runtimeProcess.timerCallbacks.get(guestId);
                     if (cb) { try { cb.dispose(); } catch { /* noop */ } }
                     runtimeProcess.timerCallbacks.delete(guestId);
+                    if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                    runtimeProcess.timerFreeIds.push(guestId);
                 }
                 return context.undefined;
             });

@@ -2,7 +2,7 @@
 
 **檔案**：`src/notification/NotificationManager.ts`
 
-全域通知系統，管理通知佇列、DOM 渲染與自動消失。
+全域通知系統，管理 toast 通知的建立、顯示、消失動畫與自動移除。
 
 ---
 
@@ -10,42 +10,39 @@
 
 | 方法 | 簽章 | 說明 |
 |------|------|------|
-| `createContainer()` | `() → HTMLElement` | 建立通知容器 DOM 元素 |
-| `notify()` | `(title, body?, type?, duration?) → string` | 發送通知，回傳通知 ID |
-| `dismiss()` | `(id) → void` | 手動關閉指定通知 |
+| `createContainer()` | `() → HTMLDivElement` | 建立通知容器，回傳 DOM 供 overlay 註冊 |
+| `notify()` | `(options) → string` | 發送通知，回傳 notificationId |
+| `dismiss()` | `(id) → void` | 手動關閉通知 |
+| `destroy()` | `() → void` | 銷毀所有通知與容器 |
 
 ---
 
-## 通知類型
+## NotificationOptions
 
-| 類型 | 說明 |
-|------|------|
-| `info` | 一般資訊（預設） |
-| `success` | 成功訊息 |
-| `warning` | 警告訊息 |
-| `error` | 錯誤訊息 |
-
----
-
-## 特性
-
-- **動畫顯示/隱藏**：通知以動畫方式出現與消失
-- **自動消失**：可配置持續時間（毫秒），`0` 表示不自動消失
-- **最大顯示數量**：同時最多顯示 5 則通知
-- **覆蓋層整合**：通知容器透過 `DesktopShell.registerOverlay()` 註冊到桌面
+```typescript
+interface NotificationOptions {
+  title: string;
+  body?: string;
+  type?: NotificationType;  // 'info' | 'success' | 'warning' | 'error'，預設 'info'
+  duration?: number;        // ms，0 = 不自動消失，預設 NOTIFICATION_DEFAULT_DURATION_MS (4000)
+  source?: string;          // 來源 app 名稱
+}
+```
 
 ---
 
-## 與其他元件的關係
+## 組態屬性
 
-| 元件 | 互動方式 |
-|------|---------|
-| `systemBootstrap.ts` | 建立 NotificationManager 實例，`createContainer()` → `DesktopShell.registerOverlay()` |
-| `notificationApi`（Host API） | 呼叫 `notify()` 與 `dismiss()` |
-| `DesktopShell` | 通知容器作為桌面覆蓋層管理 |
+| 屬性 | 型別 | 預設值 | 說明 |
+|------|------|--------|------|
+| `doNotDisturb` | `boolean` | `false` | 啟用時 `notify()` 不產生通知 |
+| `defaultDuration` | `number` | `4000` | 預設通知顯示時長（ms） |
+| `maxVisible` | `number` | `5` | 同時可見的最大通知數量 |
 
 ---
 
-## 權限
+## 行為
 
-沙箱應用透過 `notificationApi` 使用通知功能，需要 `notification.send` 權限。
+- 通知超過 `maxVisible` 時自動移除最舊的
+- 關閉動畫使用 CSS transition（`is-visible` → `is-dismissed`），transition 結束後移除 DOM
+- `doNotDisturb` 啟用時 `notify()` 直接回傳空字串

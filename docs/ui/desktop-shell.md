@@ -2,102 +2,112 @@
 
 **檔案**：`src/ui/DesktopShell.ts`
 
-建構整個桌面的 DOM，包含桌布、覆蓋層、視窗宿主、工作列與開始選單。
-
----
-
-## DOM 層級
-
-```
-.desktop-shell
-  ├── .desktop-wallpaper
-  │     └── .desktop-wallpaper-tint
-  ├── .desktop-overlay-layer    # 覆蓋層（可動態註冊）
-  ├── .desktop-window-layer     # 視窗宿主（由 WindowManager 管理）
-  ├── .desktop-start-panel      # 開始選單（z-index 9000）
-  │     ├── .desktop-start-search
-  │     └── .desktop-start-list
-  └── .desktop-taskbar
-        ├── .desktop-taskbar-start   # 「開始」按鈕
-        ├── .desktop-taskbar-apps    # 圖示按鈕區
-        └── .desktop-taskbar-clock   # 時鐘
-```
+桌面環境的 UI 層，包含工作列（taskbar）、開始選單（start menu）、桌布、視窗層、覆蓋層以及時鐘。
 
 ---
 
 ## API
 
-| 方法 | 說明 |
-|------|------|
-| `mount(applications)` | 建立桌面 DOM，啟動時鐘（不影響開始選單內容） |
-| `destroy()` | 銷毀桌面 DOM、清除計時器與狀態 |
-| `getWindowHost()` | 回傳 `.desktop-window-layer` 供 WindowManager 使用 |
-| `setApplications(apps)` | 更新開始選單的應用清單 |
-| `onLaunchRequest(handler)` | 綁定開始選單點擊 → `handler(RegisteredApplication)` |
-| `onTaskbarWindowClick(handler)` | 綁定工作列 icon 點擊 → `handler(windowId, processAppId)` |
-| `syncOpenWindows(windows)` | 同步開啟中視窗到工作列（接收陣列含 windowId、title、state、processAppId、icon） |
-| `registerOverlay(registration)` | 新增覆蓋層元素（`{ id, element, order? }`） |
-| `removeOverlay(id)` | 移除覆蓋層元素 |
+| 方法 | 簽章 | 說明 |
+|------|------|------|
+| `mount()` | `(applications) → boolean` | 掛載桌面 DOM |
+| `getWindowHost()` | `() → HTMLDivElement \| null` | 取得視窗層容器 |
+| `setApplications()` | `(apps: RegisteredApplication[]) → void` | 設定應用程式列表 |
+| `onLaunchRequest()` | `(handler) → void` | 註冊應用程式啟動回呼 |
+| `onTaskbarWindowClick()` | `(handler) → void` | 註冊工作列視窗點擊回呼 |
+| `syncOpenWindows()` | `(windows: WindowInfo[]) → void` | 同步開啟中的視窗到工作列 |
+| `registerOverlay()` | `(registration) → void` | 註冊覆蓋層元素 |
+| `removeOverlay()` | `(id) → void` | 移除覆蓋層 |
+| `applyTheme()` | `(theme: ThemeSettings) → void` | 套用主題設定 |
+| `getTheme()` | `() → ThemeSettings` | 取得當前主題 |
+| `setTaskbarMode()` | `(mode: TaskbarMode) → void` | 切換工作列模式 |
+| `getTaskbarMode()` | `() → TaskbarMode` | 取得當前工作列模式 |
+| `onTaskbarModeChange()` | `(handler) → void` | 註冊工作列模式變更回呼 |
+| `setLocale()` | `(locale, translator?) → void` | 設定語系與翻譯函式 |
+| `destroy()` | `() → void` | 銷毀桌面 DOM 與所有計時器 |
 
 ---
 
-## 工作列（Taskbar）
-
-### 結構
-
-工作列由三部分組成：
-1. **開始按鈕**：切換開始選單顯示/隱藏
-2. **應用圖示區**：顯示所有開啟中視窗的 icon
-3. **時鐘**：每秒更新
-
-### 圖示按鈕
-
-每個開啟中的視窗在工作列顯示為 44×44 的圖示按鈕：
-
-- 若有 `icon`（SVG/PNG）：顯示 `<img>` 元素
-- 若圖片載入失敗（`error` 事件）或無 icon：顯示標題首字母大寫
-- 點擊觸發 `taskbarWindowClickHandler`，最終呼叫 `WindowManager.focusWindow()`
-- `data-window-state` 屬性反映視窗當前狀態
-
----
-
-## 開始選單（Start Menu）
-
-- **搜尋框**：`input[type=search]`，即時篩選（依名稱與描述）
-- **應用列表**：每項顯示 icon + 名稱 + 描述
-- **點擊行為**：觸發 `launchHandler(app)` 並關閉面板
-- **z-index**：9000（確保在所有視窗之上）
-
-> **注意**：開始選單只顯示由 `setApplications()` 傳入的應用。Bootstrap 階段會過濾掉 `Service` 和 `Library` 類型的應用，因此它們不會出現在開始選單中。
-
-### 開始選單項目
-
-```
-.desktop-start-item
-  ├── .desktop-start-item-icon   # icon img 或首字母
-  └── .desktop-start-item-info
-        ├── .desktop-start-item-name
-        └── .desktop-start-item-desc  # 描述（若有）
-```
-
----
-
-## 覆蓋層（Overlay）
-
-透過 `registerOverlay()` / `removeOverlay()` 動態管理覆蓋層元素。支援排序（`order` 屬性）。
+## TaskbarMode
 
 ```typescript
-type DesktopOverlayRegistration = {
-  id: string;
-  element: HTMLElement;
-  order?: number;
+type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
+```
+
+- **docked**：預設模式，固定在底部
+- **fullwidth**：全寬工作列
+- **floating-compact**：浮動精簡模式，顯示可拖曳的觸發按鈕，點擊展開/收合
+
+---
+
+## ThemeSettings
+
+```typescript
+type ThemeSettings = {
+  wallpaper?: string;              // 桌布 CSS background
+  tint?: string;                   // 桌布覆蓋色調
+  accentPrimary?: string;          // 開始按鈕漸層起始色
+  accentSecondary?: string;        // 開始按鈕漸層結束色
+  taskbarOpacity?: number;         // 工作列不透明度 (0-1)
+  taskbarMode?: TaskbarMode;
+  startMenuWidth?: number;         // 開始選單寬度 (280-640)
+  startMenuHeight?: number;        // 開始選單高度 (300-800)
+  startMenuGroupByPackage?: boolean;
 };
 ```
 
 ---
 
-## 時鐘
+## 開始選單
 
-- 格式：`HH:mm:ss`
-- 每秒更新（`setInterval(1000)`）
-- `destroy()` 時自動清除計時器
+開始選單包含兩個分頁：
+
+### Folders 分頁
+- 資料夾系統：可建立/重新命名/刪除資料夾
+- 支援將應用程式拖放到資料夾中
+- 釘選應用程式區域（pinnedAppIds）
+- 資料夾與釘選資料儲存於 `localStorage`
+
+### Search 分頁
+- 搜尋輸入框過濾應用程式
+- 當 `startMenuGroupByPackage` 啟用時按套件分組顯示
+- 隱藏應用程式（`hidden: true`）不顯示
+
+---
+
+## 工作列
+
+- 開啟中的視窗按 `appDefId` 分組顯示
+- 多視窗時點擊顯示分組彈出選單
+- 使用 fingerprint 比對避免不必要的重繪
+
+---
+
+## 語系支援
+
+```typescript
+setLocale(locale: string, translator?: (key: string) => string): void
+```
+
+透過外部注入的翻譯函式（`translator`）支援 UI 文字國際化。翻譯 key 包括：`tab.folders`、`tab.search`、`btn.addFolder`、`search.placeholder` 等。
+
+---
+
+## DOM 結構
+
+```
+.desktop-shell
+├── .desktop-wallpaper
+│   └── .desktop-wallpaper-tint
+├── .desktop-overlay-layer
+├── .desktop-window-layer
+├── .desktop-start-panel
+│   ├── .desktop-start-tabs
+│   ├── .desktop-start-pane-folders
+│   └── .desktop-start-pane-search
+├── .desktop-taskbar
+│   ├── .desktop-taskbar-start
+│   ├── .desktop-taskbar-apps
+│   └── .desktop-taskbar-clock
+└── .desktop-taskbar-trigger (floating-compact mode)
+```

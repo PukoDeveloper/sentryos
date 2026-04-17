@@ -71,6 +71,8 @@ type RuntimeProcess = BaseProcessState & {
     timerCallbacks: Map<number, QuickJSHandle>;
     /** timer 順序 ID 計數器 */
     timerNextId: number;
+    /** 已回收可復用的 timer guest ID */
+    timerFreeIds?: number[];
 };
 
 type ResponseType = 'text' | 'json' | 'javascript';
