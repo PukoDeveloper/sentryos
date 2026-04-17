@@ -56,7 +56,10 @@ export function registerEnvApi(kernel: Kernel): void {
       // Strip ES module export statements for script-mode evaluation.
       // Library files may contain `export` declarations for import-mode
       // compatibility; these are invalid in evalCode (script context).
-      const scriptCode = code.replace(/^export\s+(var|const|let|function|class|default)\b[^\n]*/gm, '');
+      const scriptCode = code
+        .replace(/^export\s+(var|const|let|function|class|default)\b[^\n]*/gm, '')
+        .replace(/^export\s*\{[^}]*\}\s*(from\s*['"][^'"]*['"])?\s*;?/gm, '')
+        .replace(/^export\s+\*\s*(from\s*['"][^'"]*['"])?\s*;?/gm, '');
       return runtimeRegistry.getForPid(pid).evaluateInContext(pid, scriptCode);
     },
     listLibraries: () => {

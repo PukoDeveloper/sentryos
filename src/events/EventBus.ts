@@ -72,8 +72,17 @@ class EventBus {
             return { success: false, error: 'PermissionDenied' };
         }
         const entries = this.eventListeners.get(event);
-        if (!entries) return { success: false, error: 'EventNotFound' };
-        entries.forEach(entry => entry.listener(...args));
+        if (!entries || entries.length === 0) {
+            this.monitor?.recordEventEmit(appId, event);
+            return { success: true };
+        }
+        for (const entry of entries) {
+            try {
+                entry.listener(...args);
+            } catch (err) {
+                console.warn(`[EventBus] Listener error on event '${event}' (appId: ${entry.appId}):`, err);
+            }
+        }
         this.monitor?.recordEventEmit(appId, event);
         return { success: true };
     }

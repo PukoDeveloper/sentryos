@@ -122,7 +122,6 @@ export class AllowlistNetworkManager implements NetworkAdapter {
         },
       };
     } catch (err: unknown) {
-      this.blockedRequests++;
       if (err instanceof DOMException && err.name === 'AbortError') {
         return { success: false, error: 'Timeout' };
       }

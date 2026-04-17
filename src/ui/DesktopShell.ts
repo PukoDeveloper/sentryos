@@ -889,7 +889,7 @@ class DesktopShell {
     for (const folder of this.folders) {
       if (!folder.appIds.includes(sid)) {
         items.push({
-          label: `📁 新增到「${folder.name}」`,
+          label: this.t('ctx.addToFolder').replace('{name}', folder.name),
           action: () => this.addAppToFolder(folder.name, sid),
         });
       }
@@ -910,7 +910,7 @@ class DesktopShell {
     for (const folder of this.folders) {
       if (!folder.appIds.includes(sid)) {
         items.push({
-          label: `📁 移動到「${folder.name}」`,
+          label: this.t('ctx.moveToFolder').replace('{name}', folder.name),
           action: () => {
             this.pinnedAppIds = this.pinnedAppIds.filter(id => id !== sid);
             this.addAppToFolder(folder.name, sid);
@@ -1018,7 +1018,7 @@ class DesktopShell {
 
       const countEl = document.createElement('span');
       countEl.className = 'desktop-start-folder-count';
-      countEl.textContent = `${folder.appIds.length} 個應用`;
+      countEl.textContent = this.t('folder.appCount').replace('{count}', String(folder.appIds.length));
 
       folderInfo.appendChild(nameEl);
       folderInfo.appendChild(countEl);

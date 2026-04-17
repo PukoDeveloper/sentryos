@@ -265,9 +265,13 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                 return code;
             }
             else if (type === 'json') {
-                return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
-                    return "export const " + k + " = " + JSON.stringify(v) + ";";
-                }).join("\n") + "\nexport default " + code + ";";
+                try {
+                    return Object.entries(JSON.parse(code)).map(([k, v]: [string, unknown]) => {
+                        return "export const " + k + " = " + JSON.stringify(v) + ";";
+                    }).join("\n") + "\nexport default " + code + ";";
+                } catch {
+                    return throwImportError(`imports('${moduleName}'): invalid JSON at '${resolvedPath}'`);
+                }
             }
             else {
                 return "const code = " + JSON.stringify(code) + "; export default code;";
@@ -356,8 +360,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             context.newFunction(repeat ? 'setInterval' : 'setTimeout', (...args: any[]) => {
                 if (args.length === 0) return context.undefined;
                 const callbackHandle = args[0];
-                if (typeof context.typeof(callbackHandle) !== 'string' || context.typeof(callbackHandle) !== 'function') {
-                    // 嘗試當作 function handle 使用，即使 typeof 不精確也放行
+                if (context.typeof(callbackHandle) !== 'function') {
+                    return context.undefined;
                 }
                 const delay = args.length > 1 ? (context.dump(args[1]) ?? 0) : 0;
 
@@ -386,7 +390,19 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                             result.value.dispose();
                         }
                         context.runtime.executePendingJobs();
-                    } catch (err) { console.warn('[Runtime] timer callback error (context may be disposed):', err); }
+                    } catch (err) {
+                        console.warn('[Runtime] timer callback error (context may be disposed):', err);
+                        // 若回呼出錯且為 repeat timer，清理資源避免 handle 洩漏
+                        if (repeat) {
+                            window.clearInterval(hostId);
+                            runtimeProcess.timers.delete(hostId);
+                            runtimeProcess.timerMap.delete(guestId);
+                            runtimeProcess.timerCallbacks.delete(guestId);
+                            if (!runtimeProcess.timerFreeIds) runtimeProcess.timerFreeIds = [];
+                            runtimeProcess.timerFreeIds.push(guestId);
+                            try { callbackDup.dispose(); } catch { /* noop */ }
+                        }
+                    }
 
                     // 單次 timer 觸發後自動清理
                     if (!repeat) {

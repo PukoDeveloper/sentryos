@@ -9,7 +9,9 @@ type RuntimeError =
     | 'ProcessNotRunning'
     | 'RuntimeError'
     | 'PermissionDenied'
-    | 'InvalidTarget';
+    | 'InvalidTarget'
+    | 'InboxFull'
+    | 'TooManyChildren';
 
 type RuntimeResult<T> = {
     success: boolean;

@@ -96,7 +96,17 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('事件統計'),
           UI.text(
-            '已發布: ' + (evtData.totalEmitted || 0) + '  |  訂閱: ' + (evtData.activeSubscriptions || 0),
+            (function() {
+              var totalEmitted = 0;
+              var activeSubs = 0;
+              if (Array.isArray(evtData)) {
+                for (var i = 0; i < evtData.length; i++) {
+                  totalEmitted += (evtData[i].emitCount || 0);
+                  activeSubs += (evtData[i].subscriberCount || 0);
+                }
+              }
+              return '已發布: ' + totalEmitted + '  |  訂閱: ' + activeSubs;
+            })(),
             { fontSize: '13px', color: '#67b8ff' }
           ),
         ], { gap: '4px' }),
@@ -107,7 +117,15 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('API 統計'),
           UI.text(
-            '總呼叫: ' + (apiData.totalCalls || 0) + '  |  拒絕: ' + (apiData.totalDenied || 0),
+            (function() {
+              var totalCalls = 0;
+              if (Array.isArray(apiData)) {
+                for (var i = 0; i < apiData.length; i++) {
+                  totalCalls += (apiData[i].callCount || 0);
+                }
+              }
+              return '總呼叫: ' + totalCalls;
+            })(),
             { fontSize: '13px', color: '#ffb74d' }
           ),
         ], { gap: '4px' }),
@@ -118,7 +136,7 @@ var app = UI.createApp({
         UI.column([
           UI.subheading('權限統計'),
           UI.text(
-            '允許: ' + (permData.totalGranted || 0) + '  |  拒絕: ' + (permData.totalDenied || 0),
+            '允許: ' + ((permData.totalChecks || 0) - (permData.totalDenied || 0)) + '  |  拒絕: ' + (permData.totalDenied || 0),
             { fontSize: '13px', color: '#c084fc' }
           ),
         ], { gap: '4px' }),

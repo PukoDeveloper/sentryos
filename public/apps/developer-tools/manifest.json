@@ -28,7 +28,7 @@
             "id": "lua-tester",
             "name": "Lua 測試器",
             "main": "luatest.lua",
-            "type": "Console",
+            "type": "Window",
             "icon": "icon.svg",
             "permissions": [
                 "*"

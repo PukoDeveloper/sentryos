@@ -67,8 +67,9 @@ abstract class BaseRuntime implements IRuntime {
      * 非 JS 引擎（如 Lua）的子類別應覆寫此方法以使用原生函式呼叫。
      */
     protected invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown> {
-        const payload = JSON.stringify(arg);
-        const code = `if(typeof ${handlerName}==='function'){${handlerName}(${payload})}`;
+        const safePayload = JSON.stringify(arg);
+        const safeHandler = JSON.stringify(handlerName);
+        const code = `(function(){var _h=${safeHandler};if(typeof globalThis[_h]==='function'){return globalThis[_h](${safePayload})}})()`;
         return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
     }
 
@@ -114,6 +115,10 @@ abstract class BaseRuntime implements IRuntime {
             parentPid: process.parentPid,
             status: () => this.getProcess(pid)?.status ?? 'stopped',
             spawnChild: (appDefId?: string, type?: ProcessType) => {
+                const MAX_CHILDREN = 32;
+                if (process.children.size >= MAX_CHILDREN) {
+                    return { success: false, error: 'TooManyChildren' };
+                }
                 const targetApp = typeof appDefId === 'string' && appDefId.length > 0 ? appDefId : process.appDefId;
                 const launchResult = this.processManager.launch(process.processAppId, targetApp, {
                     parentPid: pid,
@@ -184,20 +189,6 @@ abstract class BaseRuntime implements IRuntime {
                     payload
                 })
         }), ['window'], 'window');
-
-        this.registerBuiltinApi('consoleApi', ({ pid, process }) => ({
-            writeLine: (text: unknown) => {
-                if (!this.permissions.has(process.processAppId, Permissions.CONSOLE_WRITE)) {
-                    return { success: false, error: 'PermissionDenied' };
-                }
-                const message = String(text);
-                this.eventBus.emit(process.processAppId, Events.CONSOLE_OUTPUT, {
-                    pid,
-                    message
-                });
-                return true;
-            }
-        }), ['console']);
     }
 
     // ── API 表面建構 ────────────────────────────────────────
@@ -354,6 +345,7 @@ abstract class BaseRuntime implements IRuntime {
     }
 
     protected pushMessage(fromPid: number, toPid: number, channel: string, payload: unknown): RuntimeResult<boolean> {
+        const MAX_INBOX_SIZE = 256;
         const targetProc = this.getProcess(toPid);
         if (!targetProc || targetProc.status !== 'running') {
             return { success: false, error: 'ProcessNotFound' };
@@ -362,6 +354,10 @@ abstract class BaseRuntime implements IRuntime {
         const targetState = this.processStates.get(toPid);
         if (!targetState) {
             return { success: false, error: 'ProcessNotFound' };
+        }
+
+        if (targetState.inbox.length >= MAX_INBOX_SIZE) {
+            return { success: false, error: 'InboxFull' };
         }
 
         const message: Message = {
@@ -378,7 +374,10 @@ abstract class BaseRuntime implements IRuntime {
         try {
             const safeMsg = JSON.stringify({ fromPid: message.fromPid, channel: message.channel, payload: message.payload, timestamp: message.timestamp });
             this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
-        } catch (err) { console.warn('[Runtime] onMessage dispatch failed (context may be gone):', err); }
+        } catch (err) {
+            // JSON.stringify may fail on circular references; log and continue
+            console.warn('[Runtime] onMessage dispatch failed:', err);
+        }
 
         return { success: true, data: true };
     }

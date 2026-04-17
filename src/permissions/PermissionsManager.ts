@@ -21,9 +21,19 @@ class PermissionsManager {
     private appPermissions: { [appId: string]: Set<string> };
     private inited = false;
     private readonly kernel: Kernel;
+    private idCounter = 0;
     constructor(kernel: Kernel) {
         this.kernel = kernel;
         this.appPermissions = {};
+    }
+
+    /** 產生唯一 ID，結合時間戳與遞增計數器避免碰撞 */
+    private generateId(prefix: string): string {
+        let id: string;
+        do {
+            id = `${prefix}${Date.now()}_${this.idCounter++}`;
+        } while (this.appPermissions[id] !== undefined);
+        return id;
     }
 
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
@@ -31,7 +41,7 @@ class PermissionsManager {
         if (this.inited) return { success: false, error: 'UnknownError' };
         // Load permissions from storage or initialize defaults
         this.inited = true;
-        const systemAppId = `${ID_PREFIX_SYSTEM}${Date.now()}`;
+        const systemAppId = this.generateId(ID_PREFIX_SYSTEM);
         this.appPermissions[systemAppId] = new Set([Permissions.WILDCARD]);
         return { success: true, data: systemAppId };
     }
@@ -46,7 +56,7 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        const userAppId = `${ID_PREFIX_USER}${Date.now()}`;
+        const userAppId = this.generateId(ID_PREFIX_USER);
         this.appPermissions[userAppId] = new Set(permissions);
         return { success: true, data: userAppId };
     }
@@ -57,7 +67,7 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.NEW_APP)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        const newAppId = `${ID_PREFIX_APP_INSTANCE}${Date.now()}`;
+        const newAppId = this.generateId(ID_PREFIX_APP_INSTANCE);
         // 使用 has() 做萬用字元匹配，確保父應用持有 * 時子應用能繼承具體權限
         const allowedPermissions = permissions.filter(p => this.has(fromAppId, p));
         this.appPermissions[newAppId] = new Set(allowedPermissions);

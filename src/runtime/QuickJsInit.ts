@@ -9,5 +9,8 @@ export async function initializeQuickJS(): Promise<void> {
 }
 
 export function getQuickJSInstance(): QuickJSWASMModule {
+    if (!QuickJS) {
+        throw new Error('QuickJS has not been initialized. Call initializeQuickJS() first.');
+    }
     return QuickJS;
 }

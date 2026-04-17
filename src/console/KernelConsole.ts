@@ -159,12 +159,14 @@ class KernelConsole {
       this.runtime.execute(session.pid, source);
     }
 
-    // 在 QuickJS context 中呼叫命令處理函式
-    const argsJson = JSON.stringify(args);
-    const escapedCmd = cmd.replace(/'/g, "\\'");
+    // 在 QuickJS context 中呼叫命令處理函式（使用 JSON 安全傳遞參數，避免注入風險）
+    const safeCmd = JSON.stringify(cmd);
+    const safeArgs = JSON.stringify(args);
     const code = `(function(){
-      if(globalThis.__commands && typeof globalThis.__commands['${escapedCmd}']==='function'){
-        var _r=globalThis.__commands['${escapedCmd}'](${argsJson});
+      var _cmd=${safeCmd};
+      var _args=${safeArgs};
+      if(globalThis.__commands && typeof globalThis.__commands[_cmd]==='function'){
+        var _r=globalThis.__commands[_cmd](_args);
         return _r!==undefined&&_r!==null?String(_r):'';
       }
       return '__CMD_NOT_FOUND__';
