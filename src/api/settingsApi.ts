@@ -15,7 +15,20 @@ const COLOR_TOKEN_KEYS: (keyof ThemeSettings)[] = [
 
 function sanitizeTheme(theme: Record<string, unknown>): ThemeSettings {
   const safe: ThemeSettings = {};
-  if (typeof theme.wallpaper === 'string') safe.wallpaper = theme.wallpaper;
+  if (typeof theme.wallpaper === 'string') {
+    const wp = theme.wallpaper.trim();
+    // Block dangerous URI schemes (javascript:, vbscript:, etc.)
+    if (/^[a-z]+:/i.test(wp) && !/^https?:\/\/|^data:image\//.test(wp)) {
+      // Not a valid URL — only allow if it looks like a CSS value (gradient, color, etc.)
+      if (!/^(linear-gradient|radial-gradient|conic-gradient|rgb|hsl|#|none|transparent)/i.test(wp)) {
+        // Reject suspicious schemes
+      } else {
+        safe.wallpaper = wp;
+      }
+    } else {
+      safe.wallpaper = wp;
+    }
+  }
   if (typeof theme.tint === 'string') safe.tint = theme.tint;
   if (typeof theme.accentPrimary === 'string') safe.accentPrimary = theme.accentPrimary;
   if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;

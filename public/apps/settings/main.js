@@ -52,6 +52,7 @@ var taskbarModes = [
 
 // ── State ────────────────────────────────────────────────────
 var selectedWallpaper = 0;
+var customWallpaperUrl = '';
 var selectedAccent = 0;
 var selectedOpacity = 2;
 var selectedTaskbarMode = 0;
@@ -74,6 +75,10 @@ if (saved.success && saved.data) {
   var d = saved.data;
   for (var i = 0; i < wallpapers.length; i++) {
     if (wallpapers[i].value === d.wallpaper) { selectedWallpaper = i; break; }
+  }
+  if (typeof d.wallpaper === 'string' && /^https?:\/\/|^data:image\//.test(d.wallpaper)) {
+    customWallpaperUrl = d.wallpaper;
+    selectedWallpaper = -1;
   }
   for (var i = 0; i < accents.length; i++) {
     if (accents[i].primary === d.accentPrimary && accents[i].mode === (d.accentMode || 'dark')) { selectedAccent = i; break; }
@@ -210,8 +215,11 @@ var itemCardStyle = { alignItems: 'center', gap: '12px', justifyContent: 'space-
 
 // ── Helpers ──────────────────────────────────────────────────
 function buildThemeObject() {
+  var wp = (selectedWallpaper === -1 && customWallpaperUrl)
+    ? customWallpaperUrl
+    : wallpapers[selectedWallpaper].value;
   return {
-    wallpaper: wallpapers[selectedWallpaper].value,
+    wallpaper: wp,
     tint: 'none',
     accentPrimary: accents[selectedAccent].primary,
     accentSecondary: accents[selectedAccent].secondary,
@@ -357,6 +365,7 @@ function renderWallpaperSection(self) {
       items.push(UI.button(wallpapers[idx].name, {
         onClick: function () {
           selectedWallpaper = idx;
+          customWallpaperUrl = '';
           liveApply();
           self.rerender();
         },
@@ -364,7 +373,67 @@ function renderWallpaperSection(self) {
       }));
     })(i);
   }
-  return UI.box(items, swatchGrid);
+
+  // Custom image URL swatch
+  var customSwatch = selectedWallpaper === -1 ? swatchSelected() : swatchBase();
+  if (customWallpaperUrl) {
+    customSwatch.backgroundImage = 'url("' + customWallpaperUrl.replace(/"/g, '\\"') + '")';
+    customSwatch.backgroundSize = 'cover';
+    customSwatch.backgroundPosition = 'center';
+  } else {
+    customSwatch.background = 'rgba(255,255,255,0.06)';
+  }
+  items.push(UI.button('🖼️ 自訂', {
+    onClick: function () {
+      selectedWallpaper = -1;
+      if (customWallpaperUrl) liveApply();
+      self.rerender();
+    },
+    style: customSwatch,
+  }));
+
+  var children = [UI.box(items, swatchGrid)];
+
+  // Show URL input when custom is selected
+  if (selectedWallpaper === -1) {
+    children.push(UI.box([], { height: '8px' }));
+    children.push(UI.text('圖片網址', sectionTitle));
+    children.push(UI.input({
+      value: customWallpaperUrl,
+      placeholder: 'https://example.com/wallpaper.jpg',
+      onChange: function (v) {
+        customWallpaperUrl = v || '';
+      },
+      style: {
+        padding: '10px 12px',
+        borderRadius: '8px',
+        fontSize: '13px',
+        background: 'rgba(255,255,255,0.06)',
+        color: '#f4f7fb',
+        border: '1px solid rgba(255,255,255,0.1)',
+        width: '100%',
+      },
+    }));
+    children.push(UI.button('套用圖片桌布', {
+      onClick: function () {
+        if (customWallpaperUrl) {
+          liveApply();
+          self.rerender();
+        }
+      },
+      style: {
+        padding: '8px 16px',
+        borderRadius: '8px',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        background: customWallpaperUrl ? 'linear-gradient(135deg, #4a7fff, #67b8ff)' : 'rgba(255,255,255,0.06)',
+        color: customWallpaperUrl ? '#05101c' : 'rgba(216,232,255,0.35)',
+        textAlign: 'center',
+      },
+    }));
+  }
+
+  return UI.column(children, { gap: '6px' });
 }
 
 function renderAccentSection(self) {
@@ -528,6 +597,7 @@ function renderSaveRow(self) {
       id: 'btn-reset',
       onClick: function () {
         selectedWallpaper = 0;
+        customWallpaperUrl = '';
         selectedAccent = 0;
         selectedOpacity = 2;
         selectedTaskbarMode = 0;
