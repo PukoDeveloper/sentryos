@@ -47,7 +47,7 @@ jobs:
       - name: Verify orphan (no parent commits)
         run: |
           git fetch origin pocket
-          PARENT_COUNT=$(git log origin/pocket --oneline | wc -l)
+          PARENT_COUNT=$(git rev-list --count origin/pocket)
           echo "pocket 分支目前 commit 數量：${PARENT_COUNT}"
           if [ "$PARENT_COUNT" -eq 1 ]; then
             echo "✅ 確認：pocket 現在是孤立分支（只有一個根節點 commit）。"

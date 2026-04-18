@@ -9,6 +9,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   check-branch-isolation:
     name: 確認 pocket 分支隔離
@@ -21,7 +24,7 @@ jobs:
           echo "來源分支：${HEAD_REF}"
           echo "目標分支：${{ github.base_ref }}"
 
-          if [[ "${HEAD_REF}" == "pocket" || "${HEAD_REF}" == pocket/* ]]; then
+          if [[ "${HEAD_REF}" == "pocket" || "${HEAD_REF}" == "pocket/"* ]]; then
             echo ""
             echo "❌ 禁止合併：pocket 是獨立技術路徑，不允許合入 main。"
             echo ""
