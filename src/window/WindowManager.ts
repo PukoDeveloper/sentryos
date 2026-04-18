@@ -1,11 +1,9 @@
 import {
     Z_INDEX_WINDOW_BASE, Z_INDEX_ALWAYS_ON_TOP_OFFSET,
     WINDOW_CASCADE_X_OFFSET, WINDOW_CASCADE_Y_OFFSET, WINDOW_CASCADE_INCREMENT,
-    MAXIMIZED_WINDOW_MARGIN, MAXIMIZED_TASKBAR_HEIGHT,
     DEFAULT_CONSOLE_WIDTH, DEFAULT_CONSOLE_HEIGHT,
 } from '../kernel/constants';
 import type {
-    WindowBounds,
     ContextMenuEntry,
     InitializeUiOptions,
     WindowDescriptor,
@@ -47,7 +45,8 @@ class WindowManager {
     private windowChangeListener?: (event: WindowLifecycleEvent) => void;
     private contextMenuEl: HTMLElement | null = null;
     private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
-    private maximizedTaskbarHeight = MAXIMIZED_TASKBAR_HEIGHT;
+    /** No-op in mobile mode; kept for API compatibility. */
+    setMaximizedTaskbarHeight(_height: number, _reflow = true): void { /* no-op */ }
     /** 被 modal 鎖定的視窗 → 遮罩元素 */
     private readonly blockedOverlays = new Map<string, HTMLElement>();
     /** 每個程序的視窗建立時間戳（用於速率限制） */
@@ -87,17 +86,6 @@ class WindowManager {
      * 漂浮模式下傳 0 讓視窗完全填充螢幕。
      * 若 reflow 為 true，會立刻重新佈局所有已最大化的視窗。
      */
-    setMaximizedTaskbarHeight(height: number, reflow = true): void {
-        this.maximizedTaskbarHeight = height;
-        if (reflow) {
-            for (const descriptor of this.windows.values()) {
-                if (descriptor.state === 'maximized') {
-                    this.applyWindowLayout(descriptor);
-                }
-            }
-        }
-    }
-
     createWindow(context: WindowProcessContext, options: WindowInitOptions): WindowSystemResult<string> {
         // 速率限制：每個程序每秒最多建立 N 個視窗
         const now = Date.now();
@@ -132,26 +120,10 @@ class WindowManager {
         const actions = document.createElement('div');
         actions.className = 'window-actions';
 
-        const minimizeButton = this.createTitlebarButton('−', () => {
-            this.minimizeWindow(context.processAppId, windowId);
-        });
-        const maximizeButton = this.createTitlebarButton('□', () => {
-            const descriptor = this.windows.get(windowId);
-            if (!descriptor) {
-                return;
-            }
-            if (descriptor.state === 'maximized') {
-                this.restoreWindow(context.processAppId, windowId);
-                return;
-            }
-            this.maximizeWindow(context.processAppId, windowId);
-        });
         const closeButton = this.createTitlebarButton('×', () => {
             this.closeWindow(context.processAppId, windowId);
         });
 
-        actions.appendChild(minimizeButton);
-        actions.appendChild(maximizeButton);
         actions.appendChild(closeButton);
 
         titleBar.appendChild(titleLabel);
@@ -187,16 +159,6 @@ class WindowManager {
             style: options.style,
             icon: context.icon,
         };
-
-        this.enableDrag(titleBar, descriptor);
-
-        if (descriptor.resizable) {
-            this.enableResize(root, descriptor);
-        }
-
-        root.addEventListener('pointerdown', () => {
-            this.focusWindow(context.processAppId, windowId);
-        });
 
         this.applyWindowLayout(descriptor);
         this.windows.set(windowId, descriptor);
@@ -914,30 +876,19 @@ class WindowManager {
     }
 
     private applyWindowLayout(descriptor: WindowDescriptor): void {
-        descriptor.root.style.left = `${descriptor.bounds.x}px`;
-        descriptor.root.style.top = `${descriptor.bounds.y}px`;
+        // Mobile: all windows are always fullscreen within the window layer
+        descriptor.root.style.left = '0';
+        descriptor.root.style.top = '0';
+        descriptor.root.style.width = '100%';
+        descriptor.root.style.height = '100%';
         descriptor.root.style.zIndex = String(descriptor.zIndex);
-
-        if (descriptor.state === 'maximized') {
-            descriptor.root.style.left = `${MAXIMIZED_WINDOW_MARGIN}px`;
-            descriptor.root.style.top = `${MAXIMIZED_WINDOW_MARGIN}px`;
-            descriptor.root.style.width = `calc(100% - ${MAXIMIZED_WINDOW_MARGIN * 2}px)`;
-            descriptor.root.style.height = `calc(100% - ${this.maximizedTaskbarHeight}px)`;
-            descriptor.frame.style.borderRadius = '0';
-        } else {
-            descriptor.frame.style.borderRadius = '';
-            descriptor.root.style.width = `${descriptor.bounds.width}px`;
-            descriptor.root.style.height = `${descriptor.bounds.height}px`;
-        }
+        descriptor.frame.style.borderRadius = '0';
 
         if (descriptor.style?.background) {
             descriptor.frame.style.background = descriptor.style.background;
         }
         if (descriptor.style?.color) {
             descriptor.frame.style.color = descriptor.style.color;
-        }
-        if (descriptor.style?.borderRadius) {
-            descriptor.frame.style.borderRadius = descriptor.style.borderRadius;
         }
         if (descriptor.style?.border) {
             descriptor.frame.style.border = descriptor.style.border;
@@ -978,135 +929,6 @@ class WindowManager {
             onClick();
         });
         return button;
-    }
-
-    private enableDrag(titleBar: HTMLDivElement, descriptor: WindowDescriptor): void {
-        let startX = 0;
-        let startY = 0;
-        let startBoundsX = 0;
-        let startBoundsY = 0;
-
-        const onPointerMove = (e: PointerEvent) => {
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            descriptor.bounds.x = startBoundsX + dx;
-            descriptor.bounds.y = startBoundsY + dy;
-            descriptor.root.style.left = `${descriptor.bounds.x}px`;
-            descriptor.root.style.top = `${descriptor.bounds.y}px`;
-        };
-
-        const onPointerUp = (e: PointerEvent) => {
-            titleBar.releasePointerCapture(e.pointerId);
-            descriptor.root.classList.remove('is-dragging');
-            titleBar.removeEventListener('pointermove', onPointerMove);
-            titleBar.removeEventListener('pointerup', onPointerUp);
-        };
-
-        titleBar.addEventListener('pointerdown', (e: PointerEvent) => {
-            if (descriptor.state === 'maximized') return;
-            if ((e.target as HTMLElement).closest('.window-actions')) return;
-            startX = e.clientX;
-            startY = e.clientY;
-            startBoundsX = descriptor.bounds.x;
-            startBoundsY = descriptor.bounds.y;
-            descriptor.root.classList.add('is-dragging');
-            titleBar.setPointerCapture(e.pointerId);
-            titleBar.addEventListener('pointermove', onPointerMove);
-            titleBar.addEventListener('pointerup', onPointerUp);
-        });
-    }
-
-    private enableResize(root: HTMLDivElement, descriptor: WindowDescriptor): void {
-        const edges: Array<{ className: string; dx: -1|0|1; dy: -1|0|1 }> = [
-            { className: 'window-resize-n',  dx: 0,  dy: -1 },
-            { className: 'window-resize-s',  dx: 0,  dy: 1 },
-            { className: 'window-resize-w',  dx: -1, dy: 0 },
-            { className: 'window-resize-e',  dx: 1,  dy: 0 },
-            { className: 'window-resize-nw', dx: -1, dy: -1 },
-            { className: 'window-resize-ne', dx: 1,  dy: -1 },
-            { className: 'window-resize-sw', dx: -1, dy: 1 },
-            { className: 'window-resize-se', dx: 1,  dy: 1 },
-        ];
-
-        const minW = 280;
-        const minH = 180;
-
-        for (const edge of edges) {
-            const handle = document.createElement('div');
-            handle.className = `window-resize-handle ${edge.className}`;
-
-            let startX = 0;
-            let startY = 0;
-            let startBounds: WindowBounds = { x: 0, y: 0, width: 0, height: 0 };
-
-            const onPointerMove = (e: PointerEvent) => {
-                const deltaX = e.clientX - startX;
-                const deltaY = e.clientY - startY;
-
-                let newX = startBounds.x;
-                let newY = startBounds.y;
-                let newW = startBounds.width;
-                let newH = startBounds.height;
-
-                if (edge.dx === 1) {
-                    newW = Math.max(minW, startBounds.width + deltaX);
-                } else if (edge.dx === -1) {
-                    const proposed = startBounds.width - deltaX;
-                    if (proposed >= minW) {
-                        newW = proposed;
-                        newX = startBounds.x + deltaX;
-                    } else {
-                        newW = minW;
-                        newX = startBounds.x + (startBounds.width - minW);
-                    }
-                }
-
-                if (edge.dy === 1) {
-                    newH = Math.max(minH, startBounds.height + deltaY);
-                } else if (edge.dy === -1) {
-                    const proposed = startBounds.height - deltaY;
-                    if (proposed >= minH) {
-                        newH = proposed;
-                        newY = startBounds.y + deltaY;
-                    } else {
-                        newH = minH;
-                        newY = startBounds.y + (startBounds.height - minH);
-                    }
-                }
-
-                descriptor.bounds.x = newX;
-                descriptor.bounds.y = newY;
-                descriptor.bounds.width = newW;
-                descriptor.bounds.height = newH;
-
-                root.style.left = `${newX}px`;
-                root.style.top = `${newY}px`;
-                root.style.width = `${newW}px`;
-                root.style.height = `${newH}px`;
-            };
-
-            const onPointerUp = (e: PointerEvent) => {
-                handle.releasePointerCapture(e.pointerId);
-                descriptor.root.classList.remove('is-resizing');
-                handle.removeEventListener('pointermove', onPointerMove);
-                handle.removeEventListener('pointerup', onPointerUp);
-                this.emitWindowChange('resized', descriptor);
-            };
-
-            handle.addEventListener('pointerdown', (e: PointerEvent) => {
-                if (descriptor.state === 'maximized') return;
-                e.stopPropagation();
-                startX = e.clientX;
-                startY = e.clientY;
-                startBounds = { ...descriptor.bounds };
-                descriptor.root.classList.add('is-resizing');
-                handle.setPointerCapture(e.pointerId);
-                handle.addEventListener('pointermove', onPointerMove);
-                handle.addEventListener('pointerup', onPointerUp);
-            });
-
-            root.appendChild(handle);
-        }
     }
 
     private emitWindowChange(type: WindowLifecycleEvent['type'], descriptor: WindowDescriptor): void {

@@ -18,8 +18,11 @@ type ThemeSettings = {
   accentSecondary?: string;
   accentMode?: 'dark' | 'light';
   taskbarOpacity?: number;
-  taskbarMode?: TaskbarMode;
+  /** @deprecated No-op in mobile mode */
+  taskbarMode?: string;
+  /** @deprecated No-op in mobile mode */
   startMenuWidth?: number;
+  /** @deprecated No-op in mobile mode */
   startMenuHeight?: number;
   startMenuGroupByPackage?: boolean;
   // ── Color tokens ───────────────────────────────────────
@@ -39,6 +42,7 @@ type ThemeSettings = {
   colorTaskbarBorder?: string;
 };
 
+/** @deprecated Kept for API backward-compatibility only; mobile has no taskbar modes */
 type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
 
 class DesktopShell {
@@ -47,9 +51,12 @@ class DesktopShell {
   private windowLayer: HTMLDivElement | null = null;
   private wallpaperLayer: HTMLDivElement | null = null;
   private wallpaperTint: HTMLDivElement | null = null;
-  private taskbarEl: HTMLDivElement | null = null;
+  // ── Mobile UI ────────────────────────────────────────────────
+  private statusBarTitleEl: HTMLSpanElement | null = null;
+  private appSwitcherEl: HTMLDivElement | null = null;
+  private appSwitcherVisible = false;
+  // ── Start panel ──────────────────────────────────────────────
   private startButtonEl: HTMLButtonElement | null = null;
-  private taskbarAppList: HTMLDivElement | null = null;
   private startPanel: HTMLDivElement | null = null;
   private startSearchInput: HTMLInputElement | null = null;
   private startSearchList: HTMLDivElement | null = null;
@@ -57,15 +64,17 @@ class DesktopShell {
   private folderTabEl: HTMLButtonElement | null = null;
   private searchTabEl: HTMLButtonElement | null = null;
   private addFolderBtnEl: HTMLButtonElement | null = null;
+  // ── App data ────────────────────────────────────────────────
   private allApps: RegisteredApplication[] = [];
   private openedWindows = new Map<string, WindowInfo>();
-  private lastTaskbarFingerprint = '';
+  private lastWindowFingerprint = '';
+  // ── Handlers ─────────────────────────────────────────────────
   private launchHandler: ((app: RegisteredApplication) => void) | null = null;
   private taskbarWindowClickHandler: ((windowId: string, processAppId: string) => void) | null = null;
-  private groupPopup: HTMLDivElement | null = null;
-  private activeGroupAppDefId: string | null = null;
-  private outsideClickHandler: ((e: MouseEvent) => void) | null = null;
+  private showDesktopRequestHandler: (() => void) | null = null;
   private startOutsideClickHandler: ((e: MouseEvent) => void) | null = null;
+  private switcherOutsideClickHandler: ((e: MouseEvent) => void) | null = null;
+  // ── State ────────────────────────────────────────────────────
   private clockLabel: HTMLDivElement | null = null;
   private overlays = new Map<string, DesktopOverlayRegistration>();
   private clockTimer: number | null = null;
@@ -78,15 +87,8 @@ class DesktopShell {
   private contextMenuCloseHandler: ((e: MouseEvent) => void) | null = null;
   private pinnedAppIds: string[] = [];
   private expandedPackage: string | null = null;
-  private taskbarMode: TaskbarMode = 'docked';
-  private taskbarTrigger: HTMLDivElement | null = null;
-  private taskbarHideTimer: number | null = null;
-  private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
   private locale: string = 'zh-TW';
   private translator: ((key: string) => string) | null = null;
-  private compactExpanded = false;
-  private compactDragging = false;
-  private compactDragOffset = { x: 0, y: 0 };
 
   /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
   private t(key: string): string {
@@ -127,18 +129,21 @@ class DesktopShell {
     const windowLayer = document.createElement('div');
     windowLayer.className = 'desktop-window-layer';
 
-    const taskbar = document.createElement('div');
-    taskbar.className = 'desktop-taskbar';
+    // ── Mobile Status Bar (top) ──────────────────────────────────
+    const statusBar = document.createElement('div');
+    statusBar.className = 'mobile-status-bar';
 
-    // Compact mode floating handle
-    const taskbarTrigger = document.createElement('div');
-    taskbarTrigger.className = 'desktop-taskbar-trigger';
+    const statusBarTitle = document.createElement('span');
+    statusBarTitle.className = 'mobile-status-bar-title';
+    statusBarTitle.textContent = 'SentryOS';
 
-    const startButton = document.createElement('button');
-    startButton.className = 'desktop-taskbar-start';
-    startButton.type = 'button';
-    startButton.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="10" y="1" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="1" y="10" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="10" y="10" width="7" height="7" rx="1.5" fill="currentColor"/></svg>';
+    const statusBarClock = document.createElement('div');
+    statusBarClock.className = 'mobile-status-bar-clock';
 
+    statusBar.appendChild(statusBarTitle);
+    statusBar.appendChild(statusBarClock);
+
+    // ── Start Panel (mobile bottom sheet) ───────────────────────
     const startPanel = document.createElement('div');
     startPanel.className = 'desktop-start-panel is-hidden';
 
@@ -181,7 +186,6 @@ class DesktopShell {
     folderPane.appendChild(folderToolbar);
     folderPane.appendChild(startFolderList);
 
-    // Drop on folder list (inner page mode)
     startFolderList.addEventListener('dragover', (e) => {
       if (this.openFolderName) e.preventDefault();
     });
@@ -216,33 +220,61 @@ class DesktopShell {
     startPanel.appendChild(folderPane);
     startPanel.appendChild(searchPane);
 
-    const appList = document.createElement('div');
-    appList.className = 'desktop-taskbar-apps';
+    // ── Mobile Navigation Bar (bottom) ──────────────────────────
+    const navBar = document.createElement('div');
+    navBar.className = 'mobile-nav-bar';
 
-    const clock = document.createElement('div');
-    clock.className = 'desktop-taskbar-clock';
+    const recentsBtn = document.createElement('button');
+    recentsBtn.type = 'button';
+    recentsBtn.className = 'mobile-nav-btn';
+    recentsBtn.setAttribute('aria-label', this.t('nav.recents'));
+    recentsBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' +
+      `<span>${this.t('nav.recents')}</span>`;
 
-    taskbar.appendChild(startButton);
-    taskbar.appendChild(appList);
-    taskbar.appendChild(clock);
+    const homeBtn = document.createElement('button');
+    homeBtn.type = 'button';
+    homeBtn.className = 'mobile-nav-btn mobile-nav-btn--home';
+    homeBtn.setAttribute('aria-label', this.t('nav.home'));
+    homeBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 9 12 2 21 9"/><path d="M9 22V12h6v10"/><path d="M3 9v13h18V9"/></svg>' +
+      `<span>${this.t('nav.home')}</span>`;
 
+    const desktopBtn = document.createElement('button');
+    desktopBtn.type = 'button';
+    desktopBtn.className = 'mobile-nav-btn';
+    desktopBtn.setAttribute('aria-label', this.t('nav.desktop'));
+    desktopBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' +
+      `<span>${this.t('nav.desktop')}</span>`;
+
+    navBar.appendChild(recentsBtn);
+    navBar.appendChild(homeBtn);
+    navBar.appendChild(desktopBtn);
+
+    // ── App Switcher Overlay ─────────────────────────────────────
+    const appSwitcher = document.createElement('div');
+    appSwitcher.className = 'mobile-app-switcher is-hidden';
+
+    // ── DOM assembly ─────────────────────────────────────────────
     root.appendChild(wallpaperLayer);
     root.appendChild(overlayLayer);
     root.appendChild(windowLayer);
+    root.appendChild(statusBar);
     root.appendChild(startPanel);
-    root.appendChild(taskbar);
-    root.appendChild(taskbarTrigger);
+    root.appendChild(navBar);
+    root.appendChild(appSwitcher);
     appRoot.appendChild(root);
 
+    // ── Store refs ───────────────────────────────────────────────
     this.root = root;
     this.overlayLayer = overlayLayer;
     this.windowLayer = windowLayer;
     this.wallpaperLayer = wallpaperLayer;
     this.wallpaperTint = wallpaperTint;
-    this.taskbarEl = taskbar;
-    this.taskbarTrigger = taskbarTrigger;
-    this.startButtonEl = startButton;
-    this.taskbarAppList = appList;
+    this.statusBarTitleEl = statusBarTitle;
+    this.clockLabel = statusBarClock;
+    this.startButtonEl = homeBtn;
     this.startPanel = startPanel;
     this.startSearchInput = startSearchInput;
     this.startSearchList = startSearchList;
@@ -250,29 +282,26 @@ class DesktopShell {
     this.folderTabEl = folderTab;
     this.searchTabEl = searchTab;
     this.addFolderBtnEl = addFolderBtn;
-    this.clockLabel = clock;
+    this.appSwitcherEl = appSwitcher;
 
-    startButton.addEventListener('click', () => {
-      this.toggleStartPanel();
+    // ── Event wiring ─────────────────────────────────────────────
+    recentsBtn.addEventListener('click', () => this.toggleAppSwitcher());
+    homeBtn.addEventListener('click', () => this.toggleStartPanel());
+    desktopBtn.addEventListener('click', () => {
+      this.hideAppSwitcher();
+      this.startPanel?.classList.add('is-hidden');
+      this.removeStartOutsideClick();
+      this.showDesktopRequestHandler?.();
     });
 
     startSearchInput.addEventListener('input', () => {
       this.renderStartMenu();
     });
 
-    // ── Tab switching ──
     folderTab.addEventListener('click', () => this.setActiveStartTab('folders', folderTab, searchTab, folderPane, searchPane));
     searchTab.addEventListener('click', () => this.setActiveStartTab('search', searchTab, folderTab, searchPane, folderPane));
 
-    // ── Compact mode: draggable handle + click to expand/collapse ──
-    taskbarTrigger.addEventListener('click', () => {
-      if (this.compactDragging) return;
-      this.toggleCompactExpand();
-    });
-    taskbarTrigger.addEventListener('mousedown', (e) => this.onCompactDragStart(e));
-
     this.loadFolders();
-    this.renderTaskbar();
     this.renderStartMenu();
     this.renderFoldersTab();
     this.updateClock();
@@ -301,17 +330,19 @@ class DesktopShell {
   syncOpenWindows(windows: WindowInfo[]): void {
     // Build a fingerprint to skip redundant re-renders
     const fingerprint = windows.map(w => w.windowId + ':' + w.state + ':' + w.title).join('|');
-    if (fingerprint === this.lastTaskbarFingerprint) {
+    if (fingerprint === this.lastWindowFingerprint) {
       return;
     }
-    this.lastTaskbarFingerprint = fingerprint;
+    this.lastWindowFingerprint = fingerprint;
 
     this.openedWindows.clear();
     for (const windowInfo of windows) {
       this.openedWindows.set(windowInfo.windowId, windowInfo);
     }
-    this.closeGroupPopup();
-    this.renderTaskbar();
+    // Refresh app switcher if it is visible
+    if (this.appSwitcherVisible) {
+      this.renderAppSwitcher();
+    }
   }
 
   registerOverlay(registration: DesktopOverlayRegistration): void {
@@ -330,22 +361,17 @@ class DesktopShell {
       this.clockTimer = null;
     }
 
-    this.closeGroupPopup();
+    this.hideAppSwitcher();
     this.removeStartOutsideClick();
-    if (this.taskbarHideTimer !== null) {
-      window.clearTimeout(this.taskbarHideTimer);
-      this.taskbarHideTimer = null;
-    }
     this.root?.remove();
     this.root = null;
     this.overlayLayer = null;
     this.windowLayer = null;
     this.wallpaperLayer = null;
     this.wallpaperTint = null;
-    this.taskbarEl = null;
-    this.taskbarTrigger = null;
+    this.statusBarTitleEl = null;
+    this.appSwitcherEl = null;
     this.startButtonEl = null;
-    this.taskbarAppList = null;
     this.startPanel = null;
     this.startSearchInput = null;
     this.startSearchList = null;
@@ -441,17 +467,7 @@ class DesktopShell {
         document.documentElement.style.setProperty('--sos-color-taskbar', `rgba(7, 12, 20, ${opacity})`);
       }
     }
-    if (theme.startMenuWidth !== undefined && this.startPanel) {
-      const w = Math.max(280, Math.min(640, theme.startMenuWidth));
-      this.startPanel.style.setProperty('--start-menu-width', `${w}px`);
-    }
-    if (theme.startMenuHeight !== undefined && this.startPanel) {
-      const h = Math.max(300, Math.min(800, theme.startMenuHeight));
-      this.startPanel.style.setProperty('--start-menu-height', `${h}px`);
-    }
-    if (theme.taskbarMode !== undefined) {
-      this.setTaskbarMode(theme.taskbarMode);
-    }
+    // taskbarMode and startMenuWidth/Height are no-ops in mobile mode
     if (theme.startMenuGroupByPackage !== undefined) {
       this.expandedPackage = null;
     }
@@ -491,46 +507,7 @@ class DesktopShell {
     return { ...this.currentTheme };
   }
 
-  // ── Floating taskbar ──────────────────────────────────────
-
-  setTaskbarMode(mode: TaskbarMode): void {
-    if (mode === this.taskbarMode) return;
-    this.taskbarMode = mode;
-
-    if (!this.taskbarEl || !this.taskbarTrigger) return;
-
-    // Reset classes
-    this.taskbarEl.classList.remove('is-fullwidth', 'is-floating', 'is-compact', 'is-compact-expanded');
-    this.taskbarTrigger.style.display = 'none';
-    this.taskbarTrigger.style.removeProperty('left');
-    this.taskbarTrigger.style.removeProperty('top');
-    this.taskbarTrigger.style.removeProperty('right');
-    this.taskbarTrigger.style.removeProperty('bottom');
-    this.compactExpanded = false;
-
-    if (this.taskbarHideTimer !== null) {
-      window.clearTimeout(this.taskbarHideTimer);
-      this.taskbarHideTimer = null;
-    }
-
-    if (mode === 'fullwidth') {
-      this.taskbarEl.classList.add('is-fullwidth');
-    } else if (mode === 'floating-compact') {
-      this.taskbarEl.classList.add('is-floating', 'is-compact');
-      this.taskbarTrigger.style.display = 'flex';
-    }
-    // 'docked' — default, no extra classes
-
-    this.taskbarModeChangeHandler?.(mode);
-  }
-
-  getTaskbarMode(): TaskbarMode {
-    return this.taskbarMode;
-  }
-
-  onTaskbarModeChange(handler: (mode: TaskbarMode) => void): void {
-    this.taskbarModeChangeHandler = handler;
-  }
+  // ── Locale ───────────────────────────────────────────────────
 
   setLocale(locale: string, translator?: (key: string) => string): void {
     this.locale = locale;
@@ -548,178 +525,122 @@ class DesktopShell {
     if (this.startSearchInput) this.startSearchInput.placeholder = this.t('search.placeholder');
   }
 
-  private toggleCompactExpand(): void {
-    if (this.taskbarMode !== 'floating-compact' || !this.taskbarEl) return;
-    this.compactExpanded = !this.compactExpanded;
-    this.taskbarEl.classList.toggle('is-compact-expanded', this.compactExpanded);
+  // ── Mobile: App Switcher ──────────────────────────────────────
+
+  /** Update the status bar title to reflect the currently focused app. */
+  setFocusedWindowTitle(title: string | null): void {
+    if (this.statusBarTitleEl) {
+      this.statusBarTitleEl.textContent = title ?? 'SentryOS';
+    }
   }
 
-  private onCompactDragStart(e: MouseEvent): void {
-    if (this.taskbarMode !== 'floating-compact' || !this.taskbarTrigger) return;
-    const rect = this.taskbarTrigger.getBoundingClientRect();
-    this.compactDragging = false;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    this.compactDragOffset.x = e.clientX - rect.left;
-    this.compactDragOffset.y = e.clientY - rect.top;
-
-    const onMove = (ev: MouseEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      if (!this.compactDragging && Math.abs(dx) + Math.abs(dy) < 5) return;
-      this.compactDragging = true;
-      const trigger = this.taskbarTrigger!;
-      // Clear auto-positioning so inline left/top take effect
-      trigger.style.right = 'auto';
-      trigger.style.bottom = 'auto';
-      trigger.style.left = `${Math.max(0, Math.min(window.innerWidth - 52, ev.clientX - this.compactDragOffset.x))}px`;
-      trigger.style.top = `${Math.max(0, Math.min(window.innerHeight - 52, ev.clientY - this.compactDragOffset.y))}px`;
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      // Reset dragging flag after a tick so click handler can check it
-      setTimeout(() => { this.compactDragging = false; }, 0);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  /** Register callback invoked when the user taps the "Show Desktop" nav button. */
+  onShowDesktopRequest(handler: () => void): void {
+    this.showDesktopRequestHandler = handler;
   }
 
-  private renderTaskbar(): void {
-    if (!this.taskbarAppList) {
-      return;
+  private toggleAppSwitcher(): void {
+    if (this.appSwitcherVisible) {
+      this.hideAppSwitcher();
+    } else {
+      this.showAppSwitcher();
     }
+  }
 
-    this.taskbarAppList.replaceChildren();
+  private showAppSwitcher(): void {
+    if (!this.appSwitcherEl) return;
+    // Close start panel if open
+    this.startPanel?.classList.add('is-hidden');
+    this.removeStartOutsideClick();
+    this.renderAppSwitcher();
+    this.appSwitcherEl.classList.remove('is-hidden');
+    this.appSwitcherVisible = true;
 
-    // 依 appDefId 分組
-    const groups = new Map<string, WindowInfo[]>();
-    for (const windowInfo of this.openedWindows.values()) {
-      const key = windowInfo.appDefId;
-      if (!groups.has(key)) {
-        groups.set(key, []);
+    this.switcherOutsideClickHandler = (e: MouseEvent) => {
+      const inner = this.appSwitcherEl?.querySelector('.mobile-app-switcher-inner');
+      if (inner && !inner.contains(e.target as Node)) {
+        this.hideAppSwitcher();
       }
-      groups.get(key)!.push(windowInfo);
+    };
+    document.addEventListener('click', this.switcherOutsideClickHandler, true);
+  }
+
+  private hideAppSwitcher(): void {
+    if (!this.appSwitcherEl) return;
+    this.appSwitcherEl.classList.add('is-hidden');
+    this.appSwitcherVisible = false;
+    if (this.switcherOutsideClickHandler) {
+      document.removeEventListener('click', this.switcherOutsideClickHandler, true);
+      this.switcherOutsideClickHandler = null;
     }
+  }
 
-    for (const [appDefId, windows] of groups) {
-      const representative = windows[0];
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'desktop-taskbar-app';
-      button.title = representative.title;
-      button.dataset.appDefId = appDefId;
+  private renderAppSwitcher(): void {
+    if (!this.appSwitcherEl) return;
+    this.appSwitcherEl.replaceChildren();
 
-      // 若全部都是 minimized，按鈕顯示為 minimized
-      const allMinimized = windows.every(w => w.state === 'minimized');
-      button.dataset.windowState = allMinimized ? 'minimized' : 'normal';
+    const inner = document.createElement('div');
+    inner.className = 'mobile-app-switcher-inner';
 
-      const icon = document.createElement('span');
-      icon.className = 'desktop-taskbar-app-icon';
-      if (representative.icon) {
-        const img = document.createElement('img');
-        img.src = representative.icon;
-        img.alt = '';
-        img.draggable = false;
-        img.addEventListener('error', () => {
-          img.remove();
-          icon.textContent = representative.title.charAt(0).toUpperCase();
-        });
-        icon.appendChild(img);
-      } else {
-        icon.textContent = representative.title.charAt(0).toUpperCase();
-      }
+    const visibleWindows = Array.from(this.openedWindows.values()).filter(w => w.state !== 'minimized');
 
-      button.appendChild(icon);
+    if (visibleWindows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'mobile-app-switcher-empty';
+      empty.textContent = this.t('switcher.noWindows');
+      inner.appendChild(empty);
+    } else {
+      for (const w of visibleWindows) {
+        const card = document.createElement('div');
+        card.className = 'mobile-app-card';
 
-      // 多視窗時顯示數量 badge
-      if (windows.length > 1) {
-        const badge = document.createElement('span');
-        badge.className = 'desktop-taskbar-app-badge';
-        badge.textContent = String(windows.length);
-        button.appendChild(badge);
-      }
-
-      button.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (windows.length === 1) {
-          // 單一視窗直接 focus
-          this.taskbarWindowClickHandler?.(windows[0].windowId, windows[0].processAppId);
+        const iconEl = document.createElement('span');
+        iconEl.className = 'mobile-app-card-icon';
+        if (w.icon) {
+          const img = document.createElement('img');
+          img.src = w.icon;
+          img.alt = '';
+          img.draggable = false;
+          img.addEventListener('error', () => {
+            img.remove();
+            iconEl.textContent = w.title.charAt(0).toUpperCase();
+          });
+          iconEl.appendChild(img);
         } else {
-          // 多視窗切換分組面板
-          this.toggleGroupPopup(appDefId, windows, button);
+          iconEl.textContent = w.title.charAt(0).toUpperCase();
         }
-      });
 
-      this.taskbarAppList.appendChild(button);
-    }
-  }
+        const titleEl = document.createElement('span');
+        titleEl.className = 'mobile-app-card-title';
+        titleEl.textContent = w.title;
 
-  private toggleGroupPopup(appDefId: string, windows: WindowInfo[], anchor: HTMLButtonElement): void {
-    // 若已開啟同一個群組面板，關閉它
-    if (this.activeGroupAppDefId === appDefId && this.groupPopup) {
-      this.closeGroupPopup();
-      return;
-    }
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'mobile-app-card-close';
+        closeBtn.setAttribute('aria-label', this.t('btn.closeApp'));
+        closeBtn.textContent = this.t('btn.closeApp');
+        closeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Reuse taskbar click handler to focus (which triggers close from app)
+          // For explicit close we just dispatch a focus so the running app decides
+          this.taskbarWindowClickHandler?.(w.windowId, w.processAppId);
+          this.hideAppSwitcher();
+        });
 
-    this.closeGroupPopup();
+        card.appendChild(iconEl);
+        card.appendChild(titleEl);
+        card.appendChild(closeBtn);
 
-    const popup = document.createElement('div');
-    popup.className = 'desktop-taskbar-group-popup';
+        card.addEventListener('click', () => {
+          this.taskbarWindowClickHandler?.(w.windowId, w.processAppId);
+          this.hideAppSwitcher();
+        });
 
-    for (const w of windows) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'desktop-taskbar-group-item';
-      item.dataset.windowState = w.state;
-
-      const label = document.createElement('span');
-      label.className = 'desktop-taskbar-group-item-label';
-      label.textContent = w.title;
-      item.appendChild(label);
-
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.taskbarWindowClickHandler?.(w.windowId, w.processAppId);
-        this.closeGroupPopup();
-      });
-
-      popup.appendChild(item);
-    }
-
-    // 定位：在錨定按鈕正上方
-    const anchorRect = anchor.getBoundingClientRect();
-    const rootRect = this.root?.getBoundingClientRect();
-    if (rootRect) {
-      popup.style.left = `${anchorRect.left - rootRect.left + anchorRect.width / 2}px`;
-      popup.style.bottom = `${rootRect.height - anchorRect.top + rootRect.top + 8}px`;
-    }
-
-    this.root?.appendChild(popup);
-    this.groupPopup = popup;
-    this.activeGroupAppDefId = appDefId;
-
-    // 点击外部关闭
-    this.outsideClickHandler = (e: MouseEvent) => {
-      if (!popup.contains(e.target as Node) && !anchor.contains(e.target as Node)) {
-        this.closeGroupPopup();
+        inner.appendChild(card);
       }
-    };
-    document.addEventListener('click', this.outsideClickHandler, true);
-  }
+    }
 
-  private closeGroupPopup(): void {
-    if (this.groupPopup) {
-      this.groupPopup.remove();
-      this.groupPopup = null;
-    }
-    this.activeGroupAppDefId = null;
-    if (this.outsideClickHandler) {
-      document.removeEventListener('click', this.outsideClickHandler, true);
-      this.outsideClickHandler = null;
-    }
+    this.appSwitcherEl.appendChild(inner);
   }
 
   private toggleStartPanel(): void {

@@ -1,8 +1,6 @@
 import type { Kernel } from '../kernel/Kernel';
-import type { ThemeSettings, TaskbarMode } from '../ui/DesktopShell';
+import type { ThemeSettings } from '../ui/DesktopShell';
 import { Permissions, Events } from '../kernel/constants';
-
-const VALID_TASKBAR_MODES = ['docked', 'fullwidth', 'floating-compact'] as const;
 
 const COLOR_TOKEN_KEYS: (keyof ThemeSettings)[] = [
   'colorSurface', 'colorSurfaceAlt', 'colorSurfaceInput', 'colorSurfaceHover',
@@ -34,7 +32,8 @@ function sanitizeTheme(theme: Record<string, unknown>): ThemeSettings {
   if (typeof theme.accentSecondary === 'string') safe.accentSecondary = theme.accentSecondary;
   if (theme.accentMode === 'dark' || theme.accentMode === 'light') safe.accentMode = theme.accentMode;
   if (typeof theme.taskbarOpacity === 'number') safe.taskbarOpacity = theme.taskbarOpacity;
-  if (typeof theme.taskbarMode === 'string' && (VALID_TASKBAR_MODES as readonly string[]).includes(theme.taskbarMode)) safe.taskbarMode = theme.taskbarMode as TaskbarMode;
+  // taskbarMode is a no-op in mobile but accepted for API compatibility
+  if (typeof theme.taskbarMode === 'string') safe.taskbarMode = theme.taskbarMode as string;
   if (typeof theme.startMenuWidth === 'number') safe.startMenuWidth = theme.startMenuWidth;
   if (typeof theme.startMenuHeight === 'number') safe.startMenuHeight = theme.startMenuHeight;
   if (typeof theme.startMenuGroupByPackage === 'boolean') safe.startMenuGroupByPackage = theme.startMenuGroupByPackage;

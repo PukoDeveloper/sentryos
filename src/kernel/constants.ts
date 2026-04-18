@@ -7,6 +7,10 @@ export const WINDOW_CASCADE_INCREMENT = 18;
 export const MAXIMIZED_WINDOW_MARGIN = 0;   // px (negative to counter window-layer padding)
 export const MAXIMIZED_TASKBAR_HEIGHT = 96;   // px (taskbar 82px from viewport - 40px padding)
 
+// ── Mobile UI Dimensions ─────────────────────────────────────
+export const MOBILE_STATUS_BAR_HEIGHT = 44;  // px - top status bar
+export const MOBILE_NAV_BAR_HEIGHT = 64;     // px - bottom navigation bar
+
 // ── Z-Index Layers ──────────────────────────────────────────
 export const Z_INDEX_WINDOW_BASE = 50;
 export const Z_INDEX_ALWAYS_ON_TOP_OFFSET = 500;
