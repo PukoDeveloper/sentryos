@@ -53,6 +53,11 @@ export function registerSettingsApi(kernel: Kernel): void {
   const catalogApps = kernel.get('catalogApps');
   const bootStartTime = kernel.get('bootStartTime');
 
+  function applyAndEmitTheme(safe: ThemeSettings): void {
+    desktopShell.applyTheme(safe);
+    eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
+  }
+
   runtimeRegistry.registerApi('settingsApi', ({ process }) => ({
     getTheme: () => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
@@ -64,9 +69,7 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const safe = sanitizeTheme(theme);
-      desktopShell.applyTheme(safe);
-      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
+      applyAndEmitTheme(sanitizeTheme(theme));
       return { success: true, data: null };
     },
     saveTheme: (theme: Record<string, unknown>) => {
@@ -74,8 +77,7 @@ export function registerSettingsApi(kernel: Kernel): void {
         return { success: false, error: 'PermissionDenied' };
       }
       const safe = sanitizeTheme(theme);
-      desktopShell.applyTheme(safe);
-      eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
+      applyAndEmitTheme(safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },
     loadSavedTheme: () => {

@@ -6,12 +6,11 @@ import type { IRuntime } from '../runtime/IRuntime';
 import type { RuntimeRegistry } from '../runtime/RuntimeRegistry';
 import type { FileSystemAdapter } from '../storage/FileSystem';
 import type { WindowManager } from '../window/WindowManager';
-import type { ConsoleWindowController } from '../window/types';
 import type { EnvironmentManager } from '../environment/EnvironmentManager';
 import type { NotificationManager } from '../notification/NotificationManager';
 import type { SystemMonitor } from '../monitor/SystemMonitor';
-import type { ApplicationLauncher } from '../application/ApplicationLauncher';
 import type { DesktopShell } from '../ui/DesktopShell';
+import type { ApplicationLauncher } from '../application/ApplicationLauncher';
 import type { SystemAlert } from '../notification/SystemAlert';
 import type { KernelConsole } from '../console/KernelConsole';
 import type { RegisteredApplication } from '../application/ApplicationCatalog';
@@ -50,7 +49,6 @@ export interface ValueMap {
   bootStartTime: number;
   catalogApps: RegisteredApplication[];
   iconMap: Map<string, string>;
-  consoleControllers: Map<string, ConsoleWindowController>;
 }
 
 class Kernel {

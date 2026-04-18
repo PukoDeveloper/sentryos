@@ -24,15 +24,8 @@ import type {
 import { uiComponentRegistry } from './UiComponentRegistry';
 import type { RenderContext } from './UiComponentRegistry';
 import { renderAnsiLine } from '../console/AnsiParser';
+import { toIterable } from './toIterable';
 import './builtinComponents';
-
-/** See builtinComponents.ts — normalises Lua proxy objects to JS arrays. */
-function toIterable<T>(v: T[] | Iterable<T> | null | undefined | Record<string, unknown>): T[] {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v;
-    if (typeof (v as any)[Symbol.iterator] === 'function') return Array.from(v as Iterable<T>);
-    return [];
-}
 
 const ANIM_CLOSE_MS    = 220;
 const ANIM_MINIMIZE_MS = 280;
@@ -399,6 +392,11 @@ class WindowManager {
         current.state = 'closed';
         current.root.classList.add('is-closing');
 
+        // If the open context menu belongs to this window, close it
+        if (this.contextMenuEl && current.root.contains(this.contextMenuEl)) {
+            this.closeContextMenu();
+        }
+
         this.windows.delete(windowId);
         this.processWindows.get(processAppId)?.delete(windowId);
         this.pruneBindings(windowId);
@@ -411,6 +409,11 @@ class WindowManager {
         setTimeout(() => current.root.remove(), ANIM_CLOSE_MS);
 
         return { success: true, data: windowId };
+    }
+
+    /** 清除指定程序的速率限制紀錄。應在程序終止時呼叫。 */
+    cleanupProcess(processAppId: string): void {
+        this.windowCreationTimes.delete(processAppId);
     }
 
     setWindowStyle(processAppId: string, windowId: string, style: WindowStyle): WindowSystemResult<string> {

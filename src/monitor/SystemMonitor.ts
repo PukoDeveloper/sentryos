@@ -116,6 +116,7 @@ export interface RuntimeMemorySnapshotEntry {
 const MAX_RECENT_EVENTS = 200;
 const MAX_RECENT_API_CALLS = 200;
 const MAX_RECENT_EXECUTIONS = 100;
+const MAX_PROCESS_HISTORY = 500;
 
 class SystemMonitor {
     // ── Event tracking ──
@@ -242,6 +243,9 @@ class SystemMonitor {
             launchedAt: Date.now(),
             terminatedAt: null,
         });
+        if (this.processHistory.length > MAX_PROCESS_HISTORY) {
+            this.processHistory.shift();
+        }
     }
 
     recordProcessTerminate(pid: number, appDefId: string): void {

@@ -74,7 +74,13 @@ class PermissionsManager {
         return { success: true, data: newAppId };
     }
     has(appId: string, permission: string): boolean {
-        const granted = Array.from(this.appPermissions[appId] || []).some(p => matchesPermission(p, permission));
+        const perms = this.appPermissions[appId];
+        let granted = false;
+        if (perms) {
+            for (const p of perms) {
+                if (matchesPermission(p, permission)) { granted = true; break; }
+            }
+        }
         this.monitor?.recordPermissionCheck(appId, permission, granted);
         return granted;
     }

@@ -4,7 +4,7 @@
     "author": "SentryOS Team",
     "apps": [
         {
-            "id": "Console",
+            "id": "developer-console",
             "name": "控制台",
             "version": "1.0.0",
             "main": "main.js",
@@ -15,7 +15,7 @@
             "maxInstances": 1
         },
         {
-            "id": "Catch",
+            "id": "developer-catch",
             "name": "異常故意觸發器",
             "version": "1.0.0",
             "main": "catch.js",

@@ -60,6 +60,7 @@ export class ApplicationLauncher {
     for (const wid of windowIds) {
       try { this.windowManager.closeWindow(processAppId, wid); } catch (err) { console.warn('[Launcher] closeWindow failed (may already be gone):', err); }
     }
+    this.windowManager.cleanupProcess(processAppId);
 
     // Destroy the process's runtime and remove tracking
     this.runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);

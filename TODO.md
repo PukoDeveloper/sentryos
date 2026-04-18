@@ -38,40 +38,40 @@
 
 - [x] Manifest 載入從序列 fetch 改為 `Promise.allSettled` 並行（已在 Bug 修復中一併完成）
 - [ ] Auto-start apps 中 Services 可並行啟動（systemBootstrap.ts ~L312）
-- [ ] `FileSystem.checkCapacity` 每次寫入遍歷所有 entry 計算用量，應改用增量計數器（FileSystem.ts ~L307）
+- [x] `FileSystem.checkCapacity` 每次寫入遍歷所有 entry 計算用量；已改用增量計數器（tierUsedBytes / totalUsedBytes）
 - [ ] `FileSystem.persistTier` 每次寫入/刪除序列化整個 tier 到 localStorage，高頻寫入需節流（FileSystem.ts ~L244）
 - [ ] `SystemMonitor` 的 `recentEvents.shift()` 是 O(n)，建議改用環形緩衝區（SystemMonitor.ts ~L149）
-- [ ] `PermissionsManager.has()` 每次將 Set 轉為 Array 再遍歷，可直接迭代 Set（PermissionsManager.ts ~L67）
-- [ ] `BaseRuntime.dispatchToHandler` 線性掃描所有 process 查找 processAppId，應建立反向索引（BaseRuntime.ts ~L72）
+- [x] `PermissionsManager.has()` 每次將 Set 轉為 Array 再遍歷；已改為直接迭代 Set
+- [x] `BaseRuntime.dispatchToHandler` 線性掃描所有 process 查找 processAppId；已改用 processManager.getByProcessAppId() O(1) 反向查找
 - [ ] 多層 `backdrop-filter: blur()` 疊加（taskbar + start panel + context menu + notifications），低階設備效能差（style.css）
 
 ---
 
 ### 🧹 程式碼品質 / 死碼清理
 
-- [ ] `Process.resource: any` 從未被讀寫，為殘留死碼（Process.ts ~L15）
-- [ ] `Kernel.ValueMap.consoleControllers` 宣告但從未使用（Kernel.ts ~L53）
+- [x] `Process.resource: any` 從未被讀寫；已移除殘留死碼
+- [x] `Kernel.ValueMap.consoleControllers` 宣告但從未使用；已從 ValueMap 介面移除
 - [x] `ScriptRuntime` timer typeof 檢查 if-block 為空 body（已在 Bug 修復中一併移除）
-- [ ] `toIterable()` 在 WindowManager 和 builtinComponents 中重複定義，應提取共用模組
-- [ ] `KernelConsole.padRight()` 可直接用 `String.prototype.padEnd()` 替代
-- [ ] `settingsApi` 中 `applyTheme`/`saveTheme` 有大量重複驗證邏輯（settingsApi.ts ~L40-77）
+- [x] `toIterable()` 在 WindowManager 和 builtinComponents 中重複定義；已提取至 `window/toIterable.ts` 共用模組
+- [x] `KernelConsole.padRight()` 已替換為 `String.prototype.padEnd()`
+- [x] `settingsApi` 中 `applyTheme`/`saveTheme` 有大量重複驗證邏輯；已提取 `applyAndEmitTheme` 共用函式
 - [ ] `RuntimeResult<T>` 應改為 discriminated union 以獲得型別安全（runtime/types.ts ~L18）
 - [ ] `networkApi.request` 宣告為 async 但 QuickJS 同步環境無法處理 Promise 回傳（networkApi.ts ~L28）
-- [ ] `plugins/dev.js` 存在於磁碟但未被 `plugins.json` 引用（孤立插件）
-- [ ] `vite-plugin-wasm` 在 devDependencies 中但未被 vite.config.ts 引用（未使用依賴）
-- [ ] `developer-tools/manifest.json` 中 App ID 使用 PascalCase（`Console`/`Catch`），與專案 kebab-case 慣例不一致
+- [ ] `plugins/dev.js` 存在於磁碟但未被 `plugins.json` 引用（孤立插件）——已確認磁碟上不存在此檔案，無需處理
+- [x] `vite-plugin-wasm` 在 devDependencies 中但未被 vite.config.ts 引用；已從 package.json 移除
+- [x] `developer-tools/manifest.json` 中 App ID 使用 PascalCase（`Console`/`Catch`）；已改為 `developer-console` / `developer-catch`
 - [ ] 部分互動元素缺少 `:focus-visible` 樣式，影響鍵盤無障礙
 
 ---
 
 ### 🧩 記憶體洩漏
 
-- [ ] `WindowManager.windowCreationTimes` Map 在程序終止時不清除對應 key，長期累積（WindowManager.ts ~L381）
-- [ ] `SystemMonitor.processHistory` 陣列無限增長，已終止程序紀錄永不移除（SystemMonitor.ts ~L175）
-- [ ] `ScriptRuntime.ensureRuntimeProcess` 中 `injectApis` 若拋錯，已建立的 context 不會被釋放（ScriptRuntime.ts ~L175）
-- [ ] `ScriptRuntime.execute` 中 global handle 在 inject 過程拋錯時不會 dispose（ScriptRuntime.ts ~L38-49）
-- [ ] `NotificationManager.dismiss` 的 setTimeout 在 transitionend 已觸發後仍執行，timer 未清除（NotificationManager.ts ~L80）
-- [ ] Context menu 掛載在 `document.body`，window destroy 時可能殘留未清理（WindowManager.ts ~L553）
+- [x] `WindowManager.windowCreationTimes` Map 在程序終止時不清除對應 key；已新增 `cleanupProcess()` 並在 `terminateApplication` 呼叫
+- [x] `SystemMonitor.processHistory` 陣列無限增長；已加入 `MAX_PROCESS_HISTORY = 500` 上限
+- [x] `ScriptRuntime.ensureRuntimeProcess` 中 `injectApis` 若拋錯，已建立的 context 不會被釋放；已用 try-catch 包裹並回滾
+- [x] `ScriptRuntime.execute` 中 global handle 在 inject 過程拋錯時不會 dispose；已改用 try-finally 保證釋放
+- [x] `NotificationManager.dismiss` 的 setTimeout 在 transitionend 已觸發後仍執行，timer 未清除；已在 transitionend 中 clearTimeout 並保存 handle
+- [x] Context menu 掛載在 `document.body`，window destroy 時可能殘留未清理；已在 `closeWindow` 中偵測並關閉
 
 ---
 
