@@ -18,11 +18,11 @@ type ThemeSettings = {
   accentSecondary?: string;
   accentMode?: 'dark' | 'light';
   taskbarOpacity?: number;
-  /** @deprecated No-op in mobile mode */
+  /** @deprecated No-op in mobile mode; maintained for API backward compatibility only. Do not use. */
   taskbarMode?: string;
-  /** @deprecated No-op in mobile mode */
+  /** @deprecated No-op in mobile mode; maintained for API backward compatibility only. */
   startMenuWidth?: number;
-  /** @deprecated No-op in mobile mode */
+  /** @deprecated No-op in mobile mode; maintained for API backward compatibility only. */
   startMenuHeight?: number;
   startMenuGroupByPackage?: boolean;
   // ── Color tokens ───────────────────────────────────────
@@ -71,6 +71,7 @@ class DesktopShell {
   // ── Handlers ─────────────────────────────────────────────────
   private launchHandler: ((app: RegisteredApplication) => void) | null = null;
   private taskbarWindowClickHandler: ((windowId: string, processAppId: string) => void) | null = null;
+  private windowCloseRequestHandler: ((windowId: string, processAppId: string) => void) | null = null;
   private showDesktopRequestHandler: (() => void) | null = null;
   private startOutsideClickHandler: ((e: MouseEvent) => void) | null = null;
   private switcherOutsideClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -325,6 +326,11 @@ class DesktopShell {
 
   onTaskbarWindowClick(handler: (windowId: string, processAppId: string) => void): void {
     this.taskbarWindowClickHandler = handler;
+  }
+
+  /** Register callback invoked when the user taps the close (×) button on an app switcher card. */
+  onWindowCloseRequest(handler: (windowId: string, processAppId: string) => void): void {
+    this.windowCloseRequestHandler = handler;
   }
 
   syncOpenWindows(windows: WindowInfo[]): void {
@@ -621,9 +627,7 @@ class DesktopShell {
         closeBtn.textContent = this.t('btn.closeApp');
         closeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          // Reuse taskbar click handler to focus (which triggers close from app)
-          // For explicit close we just dispatch a focus so the running app decides
-          this.taskbarWindowClickHandler?.(w.windowId, w.processAppId);
+          this.windowCloseRequestHandler?.(w.windowId, w.processAppId);
           this.hideAppSwitcher();
         });
 

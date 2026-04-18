@@ -196,6 +196,8 @@ async function bootstrapSystem(): Promise<void> {
     if (event.type === 'focused') {
       desktopShell.setFocusedWindowTitle(event.title);
     } else if (event.type === 'closed' || event.type === 'minimized') {
+      // Best-effort: pick any remaining visible window as the title source.
+      // The 'focused' event is the authoritative path; this is only a fallback.
       const visible = summaries.filter(w => w.state !== 'minimized' && w.state !== 'closed');
       desktopShell.setFocusedWindowTitle(visible.length > 0 ? visible[visible.length - 1].title : null);
     }
@@ -244,6 +246,10 @@ async function bootstrapSystem(): Promise<void> {
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
     windowManager.focusWindow(processAppId, windowId);
+  });
+
+  desktopShell.onWindowCloseRequest((windowId, processAppId) => {
+    windowManager.closeWindow(processAppId, windowId);
   });
 
   desktopShell.onShowDesktopRequest(() => {
