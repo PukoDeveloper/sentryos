@@ -1,0 +1,56 @@
+name: "方案一：將 pocket 轉為孤立分支（一次性執行）"
+
+# 此 workflow 只需執行一次。
+# 執行後，pocket 分支將成為完全獨立的 orphan branch，與 main 不共享任何 git 歷史。
+# 執行步驟：GitHub → Actions → 左側選此 workflow → Run workflow
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-orphan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pocket branch (full history)
+        uses: actions/checkout@v4
+        with:
+          ref: pocket
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Create orphan branch from pocket content
+        run: |
+          # --orphan 建立一個沒有任何 parent commit 的新分支
+          # 工作目錄與 index 的內容保留自當前 HEAD（pocket 的最新程式碼）
+          git checkout --orphan pocket-orphan-temp
+
+          # 提交為全新的根節點 commit（無 parent）
+          git commit -m "chore: pocket 獨立技術路徑起點（與 main 無歷史關聯）
+
+          此 commit 由 make-pocket-orphan.yml workflow 自動建立。
+          從此節點開始，pocket 分支的 git 歷史與 main 完全分離。"
+
+          # 強制推送，覆蓋遠端 pocket 分支
+          git push origin HEAD:pocket --force
+
+          echo "✅ pocket 分支已成功轉換為孤立 orphan branch。"
+          echo "   原有的 pocket commit 歷史已被全新的根節點取代。"
+          echo "   本機備份分支 pocket-orphan-temp 僅存在於 runner，不會推送。"
+
+      - name: Verify orphan (no parent commits)
+        run: |
+          git fetch origin pocket
+          PARENT_COUNT=$(git rev-list --count origin/pocket)
+          echo "pocket 分支目前 commit 數量：${PARENT_COUNT}"
+          if [ "$PARENT_COUNT" -eq 1 ]; then
+            echo "✅ 確認：pocket 現在是孤立分支（只有一個根節點 commit）。"
+          else
+            echo "⚠️  警告：commit 數量不符合預期，請手動確認。"
+          fi
