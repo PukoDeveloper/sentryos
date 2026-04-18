@@ -362,7 +362,18 @@ class DesktopShell {
 
   applyTheme(theme: ThemeSettings): void {
     if (theme.wallpaper !== undefined && this.wallpaperLayer) {
-      this.wallpaperLayer.style.background = theme.wallpaper;
+      const wp = theme.wallpaper;
+      if (/^https?:\/\/|^data:image\//.test(wp)) {
+        // Image URL — set individual properties so background-size works
+        this.wallpaperLayer.style.background = 'none';
+        this.wallpaperLayer.style.backgroundImage = `url("${wp.replace(/["\\]/g, '\\$&')}")`;
+        this.wallpaperLayer.style.backgroundSize = 'cover';
+        this.wallpaperLayer.style.backgroundPosition = 'center';
+        this.wallpaperLayer.style.backgroundRepeat = 'no-repeat';
+      } else {
+        // CSS gradient or solid color — shorthand resets all individual props
+        this.wallpaperLayer.style.background = wp;
+      }
     }
     if (theme.tint !== undefined && this.wallpaperTint) {
       this.wallpaperTint.style.background = theme.tint;
