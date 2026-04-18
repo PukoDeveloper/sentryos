@@ -23,6 +23,7 @@ interface NotificationEntry {
     source?: string;
     element: HTMLDivElement;
     timer: number | null;
+    fallbackTimer: number | null;
 }
 
 class NotificationManager {
@@ -53,6 +54,7 @@ class NotificationManager {
     destroy(): void {
         for (const entry of this.notifications.values()) {
             if (entry.timer !== null) window.clearTimeout(entry.timer);
+            if (entry.fallbackTimer !== null) window.clearTimeout(entry.fallbackTimer);
         }
         this.notifications.clear();
         this.container?.remove();
@@ -80,7 +82,7 @@ class NotificationManager {
         const entry: NotificationEntry = {
             id, title: options.title, body: options.body,
             type, duration, source: options.source,
-            element: el, timer,
+            element: el, timer, fallbackTimer: null,
         };
         this.notifications.set(id, entry);
 
@@ -98,19 +100,21 @@ class NotificationManager {
         entry.element.classList.remove('is-visible');
         entry.element.classList.add('is-dismissed');
 
-        // 等退場動畫結束後移除 DOM
-        entry.element.addEventListener('transitionend', () => {
-            entry.element.remove();
-            this.notifications.delete(id);
-        }, { once: true });
-
         // 若 transitionend 未觸發（例如 display:none），保底移除
-        setTimeout(() => {
+        const fallbackTimer = window.setTimeout(() => {
             if (this.notifications.has(id)) {
                 entry.element.remove();
                 this.notifications.delete(id);
             }
         }, 400);
+        entry.fallbackTimer = fallbackTimer;
+
+        // 等退場動畫結束後移除 DOM
+        entry.element.addEventListener('transitionend', () => {
+            window.clearTimeout(fallbackTimer);
+            entry.element.remove();
+            this.notifications.delete(id);
+        }, { once: true });
     }
 
     private enforceMaxVisible(): void {

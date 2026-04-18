@@ -39,9 +39,12 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             if (!runtimeProcess.importsInjected) {
                 runtimeProcess.importsInjected = true;
                 const global = runtimeProcess.context.global;
-                this.injectImportCommand(runtimeProcess.context, runtimeProcess); //TIP: 取代imports()載入方法，採用ESModule-like的全域函式實作，提供更靈活的模組載入能力
-                this.injectImportsFunction(runtimeProcess.context, global, runtimeProcess);
-                global.dispose();
+                try {
+                    this.injectImportCommand(runtimeProcess.context, runtimeProcess); //TIP: 取代imports()載入方法，採用ESModule-like的全域函式實作，提供更靈活的模組載入能力
+                    this.injectImportsFunction(runtimeProcess.context, global, runtimeProcess);
+                } finally {
+                    global.dispose();
+                }
             }
         }
 
@@ -183,7 +186,14 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             timerNextId: 1,
         };
         this.processStates.set(proc.pid, runtimeProcess);
-        this.injectApis(context, proc);
+        try {
+            this.injectApis(context, proc);
+        } catch (err) {
+            this.processStates.delete(proc.pid);
+            try { context.dispose(); } catch { /* noop */ }
+            try { runtime.dispose(); } catch { /* noop */ }
+            throw err;
+        }
         return runtimeProcess;
     }
 

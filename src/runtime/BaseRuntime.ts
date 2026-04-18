@@ -75,11 +75,9 @@ abstract class BaseRuntime implements IRuntime {
 
     /** 在指定 processAppId 的執行中程序上呼叫 handler。 */
     private dispatchToHandler(processAppId: string, handlerName: string, arg: unknown): RuntimeResult<unknown> {
-        for (const [pid] of this.processStates) {
-            const proc = this.getProcess(pid);
-            if (proc && proc.processAppId === processAppId && proc.status === 'running') {
-                return this.invokeHandler(pid, handlerName, arg);
-            }
+        const proc = this.processManager.getByProcessAppId(processAppId);
+        if (proc && proc.status === 'running' && this.processStates.has(proc.pid)) {
+            return this.invokeHandler(proc.pid, handlerName, arg);
         }
         return { success: false, error: 'ProcessNotFound' };
     }

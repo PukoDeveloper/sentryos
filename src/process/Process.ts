@@ -12,7 +12,6 @@ class Process {
     readonly type: AppType;
     readonly parentPid: number | null;
     private _status: 'running' | 'stopped' | 'suspended';
-    resource: any; // 儲存 DOM 節點或 Worker 引用
     /** 直屬子程序的 PID 集合 */
     readonly children: Set<number>;
 
@@ -29,7 +28,6 @@ class Process {
         this.type = type;
         this.parentPid = parentPid;
         this._status = 'running';
-        this.resource = null;
         this.children = new Set();
     }
 

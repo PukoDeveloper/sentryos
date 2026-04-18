@@ -134,6 +134,9 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	private readonly tierCapacities: Record<StorageTier, number>;
 	private readonly storage = new Map<StorageTier, Map<string, StorageEntry>>();
 	private readonly persistenceKey: string | null;
+	/** 增量記錄每個 tier 的已用位元組數，避免每次寫入時全量掃描 */
+	private readonly tierUsedBytes: Record<StorageTier, number> = { sys: 0, app: 0, user: 0, cache: 0 };
+	private totalUsedBytes = 0;
 
 	constructor(kernel: Kernel, options: FileSystemOptions = {}) {
 		this.kernel = kernel;
@@ -213,7 +216,10 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			metadata: options.metadata,
 		};
 
+		// Update counters after the storage operation succeeds
 		tierStorage.set(key, nextEntry);
+		this.tierUsedBytes[tier] += netBytes;
+		this.totalUsedBytes += netBytes;
 		this.persistTier(tier);
 		return {
 			success: true,
@@ -231,11 +237,16 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		}
 
 		const tierStorage = this.storage.get(tier)!;
-		if (!tierStorage.has(key)) {
+		const existingEntry = tierStorage.get(key);
+		if (!existingEntry) {
 			return { success: false, error: 'NotFound' };
 		}
 
+		const freedBytes = calculateEntryByteSize(existingEntry);
+		// Compute freed bytes before deletion, then update counters after deletion succeeds
 		tierStorage.delete(key);
+		this.tierUsedBytes[tier] -= freedBytes;
+		this.totalUsedBytes -= freedBytes;
 		this.persistTier(tier);
 		return { success: true, data: key };
 	}
@@ -311,10 +322,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			}
 
 			const tierMap = this.storage.get(tier)!;
-			let tierBytes = 0;
-			for (const entry of tierMap.values()) {
-				tierBytes += calculateEntryByteSize(entry);
-			}
+			const tierBytes = this.tierUsedBytes[tier];
 			tiers[tier] = { usedBytes: tierBytes, capacityBytes: this.tierCapacities[tier], entries: tierMap.size };
 			totalBytes += tierBytes;
 			totalEntries += tierMap.size;
@@ -399,22 +407,11 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	}
 
 	private checkCapacity(tier: StorageTier, incomingBytes = 0): StorageGuardResult {
-		let totalUsedBytes = 0;
-		let tierUsedBytes = 0;
-		for (const t of STORAGE_TIERS) {
-			const tierMap = this.storage.get(t)!;
-			for (const entry of tierMap.values()) {
-				const entrySize = calculateEntryByteSize(entry);
-				totalUsedBytes += entrySize;
-				if (t === tier) tierUsedBytes += entrySize;
-			}
-		}
-
-		if (totalUsedBytes + incomingBytes > this.totalCapacity) {
+		if (this.totalUsedBytes + incomingBytes > this.totalCapacity) {
 			return { success: false, error: 'CapacityExceeded' };
 		}
 
-		if (tierUsedBytes + incomingBytes > this.tierCapacities[tier]) {
+		if (this.tierUsedBytes[tier] + incomingBytes > this.tierCapacities[tier]) {
 			return { success: false, error: 'CapacityExceeded' };
 		}
 
@@ -449,6 +446,9 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 				const tierMap = this.storage.get(tier)!;
 				for (const entry of entries) {
 					tierMap.set(entry.key, entry);
+					const entrySize = calculateEntryByteSize(entry);
+					this.tierUsedBytes[tier] += entrySize;
+					this.totalUsedBytes += entrySize;
 				}
 			} catch { /* corrupted data — start fresh for this tier */ }
 		}

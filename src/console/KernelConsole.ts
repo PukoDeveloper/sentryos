@@ -39,11 +39,6 @@ export interface CommandContext {
 
 // ── Helpers ─────────────────────────────────────────────────
 
-function padRight(s: string, len: number): string {
-  while (s.length < len) s += ' ';
-  return s;
-}
-
 // ── KernelConsole ───────────────────────────────────────────
 
 class KernelConsole {
@@ -277,13 +272,13 @@ class KernelConsole {
     this.commands.set('ps', (ctx) => {
       if (!this.checkPermission(ctx, Permissions.PROCESS_LIST)) return;
       const procs = this.processManager.getAllProcesses();
-      ctx.writeLine(padRight('PID', 6) + padRight('STATUS', 10) + padRight('TYPE', 10) + 'APP');
+      ctx.writeLine('PID'.padEnd(6) + 'STATUS'.padEnd(10) + 'TYPE'.padEnd(10) + 'APP');
       ctx.writeLine('---   ------    --------  ---');
       for (const p of procs) {
         ctx.writeLine(
-          padRight(String(p.pid), 6) +
-          padRight(p.status, 10) +
-          padRight(p.type, 10) +
+          String(p.pid).padEnd(6) +
+          p.status.padEnd(10) +
+          p.type.padEnd(10) +
           p.appDefId
         );
       }
@@ -308,13 +303,13 @@ class KernelConsole {
     this.commands.set('apps', (ctx) => {
       if (!this.checkPermission(ctx, Permissions.SHELL_LIST_APPS)) return;
       const catalogApps = this.kernel.get('catalogApps');
-      ctx.writeLine(padRight('NAME', 20) + padRight('TYPE', 10) + padRight('VER', 10) + 'PACKAGE');
+      ctx.writeLine('NAME'.padEnd(20) + 'TYPE'.padEnd(10) + 'VER'.padEnd(10) + 'PACKAGE');
       ctx.writeLine('------------------  --------  --------  -------');
       for (const a of catalogApps) {
         ctx.writeLine(
-          padRight(a.name, 20) +
-          padRight(a.runtimeType, 10) +
-          padRight(a.version, 10) +
+          a.name.padEnd(20) +
+          a.runtimeType.padEnd(10) +
+          a.version.padEnd(10) +
           a.packageName
         );
       }
@@ -344,12 +339,12 @@ class KernelConsole {
       if (wins.length === 0) {
         ctx.writeLine(this.t('console.noWindows'));
       } else {
-        ctx.writeLine(padRight('TITLE', 25) + padRight('STATE', 12) + 'PROCESS');
+        ctx.writeLine('TITLE'.padEnd(25) + 'STATE'.padEnd(12) + 'PROCESS');
         ctx.writeLine('-----------------------  ----------  -------');
         for (const w of wins) {
           ctx.writeLine(
-            padRight(w.title, 25) +
-            padRight(w.state, 12) +
+            w.title.padEnd(25) +
+            w.state.padEnd(12) +
             w.processAppId
           );
         }
@@ -393,12 +388,12 @@ class KernelConsole {
       if (cmds.length === 0) {
         ctx.writeLine(this.t('console.noCommands'));
       } else {
-        ctx.writeLine(padRight('COMMAND', 16) + padRight('DESCRIPTION', 35) + 'LIBRARY');
+        ctx.writeLine('COMMAND'.padEnd(16) + 'DESCRIPTION'.padEnd(35) + 'LIBRARY');
         ctx.writeLine('--------------  ---------------------------------  -------');
         for (const c of cmds) {
           ctx.writeLine(
-            padRight(c.name, 16) +
-            padRight(c.description, 35) +
+            c.name.padEnd(16) +
+            c.description.padEnd(35) +
             c.libraryId
           );
         }
