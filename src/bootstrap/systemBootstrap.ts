@@ -179,12 +179,6 @@ async function bootstrapSystem(): Promise<void> {
   });
   kernel.register('windowManager', windowManager);
 
-  // Wire floating taskbar mode to window manager
-  desktopShell.onTaskbarModeChange((mode) => {
-    const height = mode === 'docked' ? 96 : mode === 'fullwidth' ? 64 : 0;
-    windowManager.setMaximizedTaskbarHeight(height);
-  });
-
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
 
@@ -197,6 +191,16 @@ async function bootstrapSystem(): Promise<void> {
   windowManager.setWindowChangeListener((event) => {
     const summaries = windowManager.getOpenWindowSummaries();
     desktopShell.syncOpenWindows(summaries);
+
+    // Update status bar title on focus / close / minimize
+    if (event.type === 'focused') {
+      desktopShell.setFocusedWindowTitle(event.title);
+    } else if (event.type === 'closed' || event.type === 'minimized') {
+      // Best-effort: pick any remaining visible window as the title source.
+      // The 'focused' event is the authoritative path; this is only a fallback.
+      const visible = summaries.filter(w => w.state !== 'minimized' && w.state !== 'closed');
+      desktopShell.setFocusedWindowTitle(visible.length > 0 ? visible[visible.length - 1].title : null);
+    }
 
     if (event.type === 'closed') {
       // 若 picker 程序的視窗關閉，自動取消對應的 dialog
@@ -242,6 +246,18 @@ async function bootstrapSystem(): Promise<void> {
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
     windowManager.focusWindow(processAppId, windowId);
+  });
+
+  desktopShell.onWindowCloseRequest((windowId, processAppId) => {
+    windowManager.closeWindow(processAppId, windowId);
+  });
+
+  desktopShell.onShowDesktopRequest(() => {
+    for (const win of windowManager.getOpenWindowSummaries()) {
+      if (win.state !== 'minimized') {
+        windowManager.minimizeWindow(win.processAppId, win.windowId);
+      }
+    }
   });
 
   desktopShell.onLaunchRequest((app) => {

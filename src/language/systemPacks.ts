@@ -25,6 +25,11 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': '重新命名',
     'hint.dragApp': '從搜尋拖曳應用程式到此資料夾',
     'tooltip.removeFromFolder': '從資料夾移除',
+    'nav.recents': '最近',
+    'nav.home': '主畫面',
+    'nav.desktop': '桌面',
+    'switcher.noWindows': '沒有已開啟的應用程式',
+    'btn.closeApp': '×',
   },
   'en': {
     'tab.folders': 'Folders',
@@ -44,6 +49,11 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': 'Rename',
     'hint.dragApp': 'Drag apps from Search into this folder',
     'tooltip.removeFromFolder': 'Remove from folder',
+    'nav.recents': 'Recents',
+    'nav.home': 'Home',
+    'nav.desktop': 'Desktop',
+    'switcher.noWindows': 'No open applications',
+    'btn.closeApp': '×',
   },
   'ja': {
     'tab.folders': 'フォルダ',
@@ -63,6 +73,11 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': '名前を変更',
     'hint.dragApp': '検索からアプリをこのフォルダにドラッグ',
     'tooltip.removeFromFolder': 'フォルダから削除',
+    'nav.recents': '最近',
+    'nav.home': 'ホーム',
+    'nav.desktop': 'デスクトップ',
+    'switcher.noWindows': '開いているアプリはありません',
+    'btn.closeApp': '×',
   },
 };
 
