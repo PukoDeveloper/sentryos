@@ -216,6 +216,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			metadata: options.metadata,
 		};
 
+		// Update counters after the storage operation succeeds
 		tierStorage.set(key, nextEntry);
 		this.tierUsedBytes[tier] += netBytes;
 		this.totalUsedBytes += netBytes;
@@ -242,6 +243,7 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 		}
 
 		const freedBytes = calculateEntryByteSize(existingEntry);
+		// Compute freed bytes before deletion, then update counters after deletion succeeds
 		tierStorage.delete(key);
 		this.tierUsedBytes[tier] -= freedBytes;
 		this.totalUsedBytes -= freedBytes;
