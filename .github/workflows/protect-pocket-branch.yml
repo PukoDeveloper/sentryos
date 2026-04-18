@@ -1,0 +1,36 @@
+name: "方案二：阻擋 pocket 合入 main"
+
+# 此 workflow 在每次有人對 main 發起 PR 時自動執行。
+# 若 PR 的來源分支是 pocket 或 pocket/** 子分支，CI 將強制失敗，阻擋合併。
+# pocket 是獨立技術路徑，不應與 main 有任何程式碼合流。
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-branch-isolation:
+    name: 確認 pocket 分支隔離
+    runs-on: ubuntu-latest
+    steps:
+      - name: 阻擋 pocket → main 的 PR
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "來源分支：${HEAD_REF}"
+          echo "目標分支：${{ github.base_ref }}"
+
+          if [[ "${HEAD_REF}" == "pocket" || "${HEAD_REF}" == pocket/* ]]; then
+            echo ""
+            echo "❌ 禁止合併：pocket 是獨立技術路徑，不允許合入 main。"
+            echo ""
+            echo "   pocket 分支使用完全不同的技術架構，"
+            echo "   與 main 的程式碼路徑不相容。"
+            echo ""
+            echo "   如需在 pocket 上整合 main 的修正，請手動 cherry-pick 特定 commit，"
+            echo "   而非進行完整的分支合併。"
+            exit 1
+          fi
+
+          echo "✅ 來源分支不是 pocket，通過檢查。"
