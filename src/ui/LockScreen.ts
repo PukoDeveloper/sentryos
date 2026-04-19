@@ -12,6 +12,21 @@ export interface LockScreenResult {
 }
 
 const DEFAULT_USERNAME = 'User';
+const STORAGE_KEY_USERNAME = 'sentryos_username';
+
+// Progressive lockout thresholds: [minFailCount, lockoutSeconds]
+const LOCKOUT_TIERS: [number, number][] = [
+  [8, 30],
+  [5, 10],
+  [3, 3],
+];
+
+function getLockoutSeconds(failCount: number): number {
+  for (const [threshold, seconds] of LOCKOUT_TIERS) {
+    if (failCount >= threshold) return seconds;
+  }
+  return 0;
+}
 
 /**
  * Full-screen lock screen rendered before the desktop shell is mounted.
@@ -38,8 +53,12 @@ export class LockScreen {
         return;
       }
 
-      let currentUsername = DEFAULT_USERNAME;
+      // Restore saved username (or fall back to default)
+      const savedUsername = localStorage.getItem(STORAGE_KEY_USERNAME) ?? DEFAULT_USERNAME;
+      let currentUsername = savedUsername;
       let editMode = false;
+      let failCount = 0;
+      let lockoutTimer: ReturnType<typeof setInterval> | null = null;
 
       // ── Overlay ─────────────────────────────────────────────
       const overlay = document.createElement('div');
@@ -105,6 +124,8 @@ export class LockScreen {
       const usernameInput = document.createElement('input');
       usernameInput.type = 'text';
       usernameInput.value = currentUsername;
+      usernameInput.autocomplete = 'username';
+      usernameInput.tabIndex = 1;
       Object.assign(usernameInput.style, {
         flex: '1',
         display: 'none',
@@ -124,6 +145,7 @@ export class LockScreen {
       editBtn.type = 'button';
       editBtn.title = 'Edit username';
       editBtn.textContent = '✏';
+      editBtn.tabIndex = 3;
       Object.assign(editBtn.style, {
         flexShrink: '0',
         width: '36px',
@@ -181,6 +203,8 @@ export class LockScreen {
       const passwordInput = document.createElement('input');
       passwordInput.type = 'password';
       passwordInput.placeholder = 'Password';
+      passwordInput.autocomplete = 'current-password';
+      passwordInput.tabIndex = 2;
       Object.assign(passwordInput.style, {
         fontSize: '15px',
         color: '#e8eaf0',
@@ -192,6 +216,17 @@ export class LockScreen {
         fontFamily: 'inherit',
         width: '100%',
         boxSizing: 'border-box',
+      });
+
+      // ── Dev-mode warning ─────────────────────────────────────
+      const devWarning = document.createElement('div');
+      devWarning.textContent = '⚠ Development mode: default password is 0000';
+      Object.assign(devWarning.style, {
+        fontSize: '12px',
+        color: '#f0c060',
+        textAlign: 'center',
+        userSelect: 'none',
+        display: authProvider.isLocalMode ? '' : 'none',
       });
 
       // ── Error message ────────────────────────────────────────
@@ -209,6 +244,7 @@ export class LockScreen {
       const loginBtn = document.createElement('button');
       loginBtn.type = 'button';
       loginBtn.textContent = 'Login';
+      loginBtn.tabIndex = 4;
       Object.assign(loginBtn.style, {
         padding: '10px',
         width: '100%',
@@ -222,11 +258,40 @@ export class LockScreen {
         fontWeight: '500',
       });
 
+      // ── Lockout helpers ──────────────────────────────────────
+      const setInputsDisabled = (disabled: boolean) => {
+        passwordInput.disabled = disabled;
+        loginBtn.disabled = disabled;
+        loginBtn.style.opacity = disabled ? '0.5' : '1';
+        loginBtn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+      };
+
+      const startLockout = (seconds: number) => {
+        setInputsDisabled(true);
+        let remaining = seconds;
+        const tick = () => {
+          errorMsg.textContent = `Too many failed attempts. Try again in ${remaining}s.`;
+          errorMsg.style.visibility = 'visible';
+        };
+        tick();
+        lockoutTimer = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(lockoutTimer!);
+            lockoutTimer = null;
+            setInputsDisabled(false);
+            errorMsg.textContent = 'You may try again.';
+          } else {
+            tick();
+          }
+        }, 1000);
+      };
+
       // ── Login logic ──────────────────────────────────────────
       let loading = false;
 
       const doLogin = async () => {
-        if (loading) return;
+        if (loading || loginBtn.disabled) return;
 
         // Commit any pending username edit first
         if (editMode) commitUsername();
@@ -248,13 +313,21 @@ export class LockScreen {
         loginBtn.style.opacity = '1';
 
         if (result.success && result.data) {
+          // Persist the username for next visit
+          localStorage.setItem(STORAGE_KEY_USERNAME, result.data.username);
           this.dismiss();
           resolve({ username: result.data.username, userkey: result.data.userKey });
         } else {
-          errorMsg.textContent = 'Invalid credentials. Please try again.';
-          errorMsg.style.visibility = 'visible';
+          failCount += 1;
+          const lockout = getLockoutSeconds(failCount);
           passwordInput.value = '';
-          passwordInput.focus();
+          if (lockout > 0) {
+            startLockout(lockout);
+          } else {
+            errorMsg.textContent = 'Invalid credentials. Please try again.';
+            errorMsg.style.visibility = 'visible';
+            passwordInput.focus();
+          }
         }
       };
 
@@ -266,6 +339,7 @@ export class LockScreen {
       // ── Assemble ─────────────────────────────────────────────
       card.appendChild(usernameRow);
       card.appendChild(passwordInput);
+      card.appendChild(devWarning);
       card.appendChild(errorMsg);
       card.appendChild(loginBtn);
 
@@ -275,6 +349,9 @@ export class LockScreen {
       root.appendChild(overlay);
       this.overlay = overlay;
 
+      // Auto-focus: password if username was pre-filled, otherwise password too
+      // (username is always pre-filled — from storage or default — so always
+      // focus the password field directly)
       passwordInput.focus();
     });
   }

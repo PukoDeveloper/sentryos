@@ -59,6 +59,11 @@ export class AuthProvider {
     }
   }
 
+  /** `true` when no remote endpoint is configured (local-mode default password). */
+  get isLocalMode(): boolean {
+    return this.authEndpoint === null;
+  }
+
   /**
    * Authenticate `username` / `password`.
    * Returns a `Result` — never throws.
