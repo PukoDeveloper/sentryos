@@ -11,6 +11,7 @@ export const MAXIMIZED_TASKBAR_HEIGHT = 96;   // px (taskbar 82px from viewport 
 export const Z_INDEX_WINDOW_BASE = 50;
 export const Z_INDEX_ALWAYS_ON_TOP_OFFSET = 500;
 export const Z_INDEX_START_PANEL = 9000;
+export const Z_INDEX_LOCK_SCREEN = 9998;
 export const Z_INDEX_BOOT_TERMINAL = 9999;
 export const Z_INDEX_ERROR_SCREEN = 10000;
 
