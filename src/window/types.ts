@@ -228,6 +228,7 @@ interface WindowDescriptor {
     style?: WindowStyle;
     icon?: string;
     stateBeforeMinimize?: WindowState;
+    boundsBeforeMaximize?: WindowBounds;
 }
 
 interface WindowProcessContext {

@@ -3,6 +3,7 @@ import {
     WINDOW_CASCADE_X_OFFSET, WINDOW_CASCADE_Y_OFFSET, WINDOW_CASCADE_INCREMENT,
     MAXIMIZED_WINDOW_MARGIN, MAXIMIZED_TASKBAR_HEIGHT,
     DEFAULT_CONSOLE_WIDTH, DEFAULT_CONSOLE_HEIGHT,
+    WINDOW_SNAP_THRESHOLD,
 } from '../kernel/constants';
 import type {
     WindowBounds,
@@ -54,6 +55,8 @@ class WindowManager {
     private readonly windowCreationTimes = new Map<string, number[]>();
     private static readonly WINDOW_RATE_LIMIT = 10;
     private static readonly WINDOW_RATE_WINDOW_MS = 1000;
+    /** 貼靠預覽遮罩 */
+    private snapPreviewEl: HTMLElement | null = null;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -67,6 +70,7 @@ class WindowManager {
     /** 清理所有視窗、DOM 元素及內部狀態。應在系統關閉時呼叫。 */
     destroy(): void {
         this.closeContextMenu();
+        this.hideSnapPreview();
         for (const descriptor of this.windows.values()) {
             descriptor.root.remove();
         }
@@ -464,6 +468,7 @@ class WindowManager {
         }
 
         const current = descriptor.data!;
+        current.boundsBeforeMaximize = { ...current.bounds };
         current.state = 'maximized';
         current.root.classList.add('is-layout-animating');
         this.applyWindowLayout(current);
@@ -482,11 +487,16 @@ class WindowManager {
 
         const current = descriptor.data!;
         const wasMinimized = current.state === 'minimized';
+        const wasMaximized = current.state === 'maximized';
         if (wasMinimized) {
             current.state = current.stateBeforeMinimize ?? 'normal';
             current.stateBeforeMinimize = undefined;
         } else {
             current.state = 'normal';
+        }
+        if (wasMaximized && current.boundsBeforeMaximize) {
+            current.bounds = { ...current.boundsBeforeMaximize };
+            current.boundsBeforeMaximize = undefined;
         }
         current.root.style.display = 'block';
         if (wasMinimized) {
@@ -1010,14 +1020,60 @@ class WindowManager {
         let startY = 0;
         let startBoundsX = 0;
         let startBoundsY = 0;
+        let dragStartedFromMaximized = false;
+        let isDragging = false;
 
         const onPointerMove = (e: PointerEvent) => {
+            if (dragStartedFromMaximized) {
+                // Un-maximize on first actual move and position window under cursor
+                dragStartedFromMaximized = false;
+                const hostRect = this.host.getBoundingClientRect();
+                const cursorHostX = e.clientX - hostRect.left;
+                const prevW = descriptor.bounds.width;
+                // Place restored title bar so cursor stays proportional to its width
+                const maxWidth = hostRect.width;
+                const relX = (startX - hostRect.left) / maxWidth;
+                let newX = cursorHostX - prevW * relX;
+                newX = Math.max(0, Math.min(hostRect.width - prevW, newX));
+                const newY = Math.max(0, e.clientY - hostRect.top - 20);
+
+                descriptor.state = 'normal';
+                if (descriptor.boundsBeforeMaximize) {
+                    descriptor.bounds = { ...descriptor.boundsBeforeMaximize };
+                    descriptor.boundsBeforeMaximize = undefined;
+                }
+                descriptor.bounds.x = newX;
+                descriptor.bounds.y = newY;
+                descriptor.frame.style.borderRadius = '';
+                this.applyWindowLayout(descriptor);
+
+                startX = e.clientX;
+                startY = e.clientY;
+                startBoundsX = newX;
+                startBoundsY = newY;
+                isDragging = true;
+                descriptor.root.classList.add('is-dragging');
+                this.emitWindowChange('restored', descriptor);
+                this.emitWindowChange('resized', descriptor);
+            }
+
+            if (!isDragging) return;
+
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
             descriptor.bounds.x = startBoundsX + dx;
             descriptor.bounds.y = startBoundsY + dy;
             descriptor.root.style.left = `${descriptor.bounds.x}px`;
             descriptor.root.style.top = `${descriptor.bounds.y}px`;
+
+            // Show snap preview near edges/corners
+            const zone = this.computeSnapZone(e.clientX, e.clientY);
+            if (zone) {
+                const snapBounds = this.getSnapBounds(zone);
+                this.showSnapPreview(snapBounds);
+            } else {
+                this.hideSnapPreview();
+            }
         };
 
         const onPointerUp = (e: PointerEvent) => {
@@ -1025,20 +1081,128 @@ class WindowManager {
             descriptor.root.classList.remove('is-dragging');
             titleBar.removeEventListener('pointermove', onPointerMove);
             titleBar.removeEventListener('pointerup', onPointerUp);
+            this.hideSnapPreview();
+
+            if (!isDragging) {
+                dragStartedFromMaximized = false;
+                return;
+            }
+            isDragging = false;
+
+            const zone = this.computeSnapZone(e.clientX, e.clientY);
+            if (zone === 'top') {
+                // Snap to maximized
+                this.maximizeWindow(descriptor.processAppId, descriptor.id);
+            } else if (zone) {
+                // Snap to half / quarter
+                descriptor.root.classList.add('is-layout-animating');
+                const snapBounds = this.getSnapBounds(zone);
+                descriptor.bounds = { ...snapBounds };
+                descriptor.state = 'normal';
+                this.applyWindowLayout(descriptor);
+                this.emitWindowChange('resized', descriptor);
+                setTimeout(() => descriptor.root.classList.remove('is-layout-animating'), 300);
+            }
         };
 
+        // Double-click title bar to maximize / restore
+        titleBar.addEventListener('dblclick', (e: MouseEvent) => {
+            if ((e.target as HTMLElement).closest('.window-actions')) return;
+            if (descriptor.state === 'maximized') {
+                this.restoreWindow(descriptor.processAppId, descriptor.id);
+            } else if (descriptor.state === 'normal') {
+                this.maximizeWindow(descriptor.processAppId, descriptor.id);
+            }
+        });
+
         titleBar.addEventListener('pointerdown', (e: PointerEvent) => {
-            if (descriptor.state === 'maximized') return;
             if ((e.target as HTMLElement).closest('.window-actions')) return;
             startX = e.clientX;
             startY = e.clientY;
+
+            if (descriptor.state === 'maximized') {
+                // Begin drag from maximized — will un-maximize on first move
+                dragStartedFromMaximized = true;
+                isDragging = false;
+                titleBar.setPointerCapture(e.pointerId);
+                titleBar.addEventListener('pointermove', onPointerMove);
+                titleBar.addEventListener('pointerup', onPointerUp);
+                return;
+            }
+
             startBoundsX = descriptor.bounds.x;
             startBoundsY = descriptor.bounds.y;
+            isDragging = true;
+            dragStartedFromMaximized = false;
             descriptor.root.classList.add('is-dragging');
             titleBar.setPointerCapture(e.pointerId);
             titleBar.addEventListener('pointermove', onPointerMove);
             titleBar.addEventListener('pointerup', onPointerUp);
         });
+    }
+
+    /** 計算游標落在哪個貼靠區域（根據與 host 邊緣的距離），角落優先。 */
+    private computeSnapZone(clientX: number, clientY: number): string | null {
+        const hostRect = this.host.getBoundingClientRect();
+        const T = WINDOW_SNAP_THRESHOLD;
+
+        const nearLeft = clientX - hostRect.left < T;
+        const nearRight = hostRect.right - clientX < T;
+        const nearTop = clientY - hostRect.top < T;
+        // Reserve bottom area for taskbar — no snapping into it
+        const nearBottom = hostRect.bottom - clientY < T + this.maximizedTaskbarHeight;
+
+        if (nearTop && nearLeft) return 'top-left';
+        if (nearTop && nearRight) return 'top-right';
+        if (nearBottom && nearLeft) return 'bottom-left';
+        if (nearBottom && nearRight) return 'bottom-right';
+        if (nearTop) return 'top';
+        if (nearLeft) return 'left';
+        if (nearRight) return 'right';
+        return null;
+    }
+
+    /** 根據貼靠區域計算視窗的像素 bounds。 */
+    private getSnapBounds(zone: string): WindowBounds {
+        const hostRect = this.host.getBoundingClientRect();
+        const w = hostRect.width;
+        const h = hostRect.height - this.maximizedTaskbarHeight;
+        const halfW = Math.floor(w / 2);
+        const halfH = Math.floor(h / 2);
+
+        switch (zone) {
+            case 'top':    return { x: 0, y: 0, width: w, height: h };
+            case 'left':   return { x: 0, y: 0, width: halfW, height: h };
+            case 'right':  return { x: halfW, y: 0, width: w - halfW, height: h };
+            case 'top-left':     return { x: 0,     y: 0,     width: halfW,      height: halfH };
+            case 'top-right':    return { x: halfW, y: 0,     width: w - halfW,  height: halfH };
+            case 'bottom-left':  return { x: 0,     y: halfH, width: halfW,      height: h - halfH };
+            case 'bottom-right': return { x: halfW, y: halfH, width: w - halfW,  height: h - halfH };
+            default:       return { x: 0, y: 0, width: w, height: h };
+        }
+    }
+
+    /** 顯示（或更新）貼靠預覽遮罩。 */
+    private showSnapPreview(bounds: WindowBounds): void {
+        if (!this.snapPreviewEl) {
+            this.snapPreviewEl = document.createElement('div');
+            this.snapPreviewEl.className = 'window-snap-preview';
+            this.host.appendChild(this.snapPreviewEl);
+        }
+        const el = this.snapPreviewEl;
+        el.style.left   = `${bounds.x}px`;
+        el.style.top    = `${bounds.y}px`;
+        el.style.width  = `${bounds.width}px`;
+        el.style.height = `${bounds.height}px`;
+        el.classList.add('is-visible');
+    }
+
+    /** 隱藏並移除貼靠預覽遮罩。 */
+    private hideSnapPreview(): void {
+        if (this.snapPreviewEl) {
+            this.snapPreviewEl.remove();
+            this.snapPreviewEl = null;
+        }
     }
 
     private enableResize(root: HTMLDivElement, descriptor: WindowDescriptor): void {
