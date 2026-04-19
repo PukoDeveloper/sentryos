@@ -243,6 +243,60 @@ export type {
     RegisteredApplication,
 };
 
+/**
+ * 從一組遠端 manifest URL 載入應用程式。
+ * 每個 URL 應直接指向 manifest.json（PackageManifest 或 LegacyManifest 格式）。
+ * 個別失敗不影響其他項目。
+ */
+async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<ApplicationCatalogResult<RegisteredApplication[]>> {
+    if (manifestUrls.length === 0) {
+        return { success: true, data: [] };
+    }
+
+    try {
+        const results = await Promise.allSettled(
+            manifestUrls.map(async (url) => {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Remote manifest fetch failed (HTTP ${response.status}): ${url}`);
+                }
+                const raw = await response.json();
+                const basePath = url.slice(0, url.lastIndexOf('/'));
+                return { raw, basePath };
+            })
+        );
+
+        const applications: RegisteredApplication[] = [];
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                console.warn('[ApplicationCatalog] Remote manifest load failed:', result.reason);
+                continue;
+            }
+            const { raw, basePath } = result.value;
+            if (isPackageManifest(raw)) {
+                const pkg = raw as PackageManifest;
+                for (const app of pkg.apps) {
+                    if (!isValidAppEntry(app)) {
+                        console.warn('[ApplicationCatalog] Invalid remote app entry in package:', pkg.name);
+                        continue;
+                    }
+                    applications.push(toRegisteredApp(pkg, app, basePath));
+                }
+            } else if (isLegacyManifest(raw)) {
+                const legacy = raw as LegacyManifest;
+                applications.push(legacyToRegisteredApp(legacy, basePath));
+            } else {
+                console.warn('[ApplicationCatalog] Unknown remote manifest format at:', basePath);
+            }
+        }
+
+        return { success: true, data: applications };
+    } catch {
+        return { success: false, error: 'LoadFailed' };
+    }
+}
+
 export {
     loadApplicationCatalog,
+    loadRemoteApplicationCatalog,
 };

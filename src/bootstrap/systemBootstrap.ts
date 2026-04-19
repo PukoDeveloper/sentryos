@@ -5,7 +5,7 @@ import { PermissionsManager } from '../permissions/PermissionsManager';
 import { EventBus } from '../events/EventBus';
 import { ApplicationManager, type Application } from '../application/ApplicationManager';
 import { ProcessManager } from '../process/ProcessManager';
-import { loadApplicationCatalog, type RegisteredApplication } from '../application/ApplicationCatalog';
+import { loadApplicationCatalog, loadRemoteApplicationCatalog, type RegisteredApplication } from '../application/ApplicationCatalog';
 import { WebFileSystemAdapter } from '../storage/FileSystem';
 import { WindowManager } from '../window/WindowManager';
 import { EnvironmentManager } from '../environment/EnvironmentManager';
@@ -110,6 +110,32 @@ async function bootstrapSystem(): Promise<void> {
   } catch (err) {
     showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
     return;
+  }
+
+  // 2.5. Load remote apps from sys:app.js
+  {
+    const fileSystem = kernel.resolve('fileSystem');
+    const systemAppId = kernel.get('systemAppId');
+    const remoteAppsEntry = fileSystem.read(systemAppId, 'sys', 'app.js');
+    if (!remoteAppsEntry.success) {
+      // First boot: initialize with empty remote app list
+      fileSystem.write(systemAppId, 'sys', 'app.js', [] as string[], { ownerLabel: 'system' });
+    } else {
+      const remoteUrls = remoteAppsEntry.data?.data;
+      if (Array.isArray(remoteUrls) && remoteUrls.length > 0) {
+        try {
+          const remoteResult = await loadRemoteApplicationCatalog(remoteUrls as string[]);
+          if (remoteResult.success && remoteResult.data) {
+            catalogApps = [...catalogApps, ...remoteResult.data];
+            bufferedLog('BOOT', 'INFO', `Remote apps loaded: ${remoteResult.data.length} app(s)`);
+          } else {
+            bufferedLog('BOOT', 'WARN', `Remote app catalog load failed: ${remoteResult.error ?? 'UnknownError'}`);
+          }
+        } catch (err) {
+          bufferedLog('BOOT', 'WARN', `Remote app catalog error: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
   }
 
   // 3. Register applications

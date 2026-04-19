@@ -210,6 +210,7 @@ export class ApplicationLauncher {
     const executed = runtime.execute(pid, code, undefined, app.entryPath);
     if (!executed.success) {
       const errorDetail = this.formatError(executed.data ?? executed.error);
+      this.systemAlert.show({ code: 'APP_CRASHED', detail: app.name });
       this.terminateApplication(proc.processAppId, `Runtime error: ${errorDetail}`);
       return;
     }
@@ -247,6 +248,9 @@ export class ApplicationLauncher {
     }
     if (!result.success && result.error === 'RuntimeError') {
       const errorDetail = this.formatError(result.data ?? 'Unknown runtime error');
+      const proc = this.processManager.getByProcessAppId(event.processAppId);
+      const appDef = proc ? this.appManager.get(proc.appDefId) : undefined;
+      this.systemAlert.show({ code: 'APP_CRASHED', detail: appDef?.name ?? event.processAppId });
       this.terminateApplication(event.processAppId, `UI event handler crashed: ${errorDetail}`);
     }
   }
