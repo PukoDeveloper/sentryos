@@ -49,6 +49,8 @@ export interface ValueMap {
   bootStartTime: number;
   catalogApps: RegisteredApplication[];
   iconMap: Map<string, string>;
+  loginUser: string;
+  userKey: string;
 }
 
 class Kernel {

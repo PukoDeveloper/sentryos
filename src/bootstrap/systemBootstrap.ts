@@ -21,6 +21,8 @@ import { ApplicationLauncher } from '../application/ApplicationLauncher';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
+import { lockScreen } from '../ui/LockScreen';
+import { AuthProvider } from '../auth/AuthProvider';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager } from '../plugin/PluginManager';
 import { LanguageManager } from '../language/LanguageManager';
@@ -83,6 +85,18 @@ async function bootstrapSystem(): Promise<void> {
 
   const desktopShell = kernel.resolve('desktopShell');
   const appManager = kernel.resolve('appManager');
+
+  // 1.5. Destroy boot terminal and show lock screen before the desktop mounts
+  bios.destroyBootTerminal();
+  {
+    const envManager = kernel.resolve('environmentManager');
+    const networkManager = kernel.resolve('networkManager');
+    const authProvider = new AuthProvider(envManager, networkManager);
+    await authProvider.loadConfig();
+    const authResult = await lockScreen.show(authProvider);
+    kernel.set('loginUser', authResult.username);
+    kernel.set('userKey', authResult.userkey);
+  }
 
   // 2. Load application catalog
   let catalogApps: RegisteredApplication[];
