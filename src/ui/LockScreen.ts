@@ -13,6 +13,18 @@ export interface LockScreenResult {
 
 const DEFAULT_USERNAME = 'User';
 const STORAGE_KEY_USERNAME = 'sentryos_username';
+const SESSION_KEY_FAIL_COUNT = 'sentryos_lock_fail_count';
+const SESSION_KEY_LOCKOUT_UNTIL = 'sentryos_lock_lockout_until';
+
+const MAX_USERNAME_LENGTH = 64;
+
+/** Strip control characters and limit length; never returns empty string. */
+function sanitizeUsername(raw: string): string {
+  // Remove characters that are not printable ASCII or common Unicode letters/symbols
+  // eslint-disable-next-line no-control-regex
+  const cleaned = raw.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, MAX_USERNAME_LENGTH);
+  return cleaned || DEFAULT_USERNAME;
+}
 
 // Progressive lockout thresholds: [minFailCount, lockoutSeconds]
 const LOCKOUT_TIERS: [number, number][] = [
@@ -53,11 +65,13 @@ export class LockScreen {
         return;
       }
 
-      // Restore saved username (or fall back to default)
-      const savedUsername = localStorage.getItem(STORAGE_KEY_USERNAME) ?? DEFAULT_USERNAME;
+      // Restore saved username (sanitized) or fall back to default
+      const rawSaved = localStorage.getItem(STORAGE_KEY_USERNAME) ?? DEFAULT_USERNAME;
+      const savedUsername = sanitizeUsername(rawSaved);
       let currentUsername = savedUsername;
       let editMode = false;
-      let failCount = 0;
+      // Persist fail count across page reloads to prevent rate-limit bypass
+      let failCount = parseInt(sessionStorage.getItem(SESSION_KEY_FAIL_COUNT) ?? '0', 10) || 0;
       let lockoutTimer: ReturnType<typeof setInterval> | null = null;
 
       // ── Overlay ─────────────────────────────────────────────
@@ -163,7 +177,7 @@ export class LockScreen {
       });
 
       const commitUsername = () => {
-        currentUsername = usernameInput.value.trim() || DEFAULT_USERNAME;
+        currentUsername = sanitizeUsername(usernameInput.value);
         usernameLabel.textContent = currentUsername;
         usernameLabel.style.display = '';
         usernameInput.style.display = 'none';
@@ -268,6 +282,8 @@ export class LockScreen {
 
       const startLockout = (seconds: number) => {
         setInputsDisabled(true);
+        const until = Date.now() + seconds * 1000;
+        sessionStorage.setItem(SESSION_KEY_LOCKOUT_UNTIL, String(until));
         let remaining = seconds;
         const tick = () => {
           errorMsg.textContent = `Too many failed attempts. Try again in ${remaining}s.`;
@@ -279,6 +295,7 @@ export class LockScreen {
           if (remaining <= 0) {
             clearInterval(lockoutTimer!);
             lockoutTimer = null;
+            sessionStorage.removeItem(SESSION_KEY_LOCKOUT_UNTIL);
             setInputsDisabled(false);
             errorMsg.textContent = 'You may try again.';
           } else {
@@ -286,6 +303,12 @@ export class LockScreen {
           }
         }, 1000);
       };
+
+      // Resume lockout if the page was reloaded during an active lockout
+      const storedUntil = parseInt(sessionStorage.getItem(SESSION_KEY_LOCKOUT_UNTIL) ?? '0', 10);
+      if (storedUntil > Date.now()) {
+        startLockout(Math.ceil((storedUntil - Date.now()) / 1000));
+      }
 
       // ── Login logic ──────────────────────────────────────────
       let loading = false;
@@ -313,12 +336,15 @@ export class LockScreen {
         loginBtn.style.opacity = '1';
 
         if (result.success && result.data) {
-          // Persist the username for next visit
-          localStorage.setItem(STORAGE_KEY_USERNAME, result.data.username);
+          // Persist the sanitized username for next visit; clear fail state
+          localStorage.setItem(STORAGE_KEY_USERNAME, sanitizeUsername(result.data.username));
+          sessionStorage.removeItem(SESSION_KEY_FAIL_COUNT);
+          sessionStorage.removeItem(SESSION_KEY_LOCKOUT_UNTIL);
           this.dismiss();
           resolve({ username: result.data.username, userkey: result.data.userKey });
         } else {
           failCount += 1;
+          sessionStorage.setItem(SESSION_KEY_FAIL_COUNT, String(failCount));
           const lockout = getLockoutSeconds(failCount);
           passwordInput.value = '';
           if (lockout > 0) {

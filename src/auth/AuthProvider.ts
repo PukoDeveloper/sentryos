@@ -50,6 +50,16 @@ export class AuthProvider {
       ) {
         const endpoint = (config as Record<string, string>).AUTH_ENDPOINT.trim();
         if (endpoint) {
+          // Only accept HTTPS endpoints to prevent credentials sent over plain HTTP
+          let parsedUrl: URL;
+          try {
+            parsedUrl = new URL(endpoint);
+          } catch {
+            return; // Malformed URL — stay in local mode
+          }
+          if (parsedUrl.protocol !== 'https:') {
+            return; // Non-HTTPS endpoint — stay in local mode
+          }
           this.authEndpoint = endpoint;
           this.envManager.setVariable('AUTH_ENDPOINT', endpoint);
         }
