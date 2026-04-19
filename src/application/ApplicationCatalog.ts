@@ -261,7 +261,8 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
                     throw new Error(`Remote manifest fetch failed (HTTP ${response.status}): ${url}`);
                 }
                 const raw = await response.json();
-                const basePath = url.slice(0, url.lastIndexOf('/'));
+                const slashIndex = url.lastIndexOf('/');
+                const basePath = slashIndex > 0 ? url.slice(0, slashIndex) : url;
                 return { raw, basePath };
             })
         );
@@ -291,7 +292,8 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
         }
 
         return { success: true, data: applications };
-    } catch {
+    } catch (err) {
+        console.warn('[ApplicationCatalog] Unexpected error loading remote catalog:', err);
         return { success: false, error: 'LoadFailed' };
     }
 }
