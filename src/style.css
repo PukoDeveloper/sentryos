@@ -247,6 +247,24 @@ body {
 	user-select: none;
 }
 
+/* ── Snap preview overlay ─────────────────────────────── */
+.window-snap-preview {
+	position: absolute;
+	pointer-events: none;
+	background: rgba(103, 184, 255, 0.12);
+	border: 2px solid rgba(103, 184, 255, 0.38);
+	border-radius: 14px;
+	box-shadow: inset 0 0 0 1px rgba(103, 184, 255, 0.12);
+	z-index: 9500;
+	opacity: 0;
+	transition: opacity 0.12s ease, left 0.1s ease, top 0.1s ease,
+	            width 0.1s ease, height 0.1s ease;
+}
+
+.window-snap-preview.is-visible {
+	opacity: 1;
+}
+
 /* ── Resize handles ────────────────────────────────────── */
 .window-resize-handle {
 	position: absolute;

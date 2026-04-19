@@ -6,6 +6,7 @@ export const WINDOW_CASCADE_Y_OFFSET = 42;
 export const WINDOW_CASCADE_INCREMENT = 18;
 export const MAXIMIZED_WINDOW_MARGIN = 0;   // px (negative to counter window-layer padding)
 export const MAXIMIZED_TASKBAR_HEIGHT = 96;   // px (taskbar 82px from viewport - 40px padding)
+export const WINDOW_SNAP_THRESHOLD = 24;    // px from host edge to trigger snap zones
 
 // ── Z-Index Layers ──────────────────────────────────────────
 export const Z_INDEX_WINDOW_BASE = 50;
