@@ -59,6 +59,10 @@ export function registerUiApi(kernel: Kernel): void {
       append: (windowId: string, parentId: string, nodes: unknown[]) =>
         windowManager.appendUiNode(process.processAppId, windowId, parentId, (nodes ?? []) as any),
 
+      // ── Window Bounds ────────────────────────────────────────
+      getWindowBounds: (windowId: string) =>
+        windowManager.getWindowBounds(process.processAppId, windowId),
+
       // ── Window Style ───────────────────────────────────────
       setWindowStyle: (windowId: string, style: Record<string, unknown>) => {
         if (!permissions.has(process.processAppId, Permissions.WINDOW_CREATE)) {

@@ -469,6 +469,7 @@ class WindowManager {
         this.applyWindowLayout(current);
         this.focusWindow(processAppId, windowId);
         this.emitWindowChange('maximized', current);
+        this.emitWindowChange('resized', current);
         setTimeout(() => current.root.classList.remove('is-layout-animating'), ANIM_LAYOUT_MS);
         return { success: true, data: windowId };
     }
@@ -498,6 +499,7 @@ class WindowManager {
         this.applyWindowLayout(current);
         this.focusWindow(processAppId, windowId);
         this.emitWindowChange('restored', current);
+        this.emitWindowChange('resized', current);
         return { success: true, data: windowId };
     }
 
@@ -548,6 +550,29 @@ class WindowManager {
 
     getWindowsByProcess(processAppId: string): string[] {
         return Array.from(this.processWindows.get(processAppId) ?? []);
+    }
+
+    getWindowBounds(processAppId: string, windowId: string): WindowSystemResult<WindowBounds> {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) {
+            return { success: false, error: descriptor.error };
+        }
+
+        const current = descriptor.data!;
+        if (current.state === 'maximized') {
+            const hostRect = this.host.getBoundingClientRect();
+            return {
+                success: true,
+                data: {
+                    x: MAXIMIZED_WINDOW_MARGIN,
+                    y: MAXIMIZED_WINDOW_MARGIN,
+                    width: hostRect.width - MAXIMIZED_WINDOW_MARGIN * 2,
+                    height: hostRect.height - this.maximizedTaskbarHeight,
+                },
+            };
+        }
+
+        return { success: true, data: { ...current.bounds } };
     }
 
     /**
@@ -1114,13 +1139,24 @@ class WindowManager {
             return;
         }
 
+        const bounds = type === 'resized'
+            ? (descriptor.state === 'maximized'
+                ? {
+                    x: MAXIMIZED_WINDOW_MARGIN,
+                    y: MAXIMIZED_WINDOW_MARGIN,
+                    width: this.host.getBoundingClientRect().width - MAXIMIZED_WINDOW_MARGIN * 2,
+                    height: this.host.getBoundingClientRect().height - this.maximizedTaskbarHeight,
+                }
+                : { ...descriptor.bounds })
+            : undefined;
+
         this.windowChangeListener({
             type,
             windowId: descriptor.id,
             processAppId: descriptor.processAppId,
             title: descriptor.title,
             state: descriptor.state,
-            bounds: type === 'resized' ? { ...descriptor.bounds } : undefined,
+            bounds,
         });
     }
 }
