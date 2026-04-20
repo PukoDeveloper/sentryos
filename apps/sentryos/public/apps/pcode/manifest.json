@@ -1,0 +1,32 @@
+{
+  "name": "pcode",
+  "description": "A powerful code editor for SentryOS powered by Monaco Editor",
+  "author": "SentryOS Team",
+  "apps": [
+    {
+      "id": "pcode",
+      "name": "PCODE",
+      "version": "1.0.0",
+      "main": "main.js",
+      "type": "Window",
+      "permissions": [
+        "window.create",
+        "event.subscribe.window.ui",
+        "event.emit.window.ui",
+        "file.read.user",
+        "file.read.app",
+        "file.write.user",
+        "file.delete.user",
+        "file.list.user",
+        "file.cross-app",
+        "notification.send",
+        "dialog.open"
+      ],
+      "engine": "quickjs",
+      "icon": "icon.svg",
+      "maxInstances": 0,
+      "autoStart": false,
+      "hidden": false
+    }
+  ]
+}

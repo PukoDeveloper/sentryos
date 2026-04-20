@@ -1,0 +1,37 @@
+{
+    "name": "Utilities",
+    "description": "Common desktop utilities for SentryOS.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "calculator-app",
+            "name": "計算機",
+            "version": "1.0.0",
+            "main": "calculator.js",
+            "type": "Window",
+            "icon": "calculator-icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "clock-app",
+            "name": "時鐘",
+            "version": "1.0.0",
+            "main": "clock.js",
+            "type": "Window",
+            "icon": "clock-icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load"
+            ],
+            "maxInstances": 1
+        }
+    ]
+}

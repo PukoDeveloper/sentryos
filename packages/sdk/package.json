@@ -1,0 +1,34 @@
+{
+  "name": "sentryos-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SentryOS SDK — Type definitions and constants for App & Plugin development",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./app": {
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

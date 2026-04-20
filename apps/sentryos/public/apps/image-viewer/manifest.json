@@ -1,0 +1,27 @@
+{
+    "name": "Image Viewer",
+    "description": "A simple image viewer for SentryOS.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "image-viewer-app",
+            "name": "圖片檢視器",
+            "version": "1.0.0",
+            "main": "main.js",
+            "type": "Window",
+            "icon": "icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.user",
+                "file.list.user",
+                "file.cross-app",
+                "notification.send",
+                "dialog.open"
+            ],
+            "maxInstances": 4
+        }
+    ]
+}

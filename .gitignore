@@ -27,3 +27,6 @@ public/plugins/*.js
 *.njsproj
 *.sln
 *.sw?
+
+# Package manager
+package-lock.json

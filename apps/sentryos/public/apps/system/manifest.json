@@ -1,0 +1,129 @@
+{
+    "name": "System",
+    "description": "SentryOS built-in system applications — terminal, task manager, settings, file manager and file picker.",
+    "author": "SentryOS Team",
+    "apps": [
+        {
+            "id": "terminal-app",
+            "name": "Terminal",
+            "version": "1.0.0",
+            "main": "terminal.js",
+            "type": "Console",
+            "icon": "terminal-icon.svg",
+            "permissions": [
+                "console.write",
+                "console.read",
+                "env.library.load",
+                "env.read",
+                "process.list",
+                "process.terminate",
+                "shell.apps",
+                "shell.launch",
+                "shell.windows",
+                "shell.sysinfo"
+            ],
+            "maxInstances": 8
+        },
+        {
+            "id": "task-manager-app",
+            "name": "工作管理員",
+            "version": "1.0.0",
+            "main": "task-manager.js",
+            "type": "Window",
+            "icon": "task-manager-icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "process.list",
+                "process.terminate",
+                "event.subscribe.process.started",
+                "event.subscribe.process.stopped",
+                "storage.usage",
+                "monitor.read",
+                "file.list.sys",
+                "file.list.app",
+                "file.list.user",
+                "file.list.cache"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "settings-app",
+            "name": "系統設定",
+            "version": "1.0.0",
+            "main": "settings.js",
+            "type": "Window",
+            "icon": "settings-icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "settings.read",
+                "settings.write",
+                "notification.send",
+                "network.status",
+                "network.manage",
+                "registry.read",
+                "registry.write"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "file-manager-app",
+            "name": "檔案管理器",
+            "version": "1.0.0",
+            "main": "file-manager.js",
+            "type": "Window",
+            "icon": "file-manager-icon.svg",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.sys",
+                "file.read.app",
+                "file.read.user",
+                "file.read.cache",
+                "file.write.user",
+                "file.delete.app",
+                "file.delete.user",
+                "file.delete.cache",
+                "file.list.sys",
+                "file.list.app",
+                "file.list.user",
+                "file.list.cache",
+                "file.list-all",
+                "file.cross-app",
+                "storage.usage",
+                "notification.send",
+                "registry.read",
+                "shell.launch"
+            ],
+            "maxInstances": 1
+        },
+        {
+            "id": "file-picker-app",
+            "name": "File Picker",
+            "version": "1.0.0",
+            "main": "file-picker.js",
+            "type": "Window",
+            "icon": "📂",
+            "permissions": [
+                "window.create",
+                "event.subscribe.window.ui",
+                "event.emit.window.ui",
+                "env.library.load",
+                "file.read.user",
+                "file.write.user",
+                "file.list.user",
+                "file.list-all",
+                "notification.send",
+                "dialog.resolve"
+            ],
+            "maxInstances": 4,
+            "hidden": true
+        }
+    ]
+}
