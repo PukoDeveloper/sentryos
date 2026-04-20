@@ -469,7 +469,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
     }
 
     /**
-     * 將相對模組路徑解析為絕對 URL 路徑，並驗證不會逃離套件目錄。
+     * 將相對模組路徑解析為絕對 URL，並驗證不會逃離套件目錄。
+     * 支援本機路徑與遠端應用程式（entryPath 為絕對 URL）。
      */
     private resolveModulePath(entryPath: string, modulePath: string): { path: string } | { error: string } {
         // 拒絕絕對路徑
@@ -482,23 +483,28 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         }
 
         try {
-            const base = new URL(entryPath + '/', globalThis.location.origin);
+            // 遠端應用程式的 entryPath 是絕對 URL；本機應用程式是相對路徑。
+            const isRemote = /^https?:\/\//i.test(entryPath);
+            const normalizedEntry = entryPath.endsWith('/') ? entryPath : entryPath + '/';
+            const base = isRemote
+                ? new URL(normalizedEntry)
+                : new URL(normalizedEntry, globalThis.location.origin);
             const resolved = new URL(modulePath, base);
 
-            // 必須同源
-            if (resolved.origin !== globalThis.location.origin) {
+            // 解析後的 origin 必須與應用程式的 entryPath origin 相同（不允許跳至第三方 origin）
+            if (resolved.origin !== base.origin) {
                 return { error: 'cross-origin imports are not allowed' };
             }
 
-            const resolvedPath = resolved.pathname;
-            const boundary = entryPath.endsWith('/') ? entryPath : entryPath + '/';
+            const resolvedHref = resolved.href;
+            const boundary = base.href;
 
             // 安全性：解析後的路徑必須在套件目錄內，禁止跨應用程式存取
-            if (!resolvedPath.startsWith(boundary)) {
+            if (!resolvedHref.startsWith(boundary)) {
                 return { error: `cannot access files outside the application package ('${boundary}')` };
             }
 
-            return { path: resolvedPath };
+            return { path: resolvedHref };
         } catch {
             return { error: 'invalid module path' };
         }
