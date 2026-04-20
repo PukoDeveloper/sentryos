@@ -5,7 +5,8 @@ import { PermissionsManager } from '../permissions/PermissionsManager';
 import { EventBus } from '../events/EventBus';
 import { ApplicationManager, type Application } from '../application/ApplicationManager';
 import { ProcessManager } from '../process/ProcessManager';
-import { loadApplicationCatalog, type RegisteredApplication } from '../application/ApplicationCatalog';
+import { loadApplicationCatalog, loadRemoteApplicationCatalog, normalizeCatalogEntry, type RegisteredApplication, type OsRejectedApp } from '../application/ApplicationCatalog';
+import { AppInstaller } from '../application/AppInstaller';
 import { WebFileSystemAdapter } from '../storage/FileSystem';
 import { WindowManager } from '../window/WindowManager';
 import { EnvironmentManager } from '../environment/EnvironmentManager';
@@ -26,7 +27,7 @@ import { AuthProvider } from '../auth/AuthProvider';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager } from '../plugin/PluginManager';
 import { LanguageManager } from '../language/LanguageManager';
-import { desktopShellPack, systemAlertPack, bootstrapPack, kernelConsolePack } from '../language/systemPacks';
+import { desktopShellPack, systemAlertPack, bootstrapPack, kernelConsolePack, appInstallerPack } from '../language/systemPacks';
 
 // ── Boot log buffer (for error screen) ──────────────────────────
 const bootLog: string[] = [];
@@ -100,16 +101,45 @@ async function bootstrapSystem(): Promise<void> {
 
   // 2. Load application catalog
   let catalogApps: RegisteredApplication[];
+  let allRejectedApps: OsRejectedApp[] = [];
   try {
     const catalogResult = await loadApplicationCatalog();
     if (!catalogResult.success || !catalogResult.data) {
       showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
       return;
     }
-    catalogApps = catalogResult.data;
+    catalogApps = catalogResult.data.apps;
+    allRejectedApps = catalogResult.data.rejected;
   } catch (err) {
     showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
     return;
+  }
+
+  // 2.5. Load remote apps from sys:app.js
+  {
+    const fileSystem = kernel.resolve('fileSystem');
+    const systemAppId = kernel.get('systemAppId');
+    const remoteAppsEntry = fileSystem.read(systemAppId, 'sys', 'app.js');
+    if (!remoteAppsEntry.success) {
+      // First boot: initialize with empty remote app list
+      fileSystem.write(systemAppId, 'sys', 'app.js', [] as string[], { ownerLabel: 'system' });
+    } else {
+      const remoteUrls = remoteAppsEntry.data?.data;
+      if (Array.isArray(remoteUrls) && remoteUrls.length > 0) {
+        try {
+          const remoteResult = await loadRemoteApplicationCatalog(remoteUrls as string[]);
+          if (remoteResult.success && remoteResult.data) {
+            catalogApps = [...catalogApps, ...remoteResult.data.apps];
+            allRejectedApps = [...allRejectedApps, ...remoteResult.data.rejected];
+            bufferedLog('BOOT', 'INFO', `Remote apps loaded: ${remoteResult.data.apps.length} app(s)`);
+          } else {
+            bufferedLog('BOOT', 'WARN', `Remote app catalog load failed: ${remoteResult.error ?? 'UnknownError'}`);
+          }
+        } catch (err) {
+          bufferedLog('BOOT', 'WARN', `Remote app catalog error: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
   }
 
   // 3. Register applications
@@ -173,6 +203,31 @@ async function bootstrapSystem(): Promise<void> {
   const systemAlert = kernel.resolve('systemAlert');
   const alertContainer = systemAlert.createContainer();
   desktopShell.registerOverlay({ id: 'system-alert-layer', element: alertContainer, order: 200 });
+
+  // Register app installer overlay
+  const appInstallerService = kernel.resolve('appInstaller');
+  const installerContainer = appInstallerService.createContainer();
+  desktopShell.registerOverlay({ id: 'app-installer-layer', element: installerContainer, order: 250 });
+
+  // Show OS-incompatibility alerts if any apps were skipped during catalog loading
+  if (allRejectedApps.length > 0) {
+    const formatAppList = (apps: OsRejectedApp[]) =>
+      apps.map(a => `• ${a.name} (${a.packageName})`).join('\n');
+    const outdated = allRejectedApps.filter(a => a.reason === 'outdated');
+    const requiresNewer = allRejectedApps.filter(a => a.reason === 'requiresNewerOs');
+    if (outdated.length > 0) {
+      systemAlert.show({ code: 'APP_OS_OUTDATED', detail: formatAppList(outdated) });
+    }
+    if (requiresNewer.length > 0) {
+      systemAlert.show({ code: 'APP_OS_REQUIRES_NEWER', detail: formatAppList(requiresNewer) });
+    }
+  }
+
+  // Boot-time permission consent check for remote apps
+  // For each entry in sys/app.js, verify that the user has previously consented to the
+  // app's permissions. If new permissions were added since last install, show re-consent.
+  // Apps whose consent is declined are removed from the catalog and from sys/app.js.
+  await checkRemoteAppConsent(kernel, appInstallerService, catalogApps);
 
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
@@ -392,12 +447,16 @@ async function initializeCore(): Promise<Kernel> {
   languageManager.registerSystemPack('alert', systemAlertPack);
   languageManager.registerSystemPack('bootstrap', bootstrapPack);
   languageManager.registerSystemPack('console', kernelConsolePack);
+  languageManager.registerSystemPack('installer', appInstallerPack);
 
   const notificationManager = new NotificationManager();
   kernel.register('notificationManager', notificationManager);
 
   const sysAlert = new SystemAlert(kernel);
   kernel.register('systemAlert', sysAlert);
+
+  const appInstaller = new AppInstaller(kernel);
+  kernel.register('appInstaller', appInstaller);
 
   const networkManager = new AllowlistNetworkManager();
   kernel.register('networkManager', networkManager);
@@ -518,6 +577,124 @@ function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplicat
 
   // 持久化初始設定
   registry.persist();
+}
+
+// ── Boot-time remote app permission consent check ──────────────
+
+/** Returns true if the URL uses http or https scheme. */
+function isRemoteUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 比對每個遠端 App 的目前權限與已同意的快取權限。
+ * - 若從未同意（app-grants 中無記錄）→ 顯示完整安裝對話框
+ * - 若有新增權限 → 顯示重新同意對話框
+ * - 若使用者拒絕 → 從 sys:app.js 移除，並從 catalogApps 剔除
+ * - 若使用者同意或無變更 → 更新 app-grants 快取
+ *
+ * catalogApps 陣列會被就地修改（splice 移除被拒絕的項目）。
+ * 呼叫完成後，呼叫端應重新呼叫 desktopShell.setApplications() 以同步最新清單。
+ */
+async function checkRemoteAppConsent(
+  kernel: Kernel,
+  appInstaller: import('../application/AppInstaller').AppInstaller,
+  catalogApps: RegisteredApplication[]
+): Promise<void> {
+  const fileSystem = kernel.resolve('fileSystem');
+  const systemAppId = kernel.get('systemAppId');
+  const appManager = kernel.resolve('appManager');
+
+  const appJsResult = fileSystem.read(systemAppId, 'sys', 'app.js');
+  if (!appJsResult.success || !Array.isArray(appJsResult.data?.data)) return;
+
+  const rawEntries = appJsResult.data!.data as string[];
+  if (rawEntries.length === 0) return;
+
+  /** Map normalizedManifestUrl → { info, appsInCatalog } */
+  const urlToApps = new Map<string, { name: string; version?: string; author?: string; description?: string; permissions: string[]; appsInCatalog: RegisteredApplication[] }>();
+
+  for (const rawEntry of rawEntries) {
+    const normalizedUrl = normalizeCatalogEntry(rawEntry);
+    if (!isRemoteUrl(normalizedUrl)) continue;  // local paths don't need consent
+
+    const entryBasePath = normalizedUrl.slice(0, normalizedUrl.lastIndexOf('/'));
+    const appsFromUrl = catalogApps.filter(a => a.entryPath === entryBasePath);
+    if (appsFromUrl.length === 0) continue;  // failed to load at boot — skip (don't remove)
+
+    // Collect all permissions from all apps in this package
+    const allPerms = new Set<string>();
+    for (const a of appsFromUrl) {
+      for (const p of a.permissions) allPerms.add(p);
+    }
+
+    urlToApps.set(normalizedUrl, {
+      name: appsFromUrl[0].packageName || appsFromUrl[0].name,
+      version: appsFromUrl[0].version,
+      permissions: Array.from(allPerms),
+      appsInCatalog: appsFromUrl,
+    });
+  }
+
+  const toRemove: string[] = [];
+
+  for (const [manifestUrl, entry] of urlToApps) {
+    const storedPerms = appInstaller.getGrantedPermissions(manifestUrl);
+    const info = {
+      name: entry.name,
+      version: entry.version,
+      permissions: entry.permissions,
+      manifestUrl,
+    };
+
+    let accepted = true;
+
+    if (storedPerms === null) {
+      // Never consented — show full install consent dialog
+      const result = await appInstaller.requestInstall(info);
+      accepted = result.confirmed;
+    } else {
+      // Check for new permissions since last consent
+      const newPerms = entry.permissions.filter(p => !storedPerms.includes(p));
+      if (newPerms.length > 0) {
+        // New permissions added — show re-consent dialog
+        accepted = await appInstaller.requestReConsent({ ...info, newPermissions: newPerms });
+      } else if (entry.permissions.length < storedPerms.length) {
+        // Permissions only reduced — silently update the cache
+        appInstaller.updateGrants(manifestUrl, entry.permissions);
+      }
+      // Otherwise permissions unchanged — nothing to do
+    }
+
+    if (!accepted) {
+      toRemove.push(manifestUrl);
+    }
+  }
+
+  if (toRemove.length === 0) return;
+
+  // Remove declined apps from sys:app.js and from catalogApps
+  for (const manifestUrl of toRemove) {
+    appInstaller.removeInstall(manifestUrl);
+    const appsToRemove = urlToApps.get(manifestUrl)?.appsInCatalog ?? [];
+    for (const app of appsToRemove) {
+      const idx = catalogApps.indexOf(app);
+      if (idx !== -1) catalogApps.splice(idx, 1);
+      if (app.appId) {
+        try { appManager.unregister(app.appId); } catch { /* ignore */ }
+      }
+    }
+    bufferedLog('BOOT', 'INFO', `Removed declined remote app: ${manifestUrl}`);
+  }
+
+  // Re-sync the desktop shell app list after removals
+  const desktopShell = kernel.resolve('desktopShell');
+  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 }
 
 export { bootstrapSystem };

@@ -17,7 +17,10 @@ export type AlertCode =
   | 'PERMISSION_DENIED'
   | 'APP_LAUNCH_FAILED'
   | 'APP_FETCH_FAILED'
-  | 'SYSTEM_ERROR';
+  | 'APP_CRASHED'
+  | 'SYSTEM_ERROR'
+  | 'APP_OS_OUTDATED'
+  | 'APP_OS_REQUIRES_NEWER';
 
 export type AlertLevel = 'warning' | 'error';
 
@@ -56,10 +59,25 @@ const ALERT_PRESETS: Record<AlertCode, AlertPreset> = {
     bodyKey: 'alert.appFetchFailed.body',
     level: 'error',
   },
+  APP_CRASHED: {
+    titleKey: 'alert.appCrashed.title',
+    bodyKey: 'alert.appCrashed.body',
+    level: 'error',
+  },
   SYSTEM_ERROR: {
     titleKey: 'alert.systemError.title',
     bodyKey: 'alert.systemError.body',
     level: 'error',
+  },
+  APP_OS_OUTDATED: {
+    titleKey: 'alert.appOsOutdated.title',
+    bodyKey: 'alert.appOsOutdated.body',
+    level: 'warning',
+  },
+  APP_OS_REQUIRES_NEWER: {
+    titleKey: 'alert.appOsRequiresNewer.title',
+    bodyKey: 'alert.appOsRequiresNewer.body',
+    level: 'warning',
   },
 };
 

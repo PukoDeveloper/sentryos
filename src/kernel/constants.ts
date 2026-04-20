@@ -47,6 +47,10 @@ export const ID_PREFIX_PLUGIN = 'plugin_';
 // ── Application Types ───────────────────────────────────────
 export type AppType = 'Service' | 'Window' | 'Console' | 'Library';
 
+// ── OS Version ──────────────────────────────────────────────
+/** 目前作業系統的語義版本號，供 manifest osVersion 相容性檢查使用 */
+export const OS_VERSION = '1.0.0';
+
 // ── Built-in App IDs ────────────────────────────────────────
 export const BUILTIN_KERNEL_CONSOLE = 'builtin_kernel_console';
 
