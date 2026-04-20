@@ -385,4 +385,5 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
 export {
     loadApplicationCatalog,
     loadRemoteApplicationCatalog,
+    normalizeCatalogEntry,
 };

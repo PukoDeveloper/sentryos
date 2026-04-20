@@ -314,3 +314,50 @@ export const kernelConsolePack: LanguagePack = {
     'console.help.footer': 'ライブラリのCLIコマンドは直接実行できます。\n例：factorial 10, reverse hello',
   },
 };
+
+// ── AppInstaller ─────────────────────────────────────────────
+
+export const appInstallerPack: LanguagePack = {
+  'zh-TW': {
+    'installer.install.title': '安裝應用程式',
+    'installer.install.body': '此應用程式請求以下存取權限，請確認後再繼續。',
+    'installer.reConsent.title': '應用程式更新了權限要求',
+    'installer.reConsent.body': '此應用程式的權限要求已變更，請重新確認以繼續使用。',
+    'installer.label.author': '作者',
+    'installer.label.perms': '請求的權限',
+    'installer.label.newPerms': '新增的權限',
+    'installer.label.noPerms': '此應用程式不請求任何額外權限。',
+    'installer.btn.install': '安裝',
+    'installer.btn.cancel': '取消',
+    'installer.btn.allow': '允許',
+    'installer.btn.remove': '移除應用程式',
+  },
+  'en': {
+    'installer.install.title': 'Install Application',
+    'installer.install.body': 'This application requests the following permissions. Please review before continuing.',
+    'installer.reConsent.title': 'App Updated Permissions',
+    'installer.reConsent.body': 'This app has changed its permission requirements. Please review to continue using it.',
+    'installer.label.author': 'Author',
+    'installer.label.perms': 'Requested Permissions',
+    'installer.label.newPerms': 'New Permissions',
+    'installer.label.noPerms': 'This app does not request any extra permissions.',
+    'installer.btn.install': 'Install',
+    'installer.btn.cancel': 'Cancel',
+    'installer.btn.allow': 'Allow',
+    'installer.btn.remove': 'Remove App',
+  },
+  'ja': {
+    'installer.install.title': 'アプリのインストール',
+    'installer.install.body': 'このアプリは以下の権限を要求しています。内容を確認してから続行してください。',
+    'installer.reConsent.title': 'アプリが権限要求を更新しました',
+    'installer.reConsent.body': 'このアプリの権限要求が変更されました。引き続き使用するには確認が必要です。',
+    'installer.label.author': '作者',
+    'installer.label.perms': '要求された権限',
+    'installer.label.newPerms': '新しい権限',
+    'installer.label.noPerms': 'このアプリは追加の権限を要求しません。',
+    'installer.btn.install': 'インストール',
+    'installer.btn.cancel': 'キャンセル',
+    'installer.btn.allow': '許可',
+    'installer.btn.remove': 'アプリを削除',
+  },
+};
