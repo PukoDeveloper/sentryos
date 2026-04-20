@@ -377,7 +377,7 @@ function renderWallpaperSection(self) {
   // Custom image URL swatch
   var customSwatch = selectedWallpaper === -1 ? swatchSelected() : swatchBase();
   if (customWallpaperUrl) {
-    customSwatch.backgroundImage = 'url("' + customWallpaperUrl.replace(/"/g, '\\"') + '")';
+    customSwatch.backgroundImage = 'url("' + customWallpaperUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '")';
     customSwatch.backgroundSize = 'cover';
     customSwatch.backgroundPosition = 'center';
   } else {
