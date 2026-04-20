@@ -139,6 +139,13 @@ async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<Regist
 // ── Helpers ─────────────────────────────────────────────────
 
 function normalizeCatalogEntry(entry: string): string {
+    // 遠端 URL（http:// / https://）直接使用，不添加前導斜線
+    if (/^https?:\/\//i.test(entry)) {
+        const withoutTrailing = entry.replace(/\/+$/, '');
+        return withoutTrailing.endsWith('manifest.json')
+            ? withoutTrailing
+            : `${withoutTrailing}/manifest.json`;
+    }
     const trimmed = entry.replace(/^\/+/, '').replace(/\/+$/, '');
     if (trimmed.endsWith('manifest.json')) {
         return `/${trimmed}`;
@@ -262,7 +269,7 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
                 }
                 const raw = await response.json();
                 const slashIndex = url.lastIndexOf('/');
-                const basePath = slashIndex > 0 ? url.slice(0, slashIndex) : url;
+                const basePath = slashIndex !== -1 ? url.slice(0, slashIndex) : url;
                 return { raw, basePath };
             })
         );

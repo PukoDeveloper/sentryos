@@ -470,10 +470,10 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
     /**
      * 將相對模組路徑解析為絕對 URL，並驗證不會逃離套件目錄。
-     * 支援本機路徑與遠端應用程式（entryPath 為絕對 URL）。
+     * entryPath 可為本機相對路徑或遠端絕對 URL；modulePath 必須是相對路徑。
      */
     private resolveModulePath(entryPath: string, modulePath: string): { path: string } | { error: string } {
-        // 拒絕絕對路徑
+        // 拒絕絕對路徑（modulePath 必須是相對路徑）
         if (modulePath.startsWith('/') || modulePath.startsWith('\\')) {
             return { error: 'absolute paths are not allowed' };
         }
