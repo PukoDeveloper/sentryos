@@ -79,6 +79,13 @@ export const Permissions = {
   // Dialog
   DIALOG_OPEN: 'dialog.open',
   DIALOG_RESOLVE: 'dialog.resolve',
+
+  // Clipboard
+  CLIPBOARD_READ: 'clipboard.read',
+  CLIPBOARD_WRITE: 'clipboard.write',
+
+  // Audio
+  AUDIO_PLAY: 'audio.play',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
@@ -93,6 +100,7 @@ export const Events = {
   KEYBOARD: 'keyboard',
   LANGUAGE_CHANGED: 'language.changed',
   THEME_CHANGED: 'theme.changed',
+  CLIPBOARD_CHANGED: 'clipboard.changed',
 } as const;
 
 // ── User Default Permissions ────────────────────────────────
@@ -152,6 +160,13 @@ export const USER_DEFAULT_PERMISSIONS: string[] = [
 
   // 對話框
   Permissions.DIALOG_OPEN,
+
+  // 剪貼簿
+  Permissions.CLIPBOARD_READ,
+  Permissions.CLIPBOARD_WRITE,
+
+  // 音訊
+  Permissions.AUDIO_PLAY,
 
   // 權限：建立子應用權限槽（供 DesktopShell 啟動使用）
   Permissions.NEW_APP,
