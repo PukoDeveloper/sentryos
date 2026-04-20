@@ -56,23 +56,36 @@ sentryos/
 ├── vite.config.ts
 ├── src/
 │   ├── main.ts             # 應用程式入口
-│   ├── style.css            # 全域樣式
-│   ├── api/                 # Host API 註冊層
-│   │   ├── index.ts         # 集中註冊入口
-│   │   ├── consoleApi.ts    # Console 輸出
-│   │   ├── envApi.ts        # 環境變數 / Library / 命令
-│   │   ├── monitorApi.ts    # 系統監控統計
+│   ├── style.css           # 全域樣式
+│   ├── api/                # Host API 註冊層（13 個模組）
+│   │   ├── index.ts        # 集中註冊入口
+│   │   ├── consoleApi.ts   # Console 輸出
+│   │   ├── dialogApi.ts    # 對話框
+│   │   ├── envApi.ts       # 環境變數 / Library / 命令
+│   │   ├── installApi.ts   # 應用程式安裝
+│   │   ├── monitorApi.ts   # 系統監控統計
+│   │   ├── networkApi.ts   # 網路請求
 │   │   ├── notificationApi.ts # 通知系統
-│   │   ├── shellApi.ts      # 系統指令
-│   │   ├── storageApi.ts    # 儲存查詢
-│   │   ├── systemApi.ts     # 程序終止
-│   │   └── uiApi.ts         # 視窗 & UI tree
-│   ├── application/         # 應用程式管理
+│   │   ├── registryApi.ts  # 系統登錄
+│   │   ├── settingsApi.ts  # 系統設定
+│   │   ├── shellApi.ts     # 系統指令
+│   │   ├── storageApi.ts   # 儲存查詢
+│   │   ├── systemApi.ts    # 程序終止
+│   │   └── uiApi.ts        # 視窗 & UI tree
+│   ├── application/        # 應用程式管理
+│   │   ├── AppInstaller.ts        # 核心層安裝對話框
 │   │   ├── ApplicationCatalog.ts  # Manifest 載入器
 │   │   ├── ApplicationLauncher.ts # 集中啟動邏輯
 │   │   └── ApplicationManager.ts  # 應用定義登錄簿
+│   ├── auth/
+│   │   └── AuthProvider.ts        # 使用者驗證
 │   ├── bootstrap/
 │   │   └── systemBootstrap.ts  # 系統初始化與 API 註冊
+│   ├── console/
+│   │   ├── AnsiParser.ts    # ANSI 控制碼解析
+│   │   └── KernelConsole.ts # 核心層主控台
+│   ├── dialog/
+│   │   └── DialogManager.ts # 對話框管理
 │   ├── environment/
 │   │   └── EnvironmentManager.ts  # 環境變數、自動啟動、程式庫
 │   ├── events/
@@ -81,15 +94,26 @@ sentryos/
 │   │   ├── Kernel.ts        # 服務定位容器
 │   │   ├── constants.ts     # 權限字串、事件名稱、預設值
 │   │   └── types.ts         # 共用型別定義
+│   ├── language/
+│   │   ├── LanguageManager.ts # 多語言 i18n 管理
+│   │   └── systemPacks.ts   # 內建語言包
 │   ├── monitor/
 │   │   └── SystemMonitor.ts  # 系統監控追蹤器
+│   ├── network/
+│   │   ├── AllowlistNetworkManager.ts # 允許清單網路管理
+│   │   └── NetworkAdapter.ts          # 網路介面卡抽象
 │   ├── notification/
 │   │   └── NotificationManager.ts # 全域通知系統
 │   ├── permissions/
 │   │   └── PermissionsManager.ts  # 萬用字元權限管理
+│   ├── plugin/
+│   │   ├── PluginContext.ts  # 插件執行上下文
+│   │   └── PluginManager.ts  # 插件管理
 │   ├── process/
 │   │   ├── Process.ts       # 程序資料模型
 │   │   └── ProcessManager.ts # 程序生命週期管理
+│   ├── registry/
+│   │   └── SystemRegistry.ts # 系統登錄表
 │   ├── runtime/
 │   │   ├── QuickJsInit.ts   # QuickJS WASM 初始化
 │   │   ├── ScriptRuntime.ts # QuickJS 沙箱執行引擎
@@ -104,11 +128,18 @@ sentryos/
 │       └── types.ts         # 視窗型別定義
 ├── public/
 │   ├── app.json             # 應用程式目錄
+│   ├── plugins.json         # 插件目錄
 │   └── apps/                # 內建應用程式
 │       ├── example/         # 範例應用
 │       ├── stdlib/          # 標準函式庫
 │       ├── terminal/        # 終端機
-│       └── task-manager/    # 工作管理員
+│       ├── task-manager/    # 工作管理員
+│       ├── file-manager/    # 檔案管理器
+│       ├── file-picker/     # 檔案選擇器
+│       ├── text-manager/    # 文字編輯器
+│       ├── utilities/       # 計算機、時鐘等實用工具
+│       ├── settings/        # 系統設定
+│       └── developer-tools/ # 開發者工具
 └── docs/                    # 完整技術文件
 ```
 
@@ -130,20 +161,25 @@ sentryos/
 │  Permissions   │ WindowManager  │ Storage   │
 │  Environment   │ Notification   │ Monitor   │
 │  ApplicationManager │ ApplicationLauncher    │
+│  Network │ Registry │ Dialog │ AppInstaller  │
+│  Auth │ Console │ Language │ Plugin         │
 ├─────────────────────────────────────────────┤
 │                 API Layer                    │
 │  ui │ system │ storage │ env │ console      │
-│  shell │ notification │ monitor              │
+│  shell │ notification │ monitor │ settings  │
+│  network │ registry │ dialog │ install      │
 ├─────────────────────────────────────────────┤
 │                   UI                         │
 │          Bios │ DesktopShell                 │
 ├─────────────────────────────────────────────┤
 │             Public Apps (沙箱)               │
 │   example │ terminal │ task-manager │ stdlib │
+│   file-manager │ file-picker │ text-manager  │
+│   utilities │ settings │ developer-tools    │
 └─────────────────────────────────────────────┘
 ```
 
-應用程式透過 Host API（`processApi`、`eventApi`、`ui`、`storageApi` 等）與系統互動，所有呼叫均受權限系統保護。
+應用程式透過 Host API（`OS.process`、`OS.event`、`OS.ui`、`OS.storage` 等）與系統互動，所有呼叫均受權限系統保護。
 
 ## 開發應用程式
 
@@ -177,22 +213,22 @@ sentryos/
 
 | API | 說明 | 權限 |
 |-----|------|------|
-| `processApi` | 程序資訊、子程序、終止 | 依操作而異 |
-| `eventApi` | 事件訂閱/發射 | `event.subscribe.*` / `event.emit.*` |
-| `ipcApi` | 跨程序通訊 | `process.ipc.*` |
-| `ui` | 視窗建立與 UI 元件 | `window.create` |
-| `systemApi` | 系統級操作 | `process.terminate` |
-| `storageApi` | 儲存空間查詢 | `storage.usage` |
-| `envApi` | 環境變數、程式庫、命令註冊 | `env.read` / `env.write` / `env.library.load` |
-| `consoleApi` | Console 輸出 | `console.write` |
-| `shellApi` | 系統指令（程序/應用/視窗/sysinfo） | `process.list` / `shell.*` |
-| `notificationApi` | 通知系統（發送/關閉） | `notification.send` |
-| `monitorApi` | 系統監控統計（事件/API/權限/程序） | `monitor.read` |
-| `envApi` | 環境變數、程式庫載入 | `env.*` |
-| `consoleApi` | 主控台讀寫 | `console.*` |
-| `shellApi` | 系統命令（僅限 Console 類型） | `shell.*` |
-| `notificationApi` | 系統通知 | `notification.send` |
-| `monitorApi` | 系統監控數據 | `monitor.read` |
+| `OS.process` | 程序資訊、子程序、終止 | 依操作而異 |
+| `OS.event` | 事件訂閱/發射 | `event.subscribe.*` / `event.emit.*` |
+| `OS.ipc` | 跨程序通訊 | — |
+| `OS.ui` | 視窗建立與 UI 元件 | `window.create` |
+| `OS.system` | 系統級操作 | `process.terminate` |
+| `OS.storage` | 儲存空間查詢 | `storage.usage` |
+| `OS.env` | 環境變數、程式庫、命令註冊 | `env.read` / `env.write` / `env.library.load` |
+| `OS.console` | Console 輸出 | `console.write` |
+| `OS.shell` | 系統指令（程序/應用/視窗/sysinfo） | `process.list` / `shell.*` |
+| `OS.notification` | 通知系統（發送/關閉） | `notification.send` |
+| `OS.monitor` | 系統監控統計（事件/API/權限/程序） | `monitor.read` |
+| `OS.settings` | 系統設定（桌布、主題、工作列等） | `settings.read` / `settings.write` |
+| `OS.network` | 網路請求（受允許清單控管） | `network.request` |
+| `OS.registry` | 系統登錄表讀寫 | `registry.read` / `registry.write` |
+| `OS.dialog` | 對話框（開啟/關閉/回呼） | — |
+| `OS.install` | 應用程式安裝（遠端 manifest） | — |
 
 ## 技術文件
 
