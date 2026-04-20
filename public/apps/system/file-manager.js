@@ -404,8 +404,8 @@ function renderHeader(s, self) {
   }
   return UI.row([
     UI.heading('檔案管理器', { color: '#d8e8ff', flex: '1', fontSize: '16px' }),
-    UI.row(tabs, { gap: '4px' }),
-  ], { alignItems: 'center' });
+    UI.row(tabs, { gap: '4px', flexWrap: 'wrap' }),
+  ], { alignItems: 'center', flexWrap: 'wrap' });
 }
 
 // ── Usage Bar ───────────────────────────────────────────────
@@ -492,7 +492,7 @@ function renderBreadcrumb(s, self) {
     ], { gap: '4px', marginLeft: 'auto' }));
   }
 
-  return UI.row(parts, { alignItems: 'center', gap: '6px' });
+  return UI.row(parts, { alignItems: 'center', gap: '6px', flexWrap: 'wrap' });
 }
 
 // ── Content: Namespace List or File List ─────────────────────
