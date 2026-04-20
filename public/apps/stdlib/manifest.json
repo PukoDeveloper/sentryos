@@ -6,43 +6,69 @@
         {
             "id": "stdlib-math",
             "name": "Math Utils",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "main": "math.js",
             "type": "Library",
             "commands": [
                 { "name": "factorial", "description": "Calculate factorial of a number", "usage": "factorial <n>" },
-                { "name": "fib", "description": "Calculate Fibonacci number", "usage": "fib <n>" },
-                { "name": "prime", "description": "Check if a number is prime", "usage": "prime <n>" },
-                { "name": "gcd", "description": "Calculate GCD of two numbers", "usage": "gcd <a> <b>" },
-                { "name": "lcm", "description": "Calculate LCM of two numbers", "usage": "lcm <a> <b>" }
+                { "name": "fib",       "description": "Calculate Fibonacci number",     "usage": "fib <n>" },
+                { "name": "prime",     "description": "Check if a number is prime",     "usage": "prime <n>" },
+                { "name": "gcd",       "description": "Calculate GCD of two numbers",  "usage": "gcd <a> <b>" },
+                { "name": "lcm",       "description": "Calculate LCM of two numbers",  "usage": "lcm <a> <b>" },
+                { "name": "clamp",     "description": "Clamp value between min and max", "usage": "clamp <value> <min> <max>" },
+                { "name": "lerp",      "description": "Linear interpolation",           "usage": "lerp <a> <b> <t>" },
+                { "name": "round",     "description": "Round to N decimal places",      "usage": "round <number> [decimals]" },
+                { "name": "range",     "description": "Generate a numeric range",       "usage": "range <start> <end> [step]" },
+                { "name": "sum",       "description": "Sum a list of numbers",          "usage": "sum <n1> <n2> ..." },
+                { "name": "avg",       "description": "Average of a list of numbers",   "usage": "avg <n1> <n2> ..." },
+                { "name": "median",    "description": "Median of a list of numbers",    "usage": "median <n1> <n2> ..." },
+                { "name": "stddev",    "description": "Standard deviation of numbers",  "usage": "stddev <n1> <n2> ..." }
             ]
         },
         {
             "id": "stdlib-string",
             "name": "String Utils",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "main": "string.js",
             "type": "Library",
             "commands": [
-                { "name": "reverse", "description": "Reverse a string", "usage": "reverse <text>" },
-                { "name": "capitalize", "description": "Capitalize first letter", "usage": "capitalize <text>" },
-                { "name": "wordcount", "description": "Count words in text", "usage": "wordcount <text...>" },
-                { "name": "repeat", "description": "Repeat a string N times", "usage": "repeat <text> <n>" }
+                { "name": "reverse",    "description": "Reverse a string",                  "usage": "reverse <text>" },
+                { "name": "capitalize", "description": "Capitalize first letter",            "usage": "capitalize <text>" },
+                { "name": "wordcount",  "description": "Count words in text",               "usage": "wordcount <text...>" },
+                { "name": "repeat",     "description": "Repeat a string N times",           "usage": "repeat <text> <n>" },
+                { "name": "uppercase",  "description": "Convert text to UPPER CASE",        "usage": "uppercase <text>" },
+                { "name": "lowercase",  "description": "Convert text to lower case",        "usage": "lowercase <text>" },
+                { "name": "titlecase",  "description": "Title-case every word",             "usage": "titlecase <text>" },
+                { "name": "truncate",   "description": "Truncate text to max length",       "usage": "truncate <text> <maxLen>" },
+                { "name": "slugify",    "description": "Convert text to URL-safe slug",     "usage": "slugify <text>" },
+                { "name": "count",      "description": "Count occurrences of needle in text", "usage": "count <needle> <text...>" }
             ]
         },
         {
             "id": "stdlib-ui",
             "name": "UI Utils",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "main": "ui.js",
             "type": "Library"
         },
         {
             "id": "stdlib-i18n",
             "name": "i18n",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "main": "i18n.js",
             "type": "Library"
+        },
+        {
+            "id": "stdlib-datetime",
+            "name": "DateTime",
+            "version": "1.0.0",
+            "main": "datetime.js",
+            "type": "Library",
+            "commands": [
+                { "name": "date",      "description": "Show current date/time",        "usage": "date [pattern]" },
+                { "name": "timestamp", "description": "Show current Unix timestamp",   "usage": "timestamp" },
+                { "name": "duration",  "description": "Format milliseconds as duration", "usage": "duration <ms>" }
+            ]
         }
     ]
 }
