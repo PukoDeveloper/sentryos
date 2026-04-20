@@ -66,6 +66,11 @@ export class ApplicationLauncher {
     this.runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
     this.runtimeRegistry.unbindProcess(proc.pid, processAppId);
 
+    // Stop any audio still playing from this process
+    if (this.kernel.has('audioManager')) {
+      this.kernel.resolve('audioManager').stopAll(processAppId);
+    }
+
     // Terminate process tree
     this.processManager.terminate(this.systemAppId, proc.pid);
 

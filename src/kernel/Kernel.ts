@@ -20,6 +20,8 @@ import type { DialogManager } from '../dialog/DialogManager';
 import type { AppInstaller } from '../application/AppInstaller';
 import type { PluginManager } from '../plugin/PluginManager';
 import type { LanguageManager } from '../language/LanguageManager';
+import type { ClipboardManager } from '../clipboard/ClipboardManager';
+import type { AudioManager } from '../audio/AudioManager';
 
 export interface ServiceMap {
   permissions: PermissionsManager;
@@ -43,6 +45,8 @@ export interface ServiceMap {
   appInstaller: AppInstaller;
   pluginManager: PluginManager;
   languageManager: LanguageManager;
+  clipboardManager: ClipboardManager;
+  audioManager: AudioManager;
 }
 
 export interface ValueMap {

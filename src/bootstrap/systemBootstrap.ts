@@ -19,6 +19,8 @@ import { AllowlistNetworkManager } from '../network/AllowlistNetworkManager';
 import { SystemRegistry } from '../registry/SystemRegistry';
 import { DialogManager } from '../dialog/DialogManager';
 import { ApplicationLauncher } from '../application/ApplicationLauncher';
+import { ClipboardManager } from '../clipboard/ClipboardManager';
+import { AudioManager } from '../audio/AudioManager';
 import { Kernel } from '../kernel/Kernel';
 import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
@@ -279,6 +281,7 @@ async function bootstrapSystem(): Promise<void> {
           runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
           runtimeRegistry.unbindProcess(proc.pid, proc.processAppId);
           processManager.terminate(systemAppId, proc.pid);
+          kernel.resolve('audioManager').stopAll(proc.processAppId);
           eventBus.emit(systemAppId, Events.PROCESS_STOPPED, {
             pid: proc.pid,
             appDefId: proc.appDefId,
@@ -307,6 +310,9 @@ async function bootstrapSystem(): Promise<void> {
 
   // 6.5. Wire runtime memory provider to system monitor
   systemMonitor.setRuntimeMemoryProvider(() => runtimeRegistry.getAllMemoryUsage());
+
+  // 6.6. Start clipboard paste listener (bridges external browser clipboard into the system)
+  kernel.resolve('clipboardManager').init();
 
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
@@ -469,6 +475,12 @@ async function initializeCore(): Promise<Kernel> {
 
   const systemRegistry = new SystemRegistry(kernel);
   kernel.register('systemRegistry', systemRegistry);
+
+  const clipboardManager = new ClipboardManager(kernel);
+  kernel.register('clipboardManager', clipboardManager);
+
+  const audioManager = new AudioManager();
+  kernel.register('audioManager', audioManager);
 
   const desktopShell = new DesktopShell();
   kernel.register('desktopShell', desktopShell);
