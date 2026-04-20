@@ -1,12 +1,31 @@
 import type { Application } from './ApplicationManager';
 import type { Result } from '../kernel/types';
 import type { AppType } from '../kernel/constants';
+import { OS_VERSION } from '../kernel/constants';
 
 type ApplicationCatalogError = 'ManifestNotFound' | 'InvalidManifest' | 'LoadFailed';
 
 type ApplicationCatalogResult<TData> = Result<TData, ApplicationCatalogError> & {
     success: boolean;
     error?: ApplicationCatalogError;
+};
+
+/** OS 版本不相容而被略過的應用程式資訊 */
+type OsRejectedApp = {
+    /** 應用程式顯示名稱 */
+    name: string;
+    /** 套件名稱 */
+    packageName: string;
+    /** 不相容原因：outdated = OS 太新；requiresNewerOs = OS 太舊 */
+    reason: 'outdated' | 'requiresNewerOs';
+    /** manifest 中宣告的版本範圍 */
+    requiredRange: { min?: string; max?: string };
+};
+
+/** loadApplicationCatalog / loadRemoteApplicationCatalog 成功時的資料形狀 */
+type CatalogData = {
+    apps: RegisteredApplication[];
+    rejected: OsRejectedApp[];
 };
 
 // ── Manifest Formats ────────────────────────────────────────
@@ -43,6 +62,9 @@ type AppEntryManifest = {
     engine?: string;
     /** Library 可在 manifest 中靜態宣告命令，開機時直接註冊。 */
     commands?: ManifestCommand[];
+    /** 相容的作業系統版本範圍。min 為最低需求版本；max 為最高支援版本。
+     *  省略代表無限制。 */
+    osVersion?: { min?: string; max?: string };
 };
 
 /** 舊格式：單一應用程式清單（向下相容） */
@@ -56,6 +78,8 @@ type LegacyManifest = {
     type?: AppType;
     permissions?: string[];
     maxInstances?: number;
+    /** 相容的作業系統版本範圍。min 為最低需求版本；max 為最高支援版本。 */
+    osVersion?: { min?: string; max?: string };
 };
 
 // ── Registered Application ──────────────────────────────────
@@ -80,7 +104,7 @@ type RegisteredApplication = Application & {
 
 // ── Catalog Loader ──────────────────────────────────────────
 
-async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<RegisteredApplication[]>> {
+async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<CatalogData>> {
     try {
         const response = await fetch('/app.json');
         if (!response.ok) {
@@ -107,6 +131,7 @@ async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<Regist
         );
 
         const applications: RegisteredApplication[] = [];
+        const rejected: OsRejectedApp[] = [];
         for (const result of results) {
             if (result.status === 'rejected') {
                 console.warn('[ApplicationCatalog]', result.reason);
@@ -120,23 +145,62 @@ async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<Regist
                         console.warn('[ApplicationCatalog] Invalid app entry in package:', pkg.name);
                         continue;
                     }
+                    const compat = checkOsCompatibility(app.osVersion, OS_VERSION);
+                    if (compat !== 'compatible') {
+                        rejected.push({ name: app.name, packageName: pkg.name, reason: compat, requiredRange: app.osVersion ?? {} });
+                        continue;
+                    }
                     applications.push(toRegisteredApp(pkg, app, basePath));
                 }
             } else if (isLegacyManifest(raw)) {
                 const legacy = raw as LegacyManifest;
-                applications.push(legacyToRegisteredApp(legacy, basePath));
+                const compat = checkOsCompatibility(legacy.osVersion, OS_VERSION);
+                if (compat !== 'compatible') {
+                    rejected.push({ name: legacy.name, packageName: legacy.name, reason: compat, requiredRange: legacy.osVersion ?? {} });
+                } else {
+                    applications.push(legacyToRegisteredApp(legacy, basePath));
+                }
             } else {
                 console.warn('[ApplicationCatalog] Unknown manifest format in:', basePath);
             }
         }
 
-        return { success: true, data: applications };
+        return { success: true, data: { apps: applications, rejected } };
     } catch {
         return { success: false, error: 'LoadFailed' };
     }
 }
 
 // ── Helpers ─────────────────────────────────────────────────
+
+/** 比較兩個語義版本字串，回傳 -1（a < b）、0（a === b）、1（a > b） */
+function compareVersion(a: string, b: string): -1 | 0 | 1 {
+    const pa = a.split('.').map(s => parseInt(s, 10) || 0);
+    const pb = b.split('.').map(s => parseInt(s, 10) || 0);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+        const na = pa[i] ?? 0;
+        const nb = pb[i] ?? 0;
+        if (na < nb) return -1;
+        if (na > nb) return 1;
+    }
+    return 0;
+}
+
+/** 依 osVersion 範圍與目前 OS 版本進行相容性檢查 */
+function checkOsCompatibility(
+    constraint: { min?: string; max?: string } | undefined,
+    currentVersion: string
+): 'compatible' | 'outdated' | 'requiresNewerOs' {
+    if (!constraint) return 'compatible';
+    if (constraint.min && compareVersion(currentVersion, constraint.min) < 0) {
+        return 'requiresNewerOs';
+    }
+    if (constraint.max && compareVersion(currentVersion, constraint.max) > 0) {
+        return 'outdated';
+    }
+    return 'compatible';
+}
 
 function normalizeCatalogEntry(entry: string): string {
     // 遠端 URL（http:// / https://）直接使用，不添加前導斜線
@@ -248,6 +312,8 @@ export type {
     AppEntryManifest,
     LegacyManifest,
     RegisteredApplication,
+    OsRejectedApp,
+    CatalogData,
 };
 
 /**
@@ -255,9 +321,9 @@ export type {
  * 每個 URL 應直接指向 manifest.json（PackageManifest 或 LegacyManifest 格式）。
  * 個別失敗不影響其他項目。
  */
-async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<ApplicationCatalogResult<RegisteredApplication[]>> {
+async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<ApplicationCatalogResult<CatalogData>> {
     if (manifestUrls.length === 0) {
-        return { success: true, data: [] };
+        return { success: true, data: { apps: [], rejected: [] } };
     }
 
     try {
@@ -275,6 +341,7 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
         );
 
         const applications: RegisteredApplication[] = [];
+        const rejected: OsRejectedApp[] = [];
         for (const result of results) {
             if (result.status === 'rejected') {
                 console.warn('[ApplicationCatalog] Remote manifest load failed:', result.reason);
@@ -288,17 +355,27 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
                         console.warn('[ApplicationCatalog] Invalid remote app entry in package:', pkg.name);
                         continue;
                     }
+                    const compat = checkOsCompatibility(app.osVersion, OS_VERSION);
+                    if (compat !== 'compatible') {
+                        rejected.push({ name: app.name, packageName: pkg.name, reason: compat, requiredRange: app.osVersion ?? {} });
+                        continue;
+                    }
                     applications.push(toRegisteredApp(pkg, app, basePath));
                 }
             } else if (isLegacyManifest(raw)) {
                 const legacy = raw as LegacyManifest;
-                applications.push(legacyToRegisteredApp(legacy, basePath));
+                const compat = checkOsCompatibility(legacy.osVersion, OS_VERSION);
+                if (compat !== 'compatible') {
+                    rejected.push({ name: legacy.name, packageName: legacy.name, reason: compat, requiredRange: legacy.osVersion ?? {} });
+                } else {
+                    applications.push(legacyToRegisteredApp(legacy, basePath));
+                }
             } else {
                 console.warn('[ApplicationCatalog] Unknown remote manifest format at:', basePath);
             }
         }
 
-        return { success: true, data: applications };
+        return { success: true, data: { apps: applications, rejected } };
     } catch (err) {
         console.warn('[ApplicationCatalog] Unexpected error loading remote catalog:', err);
         return { success: false, error: 'LoadFailed' };

@@ -80,6 +80,10 @@ export const systemAlertPack: LanguagePack = {
     'alert.appCrashed.body': '應用程式在執行過程中發生錯誤並已終止。',
     'alert.systemError.title': '系統錯誤',
     'alert.systemError.body': '發生了非預期的系統錯誤。',
+    'alert.appOsOutdated.title': '應用程式版本過舊',
+    'alert.appOsOutdated.body': '以下應用程式不支援目前的作業系統版本，已略過載入：',
+    'alert.appOsRequiresNewer.title': '作業系統版本不足',
+    'alert.appOsRequiresNewer.body': '以下應用程式需要更新的作業系統版本，已略過載入：',
     'alert.btn.ok': '確定',
   },
   'en': {
@@ -93,6 +97,10 @@ export const systemAlertPack: LanguagePack = {
     'alert.appCrashed.body': 'The application encountered an error and has been terminated.',
     'alert.systemError.title': 'System Error',
     'alert.systemError.body': 'An unexpected system error occurred.',
+    'alert.appOsOutdated.title': 'Application Too Old',
+    'alert.appOsOutdated.body': 'The following applications do not support the current OS version and were skipped:',
+    'alert.appOsRequiresNewer.title': 'OS Version Too Old',
+    'alert.appOsRequiresNewer.body': 'The following applications require a newer OS version and were skipped:',
     'alert.btn.ok': 'OK',
   },
   'ja': {
@@ -106,6 +114,10 @@ export const systemAlertPack: LanguagePack = {
     'alert.appCrashed.body': 'アプリの実行中にエラーが発生し、終了しました。',
     'alert.systemError.title': 'システムエラー',
     'alert.systemError.body': '予期しないシステムエラーが発生しました。',
+    'alert.appOsOutdated.title': 'アプリのバージョンが古すぎます',
+    'alert.appOsOutdated.body': '以下のアプリは現在の OS バージョンに対応しておらず、スキップされました：',
+    'alert.appOsRequiresNewer.title': 'OS バージョンが不足しています',
+    'alert.appOsRequiresNewer.body': '以下のアプリはより新しい OS バージョンが必要なため、スキップされました：',
     'alert.btn.ok': 'OK',
   },
 };

@@ -5,7 +5,7 @@ import { PermissionsManager } from '../permissions/PermissionsManager';
 import { EventBus } from '../events/EventBus';
 import { ApplicationManager, type Application } from '../application/ApplicationManager';
 import { ProcessManager } from '../process/ProcessManager';
-import { loadApplicationCatalog, loadRemoteApplicationCatalog, type RegisteredApplication } from '../application/ApplicationCatalog';
+import { loadApplicationCatalog, loadRemoteApplicationCatalog, type RegisteredApplication, type OsRejectedApp } from '../application/ApplicationCatalog';
 import { WebFileSystemAdapter } from '../storage/FileSystem';
 import { WindowManager } from '../window/WindowManager';
 import { EnvironmentManager } from '../environment/EnvironmentManager';
@@ -100,13 +100,15 @@ async function bootstrapSystem(): Promise<void> {
 
   // 2. Load application catalog
   let catalogApps: RegisteredApplication[];
+  let allRejectedApps: OsRejectedApp[] = [];
   try {
     const catalogResult = await loadApplicationCatalog();
     if (!catalogResult.success || !catalogResult.data) {
       showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
       return;
     }
-    catalogApps = catalogResult.data;
+    catalogApps = catalogResult.data.apps;
+    allRejectedApps = catalogResult.data.rejected;
   } catch (err) {
     showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
     return;
@@ -126,8 +128,9 @@ async function bootstrapSystem(): Promise<void> {
         try {
           const remoteResult = await loadRemoteApplicationCatalog(remoteUrls as string[]);
           if (remoteResult.success && remoteResult.data) {
-            catalogApps = [...catalogApps, ...remoteResult.data];
-            bufferedLog('BOOT', 'INFO', `Remote apps loaded: ${remoteResult.data.length} app(s)`);
+            catalogApps = [...catalogApps, ...remoteResult.data.apps];
+            allRejectedApps = [...allRejectedApps, ...remoteResult.data.rejected];
+            bufferedLog('BOOT', 'INFO', `Remote apps loaded: ${remoteResult.data.apps.length} app(s)`);
           } else {
             bufferedLog('BOOT', 'WARN', `Remote app catalog load failed: ${remoteResult.error ?? 'UnknownError'}`);
           }
@@ -199,6 +202,20 @@ async function bootstrapSystem(): Promise<void> {
   const systemAlert = kernel.resolve('systemAlert');
   const alertContainer = systemAlert.createContainer();
   desktopShell.registerOverlay({ id: 'system-alert-layer', element: alertContainer, order: 200 });
+
+  // Show OS-incompatibility alerts if any apps were skipped during catalog loading
+  if (allRejectedApps.length > 0) {
+    const formatAppList = (apps: OsRejectedApp[]) =>
+      apps.map(a => `• ${a.name} (${a.packageName})`).join('\n');
+    const outdated = allRejectedApps.filter(a => a.reason === 'outdated');
+    const requiresNewer = allRejectedApps.filter(a => a.reason === 'requiresNewerOs');
+    if (outdated.length > 0) {
+      systemAlert.show({ code: 'APP_OS_OUTDATED', detail: formatAppList(outdated) });
+    }
+    if (requiresNewer.length > 0) {
+      systemAlert.show({ code: 'APP_OS_REQUIRES_NEWER', detail: formatAppList(requiresNewer) });
+    }
+  }
 
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
