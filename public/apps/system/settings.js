@@ -120,6 +120,19 @@ function navBtnStyle(active) {
   };
 }
 
+function navBtnStyleCompact(active) {
+  return {
+    padding: '6px 10px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: active ? 'bold' : 'normal',
+    background: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+    color: active ? '#f4f7fb' : 'rgba(216,232,255,0.6)',
+    whiteSpace: 'nowrap',
+    textAlign: 'center',
+  };
+}
+
 var contentStyle = {
   flex: '1',
   padding: '20px',
@@ -139,7 +152,7 @@ var sectionTitle = {
 
 var swatchGrid = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(75px, 1fr))',
   gap: '8px',
 };
 
@@ -293,7 +306,7 @@ function renderHomePage(self) {
       quickNavBtn('🌐', '語言', 'language', self),
       quickNavBtn('🔒', '安全性', 'security', self),
       quickNavBtn('ℹ️', '關於', 'about', self),
-    ], { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    ], { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }),
 
     UI.box([], { height: '8px' }),
 
@@ -501,10 +514,10 @@ function renderTaskbarSection(self) {
   return UI.column([
     UI.text('顯示模式', sectionTitle),
     UI.text(taskbarModes[selectedTaskbarMode].desc, { fontSize: '11px', color: 'rgba(216,232,255,0.4)' }),
-    UI.box(modeItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box(modeItems, { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px' }),
     UI.box([], { height: '6px' }),
     UI.text('透明度', sectionTitle),
-    UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }),
+    UI.box(items, { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: '8px' }),
   ], { gap: '6px' });
 }
 
@@ -559,10 +572,10 @@ function renderStartMenuSection(self) {
 
   return UI.column([
     UI.text('寬度', sectionTitle),
-    UI.box(widthItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box(widthItems, { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: '8px' }),
     UI.box([], { height: '6px' }),
     UI.text('高度', sectionTitle),
-    UI.box(heightItems, { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }),
+    UI.box(heightItems, { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: '8px' }),
     UI.box([], { height: '6px' }),
     UI.text('顯示模式', sectionTitle),
     UI.row([
@@ -732,7 +745,7 @@ function renderNotificationsPage(self) {
               },
             });
           }),
-          { gap: '4px', flexShrink: '0' }
+          { gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }
         ),
       ], itemCardStyle),
     ]),
@@ -764,7 +777,7 @@ function renderNotificationsPage(self) {
               },
             });
           }),
-          { gap: '4px', flexShrink: '0' }
+          { gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }
         ),
       ], itemCardStyle),
     ]),
@@ -1263,7 +1276,7 @@ function renderNetworkPage(self) {
               color: '#05101c',
             },
           }),
-        ], { flex: '1', gap: '4px', width: '100%'}),
+        ], { flex: '1', gap: '4px', width: '100%', flexWrap: 'wrap'}),
       ], { alignItems: 'center', gap: '12px', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }),
     ]),
 
@@ -1464,6 +1477,9 @@ function stubSection(title, desc) {
   ]);
 }
 
+// ── Responsive state ─────────────────────────────────────────
+var _winWidth = 700;
+
 // ── Render ───────────────────────────────────────────────────
 var app = UI.createApp({
   title: '系統設定',
@@ -1472,17 +1488,22 @@ var app = UI.createApp({
   resizable: true,
   state: {},
   render: function (s, self) {
-    // Build sidebar nav
+    var sizeResult = self.getSize();
+    _winWidth = (sizeResult && sizeResult.success && sizeResult.data) ? sizeResult.data.width : 700;
+    var isNarrow = _winWidth < 560;
+
+    // Build nav items
     var navItems = [];
     for (var i = 0; i < pages.length; i++) {
       (function (page) {
+        var isActive = currentPage === page.id;
         navItems.push(UI.button(page.label, {
           id: 'nav-' + page.id,
           onClick: function () {
             currentPage = page.id;
             self.rerender();
           },
-          style: navBtnStyle(currentPage === page.id),
+          style: isNarrow ? navBtnStyleCompact(isActive) : navBtnStyle(isActive),
         }));
       })(pages[i]);
     }
@@ -1501,6 +1522,22 @@ var app = UI.createApp({
       case 'accessibility': content = renderAccessibilityPage(self); break;
       case 'about': content = renderAboutPage(self); break;
       default: content = renderHomePage(self); break;
+    }
+
+    if (isNarrow) {
+      return UI.column([
+        UI.box(navItems, {
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: '2px',
+          padding: '6px 8px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.02)',
+          overflowX: 'auto',
+        }),
+        UI.box([content], contentStyle, 'content-area'),
+      ], { height: '100%', gap: '0' });
     }
 
     return UI.row([

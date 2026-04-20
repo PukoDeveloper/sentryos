@@ -3,6 +3,7 @@
     "apps/system",
     "apps/utilities",
     "apps/text-manager",
+    "apps/image-viewer",
     "apps/developer-tools",
     "pcode"
 ]
