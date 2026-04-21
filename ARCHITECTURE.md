@@ -30,6 +30,7 @@
 | | [Manifest](./docs/app-development/manifest.md) | manifest.json 規格 |
 | | [開發指南](./docs/app-development/guide.md) | 新增 App 步驟與範本 |
 | **插件開發** | [插件指南](./docs/plugin-development/guide.md) | 插件結構、PluginContext API、引擎擴充 |
+| | [Python Runtime 指南](./docs/plugin-development/python-runtime.md) | Python 3 應用程式開發、Pyodide 沙箱、OS API 使用 |
 | **資料流** | [資料流](./docs/data-flow/data-flow.md) | 啟動、事件、關閉、IPC 流程 |
 | **型別定義** | [SDK README](./packages/sdk/README.md) | sentryos-sdk 型別定義與常數 |
 
@@ -43,6 +44,8 @@
 |------|------|------|
 | **主應用** | `apps/sentryos/` | Vite + TypeScript 主程式 |
 | **SDK** | `packages/sdk/` | `sentryos-sdk` — 型別定義與常數，供 App / Plugin 開發使用 |
+| **Lua Runtime 插件** | `packages/plugin-lua-runtime/` | `sentryos-plugin-lua-runtime` — Lua 5.3 引擎（Fengari） |
+| **Python Runtime 插件** | `packages/plugin-python-runtime/` | `sentryos-plugin-python-runtime` — Python 3 引擎（Pyodide） |
 
 ### 分層
 

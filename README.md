@@ -5,6 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Vite](https://img.shields.io/badge/Vite-7.x-646CFF)
 ![QuickJS](https://img.shields.io/badge/QuickJS-WASM-orange)
+![Python](https://img.shields.io/badge/Python-Pyodide-3776AB)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## AI 生成聲明
@@ -14,7 +15,7 @@
 ## 特色
 
 - **QuickJS WASM 沙箱** — 每個應用程式在獨立的 QuickJS 執行環境中運行，與主機完全隔離
-- **多引擎支援** — 透過插件系統可擴充 Lua（Wasmoon）等其他執行引擎，共用相同 Host API
+- **多引擎支援** — 透過插件系統可擴充 Lua（Fengari）、**Python（Pyodide）** 等其他執行引擎，共用相同 Host API
 - **細粒度權限系統** — 支援萬用字元匹配的階層式權限控制，應用程式只能存取被授權的 API
 - **視窗管理系統** — 支援拖曳、縮放、最大化/最小化、Z-Index 管理、8 方向調整大小
 - **程序生命週期** — 完整的程序管理（啟動、暫停、恢復、終止）與父子程序關係
@@ -78,12 +79,18 @@ sentryos/                          # Monorepo 根目錄
 │           │   ├── pcode/         # 程式碼編輯器
 │           │   ├── image-viewer/
 │           │   └── stdlib/        # 標準函式庫
-│           └── plugins/           # 插件（lua-runtime、monaco-editor 等）
+│           └── plugins/           # 插件（lua-runtime、python-runtime、monaco-editor 等）
 └── packages/
-    └── sdk/                       # sentryos-sdk 套件
+    ├── sdk/                       # sentryos-sdk 套件
+    │   ├── package.json
+    │   ├── src/                   # SDK 型別定義與常數
+    │   └── dist/                  # 建置產物（TypeScript declarations）
+    ├── plugin-lua-runtime/        # Lua 5.3 runtime 插件（Fengari）
+    │   ├── package.json
+    │   └── src/index.ts
+    └── plugin-python-runtime/     # Python 3 runtime 插件（Pyodide）
         ├── package.json
-        ├── src/                   # SDK 型別定義與常數
-        └── dist/                  # 建置產物（TypeScript declarations）
+        └── src/index.ts
 ```
 
 ### apps/sentryos/src/ 詳細結構
@@ -240,6 +247,36 @@ src/
 
 詳細說明請參閱 [開發指南](./docs/app-development/guide.md)。
 
+## 使用 Python 開發應用程式
+
+安裝 `python-runtime` 插件後，可在 manifest 中指定 `"engine": "python"` 來使用 Python 3：
+
+1. 在 `plugins.json` 中加入插件路徑
+2. 在 `manifest.json` 中設定 `"engine": "python"`：
+   ```json
+   {
+     "name": "我的 Python 應用",
+     "version": "1.0.0",
+     "apps": [{
+       "id": "my-python-app",
+       "name": "我的 Python 應用",
+       "main": "main.py",
+       "engine": "python",
+       "type": "Window",
+       "permissions": ["window.create"]
+     }]
+   }
+   ```
+3. 撰寫 `main.py`：
+   ```python
+   win = OS.ui.createWindow({"title": "我的 Python 應用", "width": 400, "height": 300})
+   OS.ui.initialize(win["data"], [
+       OS.ui.label("lbl", "Hello from Python 3!")
+   ])
+   ```
+
+詳細說明請參閱 [Python Runtime 開發指南](./docs/plugin-development/python-runtime.md)。
+
 ## 可用的 Host API
 
 | API | 說明 | 權限 |
@@ -286,6 +323,7 @@ import { Permissions, Events } from 'sentryos-sdk';
 - [Host API 參考](./docs/app-development/host-api.md)
 - [Manifest 規格](./docs/app-development/manifest.md)
 - [插件開發指南](./docs/plugin-development/guide.md)
+- [Python Runtime 開發指南](./docs/plugin-development/python-runtime.md)
 - [資料流圖](./docs/data-flow/data-flow.md)
 
 ## 技術棧
@@ -293,7 +331,9 @@ import { Permissions, Events } from 'sentryos-sdk';
 - **TypeScript 5.9** — 型別安全的核心系統（strict 模式）
 - **Vite 7** — 開發伺服器與建置工具
 - **pnpm 10 + workspace** — Monorepo 套件管理
-- **QuickJS (quickjs-emscripten)** — WASM 沙箱執行應用程式 JavaScript
+- **QuickJS (quickjs-emscripten)** — WASM 沙箱執行應用程式 JavaScript（預設 Runtime）
+- **Pyodide 0.29** — CPython 編譯為 WASM，用於 Python 應用程式沙箱執行（插件 Runtime）
+- **Fengari** — 純 JS 的 Lua 5.3 實作，用於 Lua 應用程式執行（插件 Runtime）
 - **純 CSS** — 無框架依賴的桌面環境樣式
 
 
