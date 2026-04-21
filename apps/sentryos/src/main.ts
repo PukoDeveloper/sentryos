@@ -2,7 +2,7 @@ import './style.css';
 import { createSentryOS } from './bootstrap/systemBootstrap';
 import { bios } from './ui/Bios';
 import htmlViewPlugin from 'sentryos-plugin-html-view';
-import monacoEditorPlugin from 'sentryos-plugin-monaco-editor';
+import codeEditorPlugin from 'sentryos-plugin-code-editor';
 import luaRuntimePlugin from 'sentryos-plugin-lua-runtime';
 
 const container = document.getElementById('app');
@@ -13,7 +13,7 @@ if (!container) {
 createSentryOS({
   container,
   onRestart: () => location.reload(),
-  pluginInstances: [htmlViewPlugin, monacoEditorPlugin, luaRuntimePlugin],
+  pluginInstances: [htmlViewPlugin, codeEditorPlugin, luaRuntimePlugin],
 }).catch((error) => {
   console.error('[BOOT] [CRITICAL] Fatal boot error', error);
   const details = error instanceof Error

@@ -1,7 +1,7 @@
-// ── sentryos-plugin-codemirror-editor ─────────────────────────
-// Registers the `codemirror-editor` UI component backed by CodeMirror 6
-// and the `codemirrorEditor` Host API (getValue / setValue / setLanguage /
-// destroyWorkspace) for use inside sandboxed applications.
+// ── sentryos-plugin-lite-editor ───────────────────────────────
+// Registers the `lite-editor` UI component and the `liteEditor` Host API
+// (getValue / setValue / setLanguage / destroyWorkspace)
+// for use inside sandboxed applications.
 
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightActiveLine, type ViewUpdate } from '@codemirror/view';
@@ -88,9 +88,9 @@ const codemirrorEditorRenderer: UiComponentRenderer = {
     };
 
     const container = document.createElement('div');
-    container.dataset['controlType'] = 'codemirror-editor';
+    container.dataset['controlType'] = 'lite-editor';
     if (n.id) container.dataset['controlId'] = n.id as string;
-    container.classList.add('window-ui-codemirror-editor');
+    container.classList.add('window-ui-lite-editor');
     ctx.applyStyle(container, n.style);
 
     ctx.registerNode(n.id as string | undefined, container);
@@ -227,7 +227,7 @@ function codemirrorEditorApiBuilder(
 ): Record<string, unknown> {
   const opts = (options ?? {}) as Record<string, unknown>;
   return {
-    type: 'codemirror-editor',
+    type: 'lite-editor',
     id: opts['id'],
     value: opts['value'] !== undefined ? opts['value'] : '',
     language: opts['language'] ?? 'plaintext',
@@ -245,16 +245,16 @@ function codemirrorEditorApiBuilder(
 // ── Plugin ─────────────────────────────────────────────────────
 
 function setup(context: PluginContext): void {
-  context.registerUiComponent('codemirror-editor', codemirrorEditorRenderer, codemirrorEditorApiBuilder);
+  context.registerUiComponent('lite-editor', codemirrorEditorRenderer, codemirrorEditorApiBuilder);
 
   context.registerApi(
-    'codemirrorEditor',
+    'liteEditor',
     ({ process }: ApiFactoryContext) => {
       const windowManager = context.resolve('windowManager');
 
       return {
         /**
-         * Get the current text content of a codemirror-editor by its node ID.
+         * Get the current text content of a lite-editor by its node ID.
          * Returns `null` if the editor is not found or not yet initialised.
          */
         getValue(...args: unknown[]): string | null {
@@ -269,7 +269,7 @@ function setup(context: PluginContext): void {
         },
 
         /**
-         * Set the text content of a codemirror-editor.
+         * Set the text content of a lite-editor.
          */
         setValue(...args: unknown[]): void {
           const [editorId, value] = args as [string, string];
@@ -288,7 +288,7 @@ function setup(context: PluginContext): void {
         },
 
         /**
-         * Change the language mode of a codemirror-editor.
+         * Change the language mode of a lite-editor.
          */
         setLanguage(...args: unknown[]): void {
           const [editorId, language] = args as [string, string];
@@ -307,7 +307,7 @@ function setup(context: PluginContext): void {
         },
 
         /**
-         * Dispose all CodeMirror editors associated with this process / workspace.
+         * Dispose all lite-editor instances associated with this process / workspace.
          * Call this when the application window is closed to free memory.
          */
         destroyWorkspace(..._args: unknown[]): void {
@@ -322,10 +322,10 @@ function setup(context: PluginContext): void {
       };
     },
     ['window'],
-    'codemirrorEditor',
+    'liteEditor',
   );
 
-  context.log('INFO', 'codemirror-editor: codemirror-editor component and codemirrorEditor API registered');
+  context.log('INFO', 'lite-editor: lite-editor component and liteEditor API registered');
 }
 
 function teardown(context: PluginContext): void {
@@ -338,15 +338,15 @@ function teardown(context: PluginContext): void {
     }
     editorMap.delete(key);
   }
-  context.log('INFO', 'codemirror-editor: codemirror-editor component and codemirrorEditor API unregistered');
+  context.log('INFO', 'lite-editor: lite-editor component and liteEditor API unregistered');
 }
 
 const codemirrorEditorPlugin: SentryPlugin = {
-  pluginName: 'sentryos-codemirror-editor',
+  pluginName: 'sentryos-lite-editor',
   pluginVersion: '1.0.0',
   pluginDescription:
-    '提供 codemirror-editor UI 元件（CodeMirror 6）及 OS.codemirrorEditor.* Host API，' +
-    '支援語法高亮、多語言（JS/TS/JSX/TSX/Python）、Compartment 動態切換語言與唯讀模式。',
+    '提供 lite-editor UI 元件及 OS.liteEditor.* Host API，' +
+    '支援語法高亮、多語言（JS/TS/JSX/TSX/Python）、動態切換語言與唯讀模式。',
   author: 'SentryOS',
   setup,
   teardown,

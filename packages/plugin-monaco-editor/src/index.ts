@@ -1,7 +1,7 @@
-// ── sentryos-plugin-monaco-editor ─────────────────────────────
-// Registers the `code-editor` UI component backed by Monaco Editor
-// and the `editor` Host API (getValue / setValue / setLanguage /
-// destroyWorkspace) for use inside sandboxed applications.
+// ── sentryos-plugin-code-editor ───────────────────────────────
+// Registers the `code-editor` UI component and the `editor` Host API
+// (getValue / setValue / setLanguage / destroyWorkspace)
+// for use inside sandboxed applications.
 
 import type * as Monaco from 'monaco-editor';
 import type { SentryPlugin, PluginContext, RenderContext, UiComponentRenderer } from 'sentryos-sdk';
@@ -288,7 +288,7 @@ function setup(context: PluginContext): void {
     'editor',
   );
 
-  context.log('INFO', 'monaco-editor: code-editor component and editor API registered');
+  context.log('INFO', 'code-editor: code-editor component and editor API registered');
 }
 
 function teardown(context: PluginContext): void {
@@ -303,14 +303,14 @@ function teardown(context: PluginContext): void {
     }
     editorMap.delete(key);
   }
-  context.log('INFO', 'monaco-editor: code-editor component and editor API unregistered');
+  context.log('INFO', 'code-editor: code-editor component and editor API unregistered');
 }
 
 const monacoEditorPlugin: SentryPlugin = {
-  pluginName: 'sentryos-monaco-editor',
+  pluginName: 'sentryos-code-editor',
   pluginVersion: '1.0.0',
   pluginDescription:
-    '提供 code-editor UI 元件（Monaco Editor）及 OS.editor.* Host API，' +
+    '提供 code-editor UI 元件及 OS.editor.* Host API，' +
     '支援語法高亮、多語言、工作區模型管理。',
   author: 'SentryOS',
   setup,

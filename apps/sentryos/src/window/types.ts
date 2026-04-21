@@ -8,9 +8,12 @@ type WindowControlType =
     | 'label' | 'button' | 'stack' | 'panel'
     | 'input' | 'textarea' | 'checkbox' | 'select'
     | 'image' | 'separator' | 'progress' | 'list'
-    | 'html-view';
+    | 'html-view' | 'video';
 
-type WindowUiEventType = 'click' | 'change' | 'submit' | 'dblclick' | 'contextmenu' | 'contextmenu-select';
+type WindowUiEventType =
+    | 'click' | 'change' | 'submit' | 'dblclick'
+    | 'contextmenu' | 'contextmenu-select'
+    | 'play' | 'pause' | 'ended';
 
 interface ContextMenuItem {
     id: string;
@@ -177,11 +180,21 @@ interface WindowHtmlViewNode extends WindowUiNodeBase {
     html: string;
 }
 
+interface WindowVideoNode extends WindowUiNodeBase {
+    type: 'video';
+    src: string;
+    poster?: string;
+    autoplay?: boolean;
+    controls?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+}
+
 type WindowUiNode =
     | WindowLabelNode | WindowButtonNode | WindowPanelNode | WindowStackNode
     | WindowInputNode | WindowTextareaNode | WindowCheckboxNode | WindowSelectNode
     | WindowImageNode | WindowSeparatorNode | WindowProgressNode | WindowListNode
-    | WindowHtmlViewNode;
+    | WindowHtmlViewNode | WindowVideoNode;
 
 interface WindowUiNodePatch {
     text?: string;
@@ -196,6 +209,11 @@ interface WindowUiNodePatch {
     color?: string;
     rows?: number;
     html?: string;
+    poster?: string;
+    autoplay?: boolean;
+    controls?: boolean;
+    loop?: boolean;
+    muted?: boolean;
 }
 
 interface WindowUiEvent {
@@ -287,5 +305,6 @@ export type {
     WindowUiNodeBase,
     WindowUiNodePatch,
     WindowUiStyle,
+    WindowVideoNode,
     ConsoleWindowController,
 };

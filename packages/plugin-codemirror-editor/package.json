@@ -1,8 +1,8 @@
 {
-  "name": "sentryos-plugin-codemirror-editor",
+  "name": "sentryos-plugin-lite-editor",
   "version": "1.0.0",
   "type": "module",
-  "description": "SentryOS built-in plugin — CodeMirror 6 code-editor UI component and editor Host API",
+  "description": "SentryOS built-in plugin — lite-editor UI component and editor Host API",
   "license": "MIT",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

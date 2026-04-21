@@ -1,8 +1,8 @@
 {
-  "name": "sentryos-plugin-monaco-editor",
+  "name": "sentryos-plugin-code-editor",
   "version": "1.0.0",
   "type": "module",
-  "description": "SentryOS built-in plugin — Monaco Editor code-editor UI component and editor Host API",
+  "description": "SentryOS built-in plugin — code-editor UI component and editor Host API",
   "license": "MIT",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

@@ -418,3 +418,50 @@ uiComponentRegistry.register('stack', stackRenderer,
     (children: unknown[], style?: Record<string, string>, id?: string, events?: string[]) =>
         ({ type: 'stack', children, style, id, ...(events ? { events } : {}) }),
 );
+
+// ── video ─────────────────────────────────────────────────────
+
+const videoRenderer: UiComponentRenderer = {
+    render(node, ctx) {
+        const n = node as Extract<WindowUiNode, { type: 'video' }>;
+        const video = document.createElement('video');
+        video.className = 'window-ui-video';
+        video.dataset.controlType = 'video';
+        if (n.id) video.dataset.controlId = n.id;
+        video.src = n.src;
+        if (n.poster) video.poster = n.poster;
+        video.autoplay = n.autoplay === true;
+        video.controls = n.controls ?? true;
+        video.loop = n.loop === true;
+        video.muted = n.muted === true;
+        ctx.applyStyle(video, n.style);
+
+        if (n.id) {
+            const dispatchPlay = ctx.bindEvent(n.id, 'play');
+            const dispatchPause = ctx.bindEvent(n.id, 'pause');
+            const dispatchEnded = ctx.bindEvent(n.id, 'ended');
+            video.addEventListener('play', () => dispatchPlay());
+            video.addEventListener('pause', () => dispatchPause());
+            video.addEventListener('ended', () => dispatchEnded());
+        }
+
+        ctx.registerNode(n.id, video);
+        return video;
+    },
+    patch(element, patch) {
+        const video = element as HTMLVideoElement;
+        let handled = false;
+        if (patch.src !== undefined) { video.src = patch.src; handled = true; }
+        if (patch.poster !== undefined) { video.poster = patch.poster; handled = true; }
+        if (patch.autoplay !== undefined) { video.autoplay = patch.autoplay; handled = true; }
+        if (patch.controls !== undefined) { video.controls = patch.controls; handled = true; }
+        if (patch.loop !== undefined) { video.loop = patch.loop; handled = true; }
+        if (patch.muted !== undefined) { video.muted = patch.muted; handled = true; }
+        return handled;
+    },
+};
+
+uiComponentRegistry.register('video', videoRenderer,
+    (src: string, poster?: string, controls?: boolean, autoplay?: boolean, loop?: boolean, muted?: boolean, style?: Record<string, string>, id?: string) =>
+        ({ type: 'video', src, poster, controls, autoplay, loop, muted, style, id }),
+);
