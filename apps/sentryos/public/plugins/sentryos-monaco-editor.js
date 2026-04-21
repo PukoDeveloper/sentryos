@@ -1,15 +1,15 @@
-// ── sentryos-monaco-editor plugin ─────────────────────────────
-// Registers the `code-editor` UI component (Monaco Editor) and the
+// ── sentryos-code-editor plugin ───────────────────────────────
+// Registers the `code-editor` UI component and the
 // `editor` Host API (getValue / setValue / setLanguage / destroyWorkspace).
 //
-// Monaco Editor is loaded lazily from esm.sh CDN the first time an
-// editor node is rendered.  A stub web-worker is injected so that
-// Monaco can initialise without a bundler-specific worker setup;
+// The underlying editor engine is loaded lazily from esm.sh CDN the first
+// time an editor node is rendered.  A stub web-worker is injected so that
+// it can initialise without a bundler-specific worker setup;
 // syntax highlighting works fully while rich IntelliSense features
 // that depend on dedicated workers are disabled.
 //
 // Standalone usage: list this file in public/plugins.json.
-// Bundled usage:    import 'sentryos-plugin-monaco-editor' in main.ts.
+// Bundled usage:    import 'sentryos-plugin-code-editor' in main.ts.
 
 // ── Editor Registry ────────────────────────────────────────────
 // Key: `${processAppId}::${windowId}::${nodeId}`
@@ -283,10 +283,10 @@ function teardown(context) {
 }
 
 export default {
-    pluginName: 'sentryos-monaco-editor',
+    pluginName: 'sentryos-code-editor',
     pluginVersion: '1.0.0',
     pluginDescription:
-        '提供 code-editor UI 元件（Monaco Editor）及 OS.editor.* Host API，' +
+        '提供 code-editor UI 元件及 OS.editor.* Host API，' +
         '支援語法高亮、多語言、工作區模型管理。',
     author: 'SentryOS',
     setup,

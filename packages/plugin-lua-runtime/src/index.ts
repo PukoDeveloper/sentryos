@@ -106,7 +106,7 @@ function teardown(context: PluginContext): void {
 }
 
 const luaRuntimePlugin: SentryPlugin = {
-  pluginName: 'lua-runtime',
+  pluginName: 'sentryos-lua-runtime',
   pluginVersion: '1.0.0',
   pluginDescription: 'Lua 5.3 執行引擎（Fengari），支援 manifest `"engine": "lua"` 的應用程式。',
   author: 'SentryOS',

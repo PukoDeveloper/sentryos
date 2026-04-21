@@ -187,7 +187,7 @@ function teardown(context: PluginContext): void {
 }
 
 const pythonRuntimePlugin: SentryPlugin = {
-  pluginName: 'python-runtime',
+  pluginName: 'sentryos-python-runtime',
   pluginVersion: '1.0.0',
   pluginDescription: `Python 3 執行引擎（Pyodide ${PYODIDE_VERSION}），支援 manifest \`"engine": "python"\` 的應用程式。`,
   author: 'SentryOS',
