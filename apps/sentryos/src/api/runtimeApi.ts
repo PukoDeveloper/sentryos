@@ -18,10 +18,10 @@ export function registerRuntimeApi(kernel: Kernel): void {
       if (!permissions.has(process.processAppId, Permissions.RUNTIME_EXTENDED_TIMEOUT)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isInteger(timeoutMs)) {
         return { success: false, error: 'InvalidTimeout' };
       }
-      const clamped = Math.min(Math.ceil(timeoutMs), MAX_EXTENDED_TIMEOUT_MS);
+      const clamped = Math.min(timeoutMs, MAX_EXTENDED_TIMEOUT_MS);
       runtimeRegistry.getForPid(pid).setProcessTimeout(pid, clamped);
       return { success: true, data: clamped };
     },

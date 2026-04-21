@@ -209,6 +209,8 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         if (!runtimeProcess) return { success: false, error: 'ProcessNotFound' };
 
         const timeoutMs = runtimeProcess.customTimeoutMs ?? DEFAULT_EXECUTION_TIMEOUT_MS;
+        // QuickJS interrupt handler is deadline-based: a fresh absolute deadline
+        // must be computed from the current wall-clock time for every invocation.
         runtimeProcess.runtime.setInterruptHandler(
             shouldInterruptAfterDeadline(Date.now() + timeoutMs)
         );
