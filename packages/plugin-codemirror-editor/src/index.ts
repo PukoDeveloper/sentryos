@@ -310,8 +310,7 @@ function setup(context: PluginContext): void {
          * Dispose all CodeMirror editors associated with this process / workspace.
          * Call this when the application window is closed to free memory.
          */
-        destroyWorkspace(...args: unknown[]): void {
-          const [_workspaceId] = args as [string];
+        destroyWorkspace(..._args: unknown[]): void {
           for (const [key, rec] of editorMap) {
             if (key.startsWith(`${process.processAppId}::`)) {
               unobserveResize(rec.view.dom);
