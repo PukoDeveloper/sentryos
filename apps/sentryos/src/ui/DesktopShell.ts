@@ -1496,9 +1496,12 @@ class DesktopShell {
 
   // ── Shell mode detection ──────────────────────────────────────
 
+  /** Maximum width in pixels at which portrait mode is considered a mobile device. */
+  private static readonly MOBILE_BREAKPOINT_WIDTH = 768;
+
   /** Detect whether the current viewport is a portrait mobile device. */
   static detectShellMode(): ShellMode {
-    return window.innerWidth <= 768 && window.innerHeight > window.innerWidth ? 'mobile' : 'desktop';
+    return window.innerWidth <= DesktopShell.MOBILE_BREAKPOINT_WIDTH && window.innerHeight > window.innerWidth ? 'mobile' : 'desktop';
   }
 
   /** Return the current shell mode ('desktop' | 'mobile'). */
@@ -1530,7 +1533,9 @@ class DesktopShell {
       '<polyline points="15 18 9 12 15 6"/>' +
       '</svg>';
     backBtn.addEventListener('click', () => {
-      // Close the focused window as "back" action
+      // Focus/restore the top-most running app as the "back" action.
+      // In mobile mode there is only one visible window at a time; tapping Back
+      // brings the most-recently-added window into focus (or restores it if minimized).
       const focused = this.getFocusedWindowId();
       if (focused) {
         this.taskbarWindowClickHandler?.(focused.windowId, focused.processAppId);
@@ -1769,14 +1774,13 @@ class DesktopShell {
     this.mobileRecentPanel = null;
   }
 
-  /** Return the focused window's id and processAppId, if any. Used by mobile back button. */
+  /** Return the most recently added window's id and processAppId, if any. Used by mobile back button. */
   private getFocusedWindowId(): { windowId: string; processAppId: string } | null {
+    let last: { windowId: string; processAppId: string } | null = null;
     for (const [, info] of this.openedWindows) {
-      // Use the last entry as a proxy for "most recently focused" — this is used only
-      // by the mobile back button to bring an app to focus (not to close it).
-      return { windowId: info.windowId, processAppId: info.processAppId };
+      last = { windowId: info.windowId, processAppId: info.processAppId };
     }
-    return null;
+    return last;
   }
 
   // ── Shell mode switching ──────────────────────────────────────
