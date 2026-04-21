@@ -71,6 +71,13 @@ export function registerSettingsApi(kernel: Kernel): void {
     eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
   }
 
+  /** Strip taskbar-related settings when in mobile mode where the taskbar is not used. */
+  function stripTaskbarSettingsInMobileMode(theme: ThemeSettings): ThemeSettings {
+    if (desktopShell.getShellMode() !== 'mobile') return theme;
+    const { taskbarMode: _m, taskbarOpacity: _o, ...rest } = theme;
+    return rest;
+  }
+
   runtimeRegistry.registerApi('settingsApi', ({ process }) => ({
     getTheme: () => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
@@ -78,18 +85,24 @@ export function registerSettingsApi(kernel: Kernel): void {
       }
       return { success: true, data: desktopShell.getTheme() };
     },
+    getShellMode: () => {
+      if (!permissions.has(process.processAppId, Permissions.SETTINGS_READ)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return { success: true, data: desktopShell.getShellMode() };
+    },
     applyTheme: (theme: Record<string, unknown>) => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      applyAndEmitTheme(sanitizeTheme(theme));
+      applyAndEmitTheme(stripTaskbarSettingsInMobileMode(sanitizeTheme(theme)));
       return { success: true, data: null };
     },
     saveTheme: (theme: Record<string, unknown>) => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const safe = sanitizeTheme(theme);
+      const safe = stripTaskbarSettingsInMobileMode(sanitizeTheme(theme));
       applyAndEmitTheme(safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },

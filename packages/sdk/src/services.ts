@@ -185,7 +185,15 @@ export interface SystemMonitor {
 
 // ── DesktopShell ────────────────────────────────────────────
 
-export interface DesktopShell { getTheme(): unknown; applyTheme(theme: unknown): void; setLocale(locale: string, t: (key: string) => string): void; }
+export type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
+
+export interface DesktopShell {
+  getTheme(): unknown;
+  applyTheme(theme: unknown): void;
+  setLocale(locale: string, t: (key: string) => string): void;
+  getShellMode(): 'desktop' | 'mobile';
+  getTaskbarMode(): TaskbarMode;
+}
 
 // ── ApplicationLauncher ─────────────────────────────────────
 

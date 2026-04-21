@@ -100,6 +100,7 @@ class DesktopShell {
   private orientationMql: MediaQueryList | null = null;
   private orientationChangeHandler: (() => void) | null = null;
   private shellModeChangeHandler: ((mode: ShellMode) => void) | null = null;
+  private mobileBackHandler: ((windowId: string, processAppId: string) => void) | null = null;
 
   /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
   private t(key: string): string {
@@ -1514,6 +1515,22 @@ class DesktopShell {
     this.shellModeChangeHandler = handler;
   }
 
+  /** Register a handler that is called when the mobile back button is tapped and there is a
+   *  visible (non-minimized) window to dismiss. The handler should minimise the given window. */
+  onMobileBack(handler: (windowId: string, processAppId: string) => void): void {
+    this.mobileBackHandler = handler;
+  }
+
+  /** Return the first non-minimized window currently tracked, or null. */
+  private getVisibleWindow(): { windowId: string; processAppId: string } | null {
+    for (const info of this.openedWindows.values()) {
+      if (info.state !== 'minimized') {
+        return { windowId: info.windowId, processAppId: info.processAppId };
+      }
+    }
+    return null;
+  }
+
   // ── Mobile nav bar ────────────────────────────────────────────
 
   /** Build and append the mobile bottom navigation bar to the root. */
@@ -1533,12 +1550,19 @@ class DesktopShell {
       '<polyline points="15 18 9 12 15 6"/>' +
       '</svg>';
     backBtn.addEventListener('click', () => {
-      // Focus/restore the top-most running app as the "back" action.
-      // In mobile mode there is only one visible window at a time; tapping Back
-      // brings the most-recently-added window into focus (or restores it if minimized).
-      const focused = this.getFocusedWindowId();
-      if (focused) {
-        this.taskbarWindowClickHandler?.(focused.windowId, focused.processAppId);
+      // 1. Dismiss any open overlay first (drawer or recent-apps panel).
+      if (this.mobileAppDrawerOpen) {
+        this.closeMobileAppDrawer();
+        return;
+      }
+      if (this.mobileRecentOpen) {
+        this.closeMobileRecentPanel();
+        return;
+      }
+      // 2. Minimise the currently visible window (equivalent to "exit current app").
+      const visible = this.getVisibleWindow();
+      if (visible) {
+        this.mobileBackHandler?.(visible.windowId, visible.processAppId);
       }
     });
 
@@ -1772,15 +1796,6 @@ class DesktopShell {
     panel.classList.remove('is-open');
     panel.addEventListener('transitionend', () => panel.remove(), { once: true });
     this.mobileRecentPanel = null;
-  }
-
-  /** Return the most recently added window's id and processAppId, if any. Used by mobile back button. */
-  private getFocusedWindowId(): { windowId: string; processAppId: string } | null {
-    let last: { windowId: string; processAppId: string } | null = null;
-    for (const [, info] of this.openedWindows) {
-      last = { windowId: info.windowId, processAppId: info.processAppId };
-    }
-    return last;
   }
 
   // ── Shell mode switching ──────────────────────────────────────
