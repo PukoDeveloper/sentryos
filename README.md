@@ -53,6 +53,21 @@ pnpm build:sdk
 pnpm preview
 ```
 
+### 快速建立插件或應用程式
+
+```bash
+# 互動模式（詢問你要建立 Plugin 還是 App）
+pnpm scaffold
+
+# 直接建立 Plugin（TypeScript 套件）
+pnpm scaffold:plugin
+
+# 直接建立 App（JS / Lua / Python）
+pnpm scaffold:app
+```
+
+詳見 [create-sentryos README](./packages/create-sentryos/README.md)。
+
 ## Monorepo 結構
 
 本專案採用 **pnpm workspace** 管理，分為兩個套件：

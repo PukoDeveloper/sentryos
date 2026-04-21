@@ -1,0 +1,16 @@
+{
+  "name": "create-sentryos",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SentryOS 開發環境快速建立工具 — 一鍵生成插件或應用程式的專案骨架",
+  "license": "MIT",
+  "bin": {
+    "create-sentryos": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
