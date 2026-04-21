@@ -1780,14 +1780,15 @@ body {
 	padding-bottom: 60px;
 }
 
-/* Mobile full-screen windows: no floating style, fill the layer */
+/* Mobile full-screen windows: fill the layer minus the nav bar at the bottom */
 .desktop-shell.is-mobile .window-shell.is-mobile-fullscreen {
 	position: absolute;
-	inset: 0;
-	width: 100% !important;
-	height: 100% !important;
-	left: 0 !important;
 	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 60px !important; /* leave room for the mobile nav bar */
+	width: auto !important;  /* derived from left + right */
+	height: auto !important; /* derived from top + bottom */
 	border-radius: 0;
 }
 

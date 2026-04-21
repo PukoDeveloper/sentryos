@@ -346,6 +346,10 @@ async function bootstrapSystem(): Promise<void> {
     windowManager.focusWindow(processAppId, windowId);
   });
 
+  desktopShell.onMobileBack((windowId, processAppId) => {
+    windowManager.minimizeWindow(processAppId, windowId);
+  });
+
   desktopShell.onLaunchRequest((app) => {
     if (app.appId === BUILTIN_KERNEL_CONSOLE) {
       launcher.launchKernelConsole(BUILTIN_KERNEL_CONSOLE, app.name, app.icon);
