@@ -43,6 +43,8 @@ export class AllowlistNetworkManager implements NetworkAdapter {
    * Maps appId → Set of composite socket keys.
    */
   private readonly appSockets = new Map<string, Set<string>>();
+  /** Per-process socket ID counters, cleaned up in wsCloseAllForApp. */
+  private readonly wsCounters = new Map<string, number>();
 
   // ── Enable / Disable ────────────────────────────────────────
 
@@ -188,7 +190,6 @@ export class AllowlistNetworkManager implements NetworkAdapter {
 
   wsConnect(
     appId: string,
-    socketId: string,
     url: string,
     callback: WebSocketEventCallback,
   ): WebSocketResult<string> {
@@ -212,17 +213,17 @@ export class AllowlistNetworkManager implements NetworkAdapter {
       return { success: false, error: 'NotAllowed' };
     }
 
-    const key = socketKey(appId, socketId);
-    if (this.sockets.has(key)) {
-      // Caller reused a socketId that is still live – reject to avoid confusion
-      return { success: false, error: 'UnknownError' };
-    }
-
     // Enforce per-process connection limit using the secondary index (O(1))
     const appKeys = this.appSockets.get(appId);
     if ((appKeys?.size ?? 0) >= MAX_WS_PER_APP) {
       return { success: false, error: 'TooManyConnections' };
     }
+
+    // Generate a socketId scoped to this process
+    const n = (this.wsCounters.get(appId) ?? 0) + 1;
+    this.wsCounters.set(appId, n);
+    const socketId = `ws_${n}`;
+    const key = socketKey(appId, socketId);
 
     let ws: WebSocket;
     try {
@@ -310,6 +311,7 @@ export class AllowlistNetworkManager implements NetworkAdapter {
       }
     }
     this.appSockets.delete(appId);
+    this.wsCounters.delete(appId);
   }
 
   wsGetStatus(appId: string, socketId: string): WebSocketResult<WebSocketStatus> {
@@ -355,7 +357,8 @@ export class AllowlistNetworkManager implements NetworkAdapter {
   }
 
   private isAllowedHost(hostname: string): boolean {
-    return this.allowlist.some(entry => this.matchPattern(entry.pattern, hostname.toLowerCase()));
+    // hostname from new URL() is already lowercase for ASCII hostnames
+    return this.allowlist.some(entry => this.matchPattern(entry.pattern, hostname));
   }
 
   /** Remove a socket from both the primary map and the secondary index. */

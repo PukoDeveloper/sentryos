@@ -5,15 +5,6 @@ import { Permissions } from '../kernel/constants';
 const NETWORK_SETTINGS_KEY = 'network-settings';
 const NETWORK_TIER = 'sys' as const;
 
-/** Per-process WebSocket socket ID counters, keyed by processAppId. */
-const wsCounters = new Map<string, number>();
-
-function nextSocketId(processAppId: string): string {
-  const n = (wsCounters.get(processAppId) ?? 0) + 1;
-  wsCounters.set(processAppId, n);
-  return `ws_${n}`;
-}
-
 export function registerNetworkApi(kernel: Kernel): void {
   const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
@@ -186,12 +177,10 @@ export function registerNetworkApi(kernel: Kernel): void {
         return { success: false, error: 'UnknownError' };
       }
 
-      const socketId = nextSocketId(process.processAppId);
       const processAppId = process.processAppId;
 
       const result = networkManager.wsConnect(
         processAppId,
-        socketId,
         url,
         (event) => {
           // Push the WebSocket event into the sandboxed process.

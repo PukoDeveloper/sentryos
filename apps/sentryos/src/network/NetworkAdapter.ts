@@ -112,14 +112,13 @@ export interface NetworkAdapter {
 
   /**
    * Open a WebSocket connection on behalf of appId.
-   * @param appId       The process credential ID that owns this connection.
-   * @param socketId    A caller-supplied unique ID for this socket within the process.
-   * @param url         The WebSocket URL (ws:// or wss://).
-   * @param callback    Host-side callback invoked for each WebSocket event.
+   * The manager generates and returns the socketId.
+   * @param appId    The process credential ID that owns this connection.
+   * @param url      The WebSocket URL (ws:// or wss://).
+   * @param callback Host-side callback invoked for each WebSocket event.
    */
   wsConnect(
     appId: string,
-    socketId: string,
     url: string,
     callback: WebSocketEventCallback,
   ): WebSocketResult<string>;
