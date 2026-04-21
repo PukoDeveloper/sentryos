@@ -71,8 +71,8 @@ export function registerSettingsApi(kernel: Kernel): void {
     eventBus.emit(systemAppId, Events.THEME_CHANGED, safe);
   }
 
-  /** Strip taskbar-mode settings that are only meaningful in desktop mode. */
-  function stripMobileIncompatibleSettings(theme: ThemeSettings): ThemeSettings {
+  /** Strip taskbar-related settings when in mobile mode where the taskbar is not used. */
+  function stripTaskbarSettingsInMobileMode(theme: ThemeSettings): ThemeSettings {
     if (desktopShell.getShellMode() !== 'mobile') return theme;
     const { taskbarMode: _taskbarMode, taskbarOpacity: _taskbarOpacity, ...rest } = theme;
     return rest;
@@ -95,14 +95,14 @@ export function registerSettingsApi(kernel: Kernel): void {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      applyAndEmitTheme(stripMobileIncompatibleSettings(sanitizeTheme(theme)));
+      applyAndEmitTheme(stripTaskbarSettingsInMobileMode(sanitizeTheme(theme)));
       return { success: true, data: null };
     },
     saveTheme: (theme: Record<string, unknown>) => {
       if (!permissions.has(process.processAppId, Permissions.SETTINGS_WRITE)) {
         return { success: false, error: 'PermissionDenied' };
       }
-      const safe = stripMobileIncompatibleSettings(sanitizeTheme(theme));
+      const safe = stripTaskbarSettingsInMobileMode(sanitizeTheme(theme));
       applyAndEmitTheme(safe);
       return fileSystem.write(systemAppId, SETTINGS_TIER, SETTINGS_KEY, safe);
     },
