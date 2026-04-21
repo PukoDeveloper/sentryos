@@ -50,6 +50,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: dist/
+          path: apps/sentryos/dist/
           # artifact 保留 90 天
           retention-days: 90
