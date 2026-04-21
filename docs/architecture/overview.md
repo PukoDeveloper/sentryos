@@ -76,8 +76,11 @@ SentryOS 是一個基於瀏覽器的作業系統模擬器，使用 Vite + TypeSc
 | `networkManager` | `NetworkAdapter` | 網路管理 |
 | `systemRegistry` | `SystemRegistry` | 角色/檔案類型註冊表 |
 | `dialogManager` | `DialogManager` | 對話框管理 |
+| `appInstaller` | `AppInstaller` | 遠端應用程式安裝 |
 | `pluginManager` | `PluginManager` | 插件管理 |
 | `languageManager` | `LanguageManager` | 語系管理 |
+| `clipboardManager` | `ClipboardManager` | 跨應用剪貼簿 |
+| `audioManager` | `AudioManager` | 系統音訊管理 |
 
 ### ValueMap（值）
 
@@ -90,7 +93,8 @@ SentryOS 是一個基於瀏覽器的作業系統模擬器，使用 Vite + TypeSc
 | `bootStartTime` | `number` | 開機時間戳 |
 | `catalogApps` | `RegisteredApplication[]` | 所有已載入應用 |
 | `iconMap` | `Map<string, string>` | appDefId → icon 路徑 |
-| `consoleControllers` | `Map<string, ConsoleWindowController>` | processAppId → 主控台控制器 |
+| `loginUser` | `string` | 目前登入的使用者名稱 |
+| `userKey` | `string` | 使用者識別金鑰 |
 
 ---
 
@@ -400,7 +404,7 @@ file.<action>.<tier>           file.read.app, file.write.user 等
 ## 目錄結構
 
 ```
-src/
+apps/sentryos/src/
 ├── main.ts                    # 進入點
 ├── api/                       # Host API 模組（註冊到 RuntimeRegistry）
 │   ├── index.ts               # registerAllHostApis
@@ -415,13 +419,23 @@ src/
 │   ├── settingsApi.ts         # OS.settings.*
 │   ├── networkApi.ts          # OS.network.*
 │   ├── registryApi.ts         # OS.registry.*
-│   └── dialogApi.ts           # OS.dialog.*
+│   ├── dialogApi.ts           # OS.dialog.*
+│   ├── installApi.ts          # OS.install.*
+│   ├── clipboardApi.ts        # OS.clipboard.*
+│   └── audioApi.ts            # OS.audio.*
 ├── application/               # 應用程式管理
+│   ├── AppInstaller.ts        # 遠端安裝對話框
 │   ├── ApplicationCatalog.ts  # manifest 解析
 │   ├── ApplicationManager.ts  # 應用定義登錄
 │   └── ApplicationLauncher.ts # 應用啟動/終止邏輯
+├── audio/
+│   └── AudioManager.ts        # 系統音訊管理
+├── auth/
+│   └── AuthProvider.ts        # 使用者驗證
 ├── bootstrap/
 │   └── systemBootstrap.ts     # 開機流程
+├── clipboard/
+│   └── ClipboardManager.ts    # 跨應用剪貼簿
 ├── console/
 │   ├── KernelConsole.ts       # 核心主控台
 │   └── AnsiParser.ts          # ANSI 色碼解析
@@ -456,13 +470,14 @@ src/
 │   ├── Process.ts
 │   └── ProcessManager.ts
 ├── registry/
-│   └── SystemRegistry.ts      # 角色/檔案類型註冊表
+│   └── SystemRegistry.ts      # 角色/檔案類型登錄表
 ├── runtime/
-│   ├── ScriptRuntime.ts       # QuickJS 引擎實作
+│   ├── AdapterRuntime.ts      # 插件引擎橋接適配器
 │   ├── BaseRuntime.ts         # 引擎無關的共用邏輯
-│   ├── IRuntime.ts            # Runtime 介面
-│   ├── RuntimeRegistry.ts     # 多引擎 + 中央 API 管理
+│   ├── IRuntime.ts            # Runtime 介面定義
 │   ├── QuickJsInit.ts         # QuickJS WASM 初始化
+│   ├── RuntimeRegistry.ts     # 多引擎 + 中央 API 管理
+│   ├── ScriptRuntime.ts       # QuickJS 引擎實作
 │   └── types.ts               # Runtime 型別
 ├── storage/
 │   └── FileSystem.ts          # 分層檔案系統（localStorage）
@@ -470,10 +485,10 @@ src/
 │   ├── Bios.ts                # 啟動/錯誤畫面
 │   └── DesktopShell.ts        # 桌面環境
 └── window/
-    ├── WindowManager.ts       # 視窗管理
-    ├── types.ts               # 視窗型別
-    ├── UiComponentRegistry.ts # UI 元件 Registry
-    └── builtinComponents.ts   # 內建 UI 元件
+    ├── WindowManager.ts        # 視窗管理
+    ├── UiComponentRegistry.ts  # UI 元件 Registry
+    ├── builtinComponents.ts    # 內建 UI 元件
+    └── types.ts                # 視窗型別
 ```
 
 ---
@@ -508,4 +523,4 @@ src/
 - [視窗系統型別](../window-system/window-system.md)
 
 ### 型別定義
-- [types/](../types/README.md) — Plugin SDK 型別定義檔
+- [sentryos-sdk](../../packages/sdk/README.md) — TypeScript 型別定義與常數
