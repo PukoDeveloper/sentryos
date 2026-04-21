@@ -557,6 +557,143 @@ export default {
 
 ---
 
+## 完整範例：Python Runtime 引擎插件
+
+以下是使用 **Adapter 模式**與 **Pyodide（CPython WASM）** 的 Python Runtime 插件範例，提供與 QuickJS 等級相同的沙箱安全性：
+
+```javascript
+// /plugins/python-runtime.js
+import { loadPyodide } from 'pyodide';
+
+// Python 沙箱初始化程式碼（在 Pyodide 主 globals 中執行一次）
+const SANDBOX_SETUP = `
+import builtins as _bi
+
+_BLOCKED_BUILTINS = frozenset({
+    'open', 'exec', 'eval', 'compile', '__import__',
+    'input', 'breakpoint', 'exit', 'quit',
+})
+
+_BLOCKED_MODULES = frozenset({
+    'os', 'sys', 'subprocess', 'socket', 'ctypes',
+    'importlib', 'pathlib', 'io', 'shutil', 'tempfile',
+    '_thread', 'threading', 'multiprocessing', 'signal',
+})
+
+_orig_import = _bi.__import__
+
+def _restricted_import(name, glbs=None, locs=None, fromlist=(), level=0):
+    root = name.split('.')[0]
+    if root in _BLOCKED_MODULES:
+        raise ImportError(f"Module '{root}' is blocked in the SentryOS sandbox")
+    return _orig_import(name, glbs, locs, fromlist, level)
+
+_safe_builtins = {k: v for k, v in _bi.__dict__.items() if k not in _BLOCKED_BUILTINS}
+_safe_builtins['__import__'] = _restricted_import
+
+def create_namespace(os_api_js):
+    return {
+        '__builtins__': _safe_builtins,
+        '__name__': '__main__',
+        '__doc__': None,
+        'OS': os_api_js,
+    }
+
+def execute_in_namespace(ns, code):
+    exec(compile(code, '<sentryos-sandbox>', 'exec'), ns)
+
+def call_handler(ns, handler_name, arg):
+    fn = ns.get(handler_name)
+    if callable(fn):
+        return fn(arg)
+    return None
+`;
+
+async function setup(context) {
+    let pyodide;
+    try {
+        pyodide = await loadPyodide({
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/'
+        });
+        pyodide.runPython(SANDBOX_SETUP);
+    } catch (err) {
+        context.log('ERROR', `python-runtime: 初始化失敗 — ${err}`);
+        return;
+    }
+
+    const pyCreate = pyodide.globals.get('create_namespace');
+    const pyExec   = pyodide.globals.get('execute_in_namespace');
+    const pyCall   = pyodide.globals.get('call_handler');
+
+    const runtime = context.createRuntime({
+        createSandbox(_pid) {
+            // 建立佔位物件；namespace 在 injectGlobals 中填入
+            return { namespace: null };
+        },
+        injectGlobals(sandbox, apiSurface) {
+            // toPy 深度 1：巢狀物件保持 JsProxy（可從 Python 呼叫 JS 函式）
+            const osApiPy = pyodide.toPy(apiSurface, { depth: 1 });
+            sandbox.namespace = pyCreate(osApiPy);
+        },
+        execute(sandbox, code) {
+            if (!sandbox.namespace) throw new Error('Sandbox not initialized');
+            pyExec(sandbox.namespace, code);
+            return null;
+        },
+        destroy(sandbox) {
+            sandbox.namespace?.destroy?.();
+            sandbox.namespace = null;
+        },
+        callHandler(sandbox, handlerName, arg) {
+            if (!sandbox.namespace) return undefined;
+            return pyCall(sandbox.namespace, handlerName, pyodide.toPy(arg, { depth: 1 }));
+        },
+    });
+
+    context.registerRuntime('python', runtime);
+    context.log('INFO', 'python-runtime: Python 3 引擎已註冊（Pyodide）');
+}
+
+function teardown(context) {
+    context.log('INFO', 'python-runtime: Python 3 引擎已卸載');
+}
+
+export default {
+    pluginName: 'python-runtime',
+    pluginVersion: '1.0.0',
+    pluginDescription: 'Python 3 runtime engine (Pyodide WASM)',
+    setup,
+    teardown,
+};
+```
+
+應用程式 manifest 設定：
+
+```json
+{
+  "engine": "python",
+  "main": "main.py"
+}
+```
+
+應用程式程式碼（`main.py`）：
+
+```python
+win = OS.ui.createWindow({"title": "Python App", "width": 400, "height": 300})
+OS.ui.initialize(win["data"], [
+    OS.ui.label("lbl", "Hello from Python 3!")
+])
+
+def onWindowEvent(event):
+    action = event.get("action")
+    if action == "close":
+        OS.process.exit(0)
+```
+
+詳細說明請參閱 [Python Runtime 開發指南](./python-runtime.md)。
+
+---
+
 ## 常見問題
 
 ### 插件載入失敗

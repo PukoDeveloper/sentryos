@@ -1,0 +1,30 @@
+{
+  "name": "sentryos-plugin-python-runtime",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SentryOS built-in plugin — Python 3 runtime engine powered by Pyodide (CPython WASM)",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pyodide": "^0.29.3",
+    "sentryos-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}
