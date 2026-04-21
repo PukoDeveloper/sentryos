@@ -73,6 +73,8 @@ export interface RenderContext {
   processAppId: string;
   renderChild(node: WindowUiNode): HTMLElement;
   bindEvent(controlId: string | undefined, type: string): (extra?: Partial<WindowUiEvent>) => void;
+  /** Dispatch code extracted from html-view <script> tags to the sandboxed Runtime. */
+  dispatchScript(code: string): void;
   registerNode(nodeId: string | undefined, element: HTMLElement): void;
   applyStyle(element: HTMLElement, style?: WindowUiStyle): void;
 }

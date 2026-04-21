@@ -13,6 +13,9 @@ importers:
       quickjs-emscripten:
         specifier: ^0.32.0
         version: 0.32.0
+      sentryos-plugin-html-view:
+        specifier: workspace:*
+        version: link:../../packages/plugin-html-view
       sentryos-sdk:
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -23,6 +26,16 @@ importers:
       vite:
         specifier: ^7.2.4
         version: 7.3.2
+
+  packages/plugin-html-view:
+    dependencies:
+      sentryos-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
   packages/sdk:
     devDependencies:

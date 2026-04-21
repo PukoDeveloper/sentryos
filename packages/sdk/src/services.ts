@@ -130,6 +130,10 @@ export interface WindowManager {
   showContextMenu(processAppId: string, windowId: string, controlId: string, x: number, y: number, items: ContextMenuEntry[]): WindowSystemResult<string>;
   closeContextMenu(): void;
   createConsoleWindow(context: WindowProcessContext, title: string, inputHandler: (line: string) => void): ConsoleWindowController;
+  /** Retrieve the raw DOM element for a UI node inside a window. */
+  getNodeElement(processAppId: string, windowId: string, nodeId: string): HTMLElement | null;
+  /** Build a RenderContext for the given process / window pair. */
+  buildRenderContextFor(processAppId: string, windowId: string): import('./window').RenderContext | null;
 }
 
 // ── EnvironmentManager ──────────────────────────────────────

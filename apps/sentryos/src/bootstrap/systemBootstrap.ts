@@ -29,6 +29,7 @@ import { lockScreen } from '../ui/LockScreen';
 import { AuthProvider } from '../auth/AuthProvider';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager, type PluginModule } from '../plugin/PluginManager';
+import type { SentryPlugin } from 'sentryos-sdk';
 import { LanguageManager } from '../language/LanguageManager';
 import { desktopShellPack, systemAlertPack, bootstrapPack, kernelConsolePack, appInstallerPack, lockScreenPack } from '../language/systemPacks';
 
@@ -49,7 +50,7 @@ export interface SentryOSOptions {
    * Pre-imported plugin modules to load at boot time.
    * These are resolved before any plugins listed in `plugins.json`.
    */
-  pluginInstances?: PluginModule[];
+  pluginInstances?: SentryPlugin[];
   /**
    * Optional factory for creating the kernel's filesystem adapter.
    *
@@ -339,6 +340,13 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     const height = mode === 'docked' ? 96 : mode === 'fullwidth' ? 64 : 0;
     windowManager.setMaximizedTaskbarHeight(height);
   });
+  // Apply the current mode immediately — the saved theme may have already set
+  // a non-default taskbar mode before onTaskbarModeChange was registered.
+  {
+    const currentMode = desktopShell.getTaskbarMode();
+    const initialHeight = currentMode === 'docked' ? 96 : currentMode === 'fullwidth' ? 64 : 0;
+    windowManager.setMaximizedTaskbarHeight(initialHeight, false);
+  }
 
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
@@ -458,7 +466,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   try {
     // 8a. Load pre-imported plugin instances (from host page / NPM packages)
     if (pluginInstances.length > 0) {
-      const instanceResult = await pluginManager.loadPluginModules(pluginInstances);
+      const instanceResult = await pluginManager.loadPluginModules(pluginInstances as unknown as PluginModule[]);
       for (const name of instanceResult.loaded) {
         bufferedLog('BOOT', 'INFO', `Plugin (instance) loaded: ${name}`);
       }

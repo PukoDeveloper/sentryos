@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "quickjs-emscripten": "^0.32.0",
-    "sentryos-sdk": "workspace:*"
+    "sentryos-sdk": "workspace:*",
+    "sentryos-plugin-html-view": "workspace:*"
   }
 }
