@@ -310,11 +310,15 @@ globalThis['${appName.replace(/\W+/g, '')}'] = ${appName.replace(/\W+/g, '')};
 function buildAppMainLua(appName, appType) {
   if (appType === 'Window') {
     return `-- ${appName}
-local win = OS.ui.createWindow({ title = "${appName}", width = 600, height = 400 })
+local windowId = OS.ui.createWindow({
+  title = "${appName}",
+  width = 600,
+  height = 400,
+}).data
 
-OS.ui.initialize(win, {
-  OS.ui.label("lbl-title", "${appName}"),
-  OS.ui.button("btn-hello", "點我打招呼"),
+OS.ui.initialize(windowId, {
+  OS.ui.label("${appName}"),
+  OS.ui.button("點我打招呼", {}, "btn-hello"),
 })
 
 function onWindowEvent(event)
