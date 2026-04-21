@@ -100,7 +100,8 @@ class DesktopShell {
   private orientationMql: MediaQueryList | null = null;
   private orientationChangeHandler: (() => void) | null = null;
   private shellModeChangeHandler: ((mode: ShellMode) => void) | null = null;
-  private mobileBackHandler: ((windowId: string, processAppId: string) => void) | null = null;
+  private mobileInfoClock: HTMLDivElement | null = null;
+  private mobileNotifBadge: HTMLSpanElement | null = null;
 
   /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
   private t(key: string): string {
@@ -410,6 +411,8 @@ class DesktopShell {
     this.mobileRecentPanel = null;
     this.mobileAppDrawerOpen = false;
     this.mobileRecentOpen = false;
+    this.mobileInfoClock = null;
+    this.mobileNotifBadge = null;
   }
 
   applyTheme(theme: ThemeSettings): void {
@@ -1473,16 +1476,21 @@ class DesktopShell {
     }
   }
 
-  private updateClock(): void {
-    if (!this.clockLabel) {
-      return;
-    }
-
-    const now = new Date();
-    this.clockLabel.textContent = now.toLocaleTimeString(this.locale, {
+  private formatCurrentTime(): string {
+    return new Date().toLocaleTimeString(this.locale, {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  private updateClock(): void {
+    const timeStr = this.formatCurrentTime();
+    if (this.clockLabel) {
+      this.clockLabel.textContent = timeStr;
+    }
+    if (this.mobileInfoClock) {
+      this.mobileInfoClock.textContent = timeStr;
+    }
   }
 
   private startClock(): void {
@@ -1515,20 +1523,15 @@ class DesktopShell {
     this.shellModeChangeHandler = handler;
   }
 
-  /** Register a handler that is called when the mobile back button is tapped and there is a
-   *  visible (non-minimized) window to dismiss. The handler should minimise the given window. */
-  onMobileBack(handler: (windowId: string, processAppId: string) => void): void {
-    this.mobileBackHandler = handler;
-  }
-
-  /** Return the first non-minimized window currently tracked, or null. */
-  private getVisibleWindow(): { windowId: string; processAppId: string } | null {
-    for (const info of this.openedWindows.values()) {
-      if (info.state !== 'minimized') {
-        return { windowId: info.windowId, processAppId: info.processAppId };
-      }
+  /** Update the notification count badge shown in the mobile info panel. */
+  updateMobileNotifBadge(count: number): void {
+    if (!this.mobileNotifBadge) return;
+    if (count > 0) {
+      this.mobileNotifBadge.textContent = count > 99 ? '99+' : String(count);
+      this.mobileNotifBadge.style.removeProperty('display');
+    } else {
+      this.mobileNotifBadge.style.display = 'none';
     }
-    return null;
   }
 
   // ── Mobile nav bar ────────────────────────────────────────────
@@ -1540,31 +1543,28 @@ class DesktopShell {
     const nav = document.createElement('div');
     nav.className = 'mobile-nav-bar';
 
-    // Back button
-    const backBtn = document.createElement('button');
-    backBtn.type = 'button';
-    backBtn.className = 'mobile-nav-btn';
-    backBtn.setAttribute('aria-label', 'Back');
-    backBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<polyline points="15 18 9 12 15 6"/>' +
+    // Info panel (replaces back button) — shows clock and notification indicator
+    const infoPanel = document.createElement('div');
+    infoPanel.className = 'mobile-info-panel';
+
+    const infoClock = document.createElement('div');
+    infoClock.className = 'mobile-info-clock';
+    infoClock.textContent = this.formatCurrentTime();
+
+    const notifIndicator = document.createElement('div');
+    notifIndicator.className = 'mobile-info-notif';
+    notifIndicator.innerHTML =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">' +
+      '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>' +
       '</svg>';
-    backBtn.addEventListener('click', () => {
-      // 1. Dismiss any open overlay first (drawer or recent-apps panel).
-      if (this.mobileAppDrawerOpen) {
-        this.closeMobileAppDrawer();
-        return;
-      }
-      if (this.mobileRecentOpen) {
-        this.closeMobileRecentPanel();
-        return;
-      }
-      // 2. Minimise the currently visible window (equivalent to "exit current app").
-      const visible = this.getVisibleWindow();
-      if (visible) {
-        this.mobileBackHandler?.(visible.windowId, visible.processAppId);
-      }
-    });
+
+    const notifBadge = document.createElement('span');
+    notifBadge.className = 'mobile-info-notif-badge';
+    notifBadge.style.display = 'none';
+    notifIndicator.appendChild(notifBadge);
+
+    infoPanel.appendChild(infoClock);
+    infoPanel.appendChild(notifIndicator);
 
     // Home button
     const homeBtn = document.createElement('button');
@@ -1598,18 +1598,22 @@ class DesktopShell {
       this.toggleMobileRecentPanel();
     });
 
-    nav.appendChild(backBtn);
+    nav.appendChild(infoPanel);
     nav.appendChild(homeBtn);
     nav.appendChild(recentBtn);
 
     this.root.appendChild(nav);
     this.mobileNavBar = nav;
+    this.mobileInfoClock = infoClock;
+    this.mobileNotifBadge = notifBadge;
   }
 
   /** Remove the mobile nav bar from the DOM. */
   private unmountMobileNavBar(): void {
     this.mobileNavBar?.remove();
     this.mobileNavBar = null;
+    this.mobileInfoClock = null;
+    this.mobileNotifBadge = null;
   }
 
   // ── Mobile app drawer ─────────────────────────────────────────

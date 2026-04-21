@@ -201,6 +201,9 @@ async function bootstrapSystem(): Promise<void> {
   // Register notification overlay
   const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });
+  kernel.resolve('notificationManager').onCountChange((count: number) => {
+    desktopShell.updateMobileNotifBadge(count);
+  });
 
   // Register system alert overlay
   const systemAlert = kernel.resolve('systemAlert');
@@ -344,10 +347,6 @@ async function bootstrapSystem(): Promise<void> {
   // 7. Wire desktop shell events
   desktopShell.onTaskbarWindowClick((windowId, processAppId) => {
     windowManager.focusWindow(processAppId, windowId);
-  });
-
-  desktopShell.onMobileBack((windowId, processAppId) => {
-    windowManager.minimizeWindow(processAppId, windowId);
   });
 
   desktopShell.onLaunchRequest((app) => {

@@ -33,6 +33,7 @@ class NotificationManager {
     private _doNotDisturb = false;
     private _defaultDuration = NOTIFICATION_DEFAULT_DURATION_MS;
     private _maxVisible = NOTIFICATION_MAX_VISIBLE;
+    private countChangeHandler: ((count: number) => void) | null = null;
 
     get doNotDisturb(): boolean { return this._doNotDisturb; }
     set doNotDisturb(v: boolean) { this._doNotDisturb = v; }
@@ -42,6 +43,11 @@ class NotificationManager {
 
     get maxVisible(): number { return this._maxVisible; }
     set maxVisible(v: number) { this._maxVisible = Math.max(1, v); }
+
+    /** Register a callback that fires whenever the number of active notifications changes. */
+    onCountChange(handler: (count: number) => void): void {
+        this.countChangeHandler = handler;
+    }
 
     /** 建立通知容器，回傳 HTMLElement 供 DesktopShell.registerOverlay 使用 */
     createContainer(): HTMLDivElement {
@@ -89,6 +95,8 @@ class NotificationManager {
         // 超過最大顯示數量時，移除最舊的
         this.enforceMaxVisible();
 
+        this.countChangeHandler?.(this.notifications.size);
+
         return id;
     }
 
@@ -105,6 +113,7 @@ class NotificationManager {
             if (this.notifications.has(id)) {
                 entry.element.remove();
                 this.notifications.delete(id);
+                this.countChangeHandler?.(this.notifications.size);
             }
         }, 400);
         entry.fallbackTimer = fallbackTimer;
@@ -114,6 +123,7 @@ class NotificationManager {
             window.clearTimeout(fallbackTimer);
             entry.element.remove();
             this.notifications.delete(id);
+            this.countChangeHandler?.(this.notifications.size);
         }, { once: true });
     }
 

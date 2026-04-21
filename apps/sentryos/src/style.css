@@ -2079,3 +2079,72 @@ body {
 	font-size: 14px;
 	padding: 40px 0;
 }
+
+/* ── Mobile Info Panel ──────────────────────────────────── */
+
+.mobile-info-panel {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 2px;
+	min-width: 52px;
+	padding: 0 4px;
+}
+
+.mobile-info-clock {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--sos-color-text);
+	line-height: 1;
+	letter-spacing: 0.02em;
+}
+
+.mobile-info-notif {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--sos-color-text-secondary);
+	font-size: 11px;
+	line-height: 1;
+	position: relative;
+}
+
+.mobile-info-notif-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 14px;
+	height: 14px;
+	padding: 0 3px;
+	border-radius: 7px;
+	background: var(--sos-color-accent);
+	color: #fff;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+/* ── Notification container override for mobile ─────────── */
+
+.desktop-shell.is-mobile .notification-container {
+	top: auto;
+	bottom: 68px;
+	right: 8px;
+	left: 8px;
+	max-width: 100%;
+}
+
+.desktop-shell.is-mobile .notification-toast {
+	padding: 8px 10px;
+	font-size: 12px;
+	border-radius: 10px;
+	gap: 8px;
+}
+
+.desktop-shell.is-mobile .notification-icon {
+	width: 20px;
+	height: 20px;
+	font-size: 12px;
+	border-radius: 6px;
+}
