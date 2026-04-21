@@ -57,10 +57,49 @@ class WindowManager {
     private static readonly WINDOW_RATE_WINDOW_MS = 1000;
     /** 貼靠預覽遮罩 */
     private snapPreviewEl: HTMLElement | null = null;
+    /** 強制全螢幕模式（手機直屏模式用） */
+    private forcedMaximize = false;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
         this.uiEventHandler = uiEventHandler;
+    }
+
+    /**
+     * 設定強制全螢幕模式。
+     * 啟用後，所有新建視窗會立即最大化，且不顯示最小化／還原按鈕。
+     * 呼叫時也會重新佈局所有現有視窗。
+     */
+    setForcedMaximize(enabled: boolean): void {
+        this.forcedMaximize = enabled;
+        for (const descriptor of this.windows.values()) {
+            if (enabled) {
+                if (descriptor.state !== 'maximized') {
+                    descriptor.boundsBeforeMaximize = { ...descriptor.bounds };
+                    descriptor.state = 'maximized';
+                    this.applyWindowLayout(descriptor);
+                }
+                this.applyMobileWindowStyle(descriptor);
+            } else {
+                this.removeMobileWindowStyle(descriptor);
+                if (descriptor.state === 'maximized' && descriptor.boundsBeforeMaximize) {
+                    descriptor.state = 'normal';
+                    descriptor.bounds = { ...descriptor.boundsBeforeMaximize };
+                    descriptor.boundsBeforeMaximize = undefined;
+                    this.applyWindowLayout(descriptor);
+                }
+            }
+        }
+    }
+
+    /** 在強制全螢幕模式下隱藏最小化、還原按鈕，並移除拖曳游標 */
+    private applyMobileWindowStyle(descriptor: WindowDescriptor): void {
+        descriptor.root.classList.add('is-mobile-fullscreen');
+    }
+
+    /** 移除強制全螢幕模式的視覺修改 */
+    private removeMobileWindowStyle(descriptor: WindowDescriptor): void {
+        descriptor.root.classList.remove('is-mobile-fullscreen');
     }
 
     setWindowChangeListener(listener: (event: WindowLifecycleEvent) => void): void {
@@ -201,6 +240,13 @@ class WindowManager {
         root.addEventListener('pointerdown', () => {
             this.focusWindow(context.processAppId, windowId);
         });
+
+        // In forced-maximize (mobile) mode, immediately maximize the window
+        if (this.forcedMaximize) {
+            descriptor.boundsBeforeMaximize = { ...descriptor.bounds };
+            descriptor.state = 'maximized';
+            this.applyMobileWindowStyle(descriptor);
+        }
 
         this.applyWindowLayout(descriptor);
         this.windows.set(windowId, descriptor);

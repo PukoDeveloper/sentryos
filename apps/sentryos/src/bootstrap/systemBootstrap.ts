@@ -257,6 +257,24 @@ async function bootstrapSystem(): Promise<void> {
     windowManager.setMaximizedTaskbarHeight(height);
   });
 
+  // Wire mobile shell mode: force all windows full-screen on portrait phone,
+  // and adjust the maximized taskbar height to leave room for the mobile nav bar.
+  const MOBILE_NAV_HEIGHT = 60;
+  const applyShellModeToWindowManager = (mode: ReturnType<typeof desktopShell.getShellMode>) => {
+    if (mode === 'mobile') {
+      windowManager.setMaximizedTaskbarHeight(MOBILE_NAV_HEIGHT, false);
+      windowManager.setForcedMaximize(true);
+    } else {
+      windowManager.setForcedMaximize(false);
+      const taskbarMode = desktopShell.getTaskbarMode();
+      const height = taskbarMode === 'docked' ? 96 : taskbarMode === 'fullwidth' ? 64 : 0;
+      windowManager.setMaximizedTaskbarHeight(height, false);
+    }
+  };
+  desktopShell.onShellModeChange(applyShellModeToWindowManager);
+  // Apply current mode immediately (shell may already be in mobile mode from mount)
+  applyShellModeToWindowManager(desktopShell.getShellMode());
+
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
 
