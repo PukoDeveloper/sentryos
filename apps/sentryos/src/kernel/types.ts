@@ -12,7 +12,7 @@ type EventBusResult = {
     error?: EventBusError;
 } & Result<any, EventBusError>;
 
-type PermissionError = 'PermissionDenied' | 'InvalidPermission' | 'NotInitialized' | 'UnknownError';
+type PermissionError = 'PermissionDenied' | 'InvalidPermission' | 'NotInitialized' | 'AlreadyInitialized' | 'UnknownError';
 
 type PermissionResult = {
     success: boolean;

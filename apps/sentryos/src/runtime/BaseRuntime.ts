@@ -344,6 +344,7 @@ abstract class BaseRuntime implements IRuntime {
 
     protected pushMessage(fromPid: number, toPid: number, channel: string, payload: unknown): RuntimeResult<boolean> {
         const MAX_INBOX_SIZE = 256;
+        const INBOX_WARN_THRESHOLD = Math.floor(MAX_INBOX_SIZE * 0.8);
         const targetProc = this.getProcess(toPid);
         if (!targetProc || targetProc.status !== 'running') {
             return { success: false, error: 'ProcessNotFound' };
@@ -367,6 +368,14 @@ abstract class BaseRuntime implements IRuntime {
             timestamp: Date.now()
         };
         targetState.inbox.push(message);
+
+        if (targetState.inbox.length === INBOX_WARN_THRESHOLD) {
+            this.eventBus.emit(targetProc.processAppId, Events.PROCESS_INBOX_NEAR_FULL, {
+                pid: toPid,
+                inboxSize: targetState.inbox.length,
+                maxInboxSize: MAX_INBOX_SIZE,
+            });
+        }
 
         // 自動呼叫目標程序的 onMessage 回呼（若存在）
         try {

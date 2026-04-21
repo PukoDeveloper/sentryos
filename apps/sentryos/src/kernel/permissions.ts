@@ -96,6 +96,7 @@ export const Events = {
   CONSOLE_INPUT: 'console.input',
   PROCESS_STARTED: 'process.started',
   PROCESS_STOPPED: 'process.stopped',
+  PROCESS_INBOX_NEAR_FULL: 'process.inbox.near-full',
   NOTIFICATION: 'notification',
   KEYBOARD: 'keyboard',
   LANGUAGE_CHANGED: 'language.changed',

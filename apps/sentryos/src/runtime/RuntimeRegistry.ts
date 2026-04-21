@@ -44,6 +44,9 @@ class RuntimeRegistry {
 
     /** 以 engine 名稱（例如 'quickjs'）註冊一個 Runtime 實例。 */
     register(engine: string, runtime: IRuntime): void {
+        if (this.runtimes.has(engine)) {
+            console.warn(`[RuntimeRegistry] Engine '${engine}' is already registered and will be overwritten. Verify that no two plugins use the same engine name.`);
+        }
         this.runtimes.set(engine, runtime);
     }
 
