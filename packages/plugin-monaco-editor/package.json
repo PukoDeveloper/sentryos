@@ -1,0 +1,30 @@
+{
+  "name": "sentryos-plugin-monaco-editor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SentryOS built-in plugin — Monaco Editor code-editor UI component and editor Host API",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.55.1",
+    "sentryos-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

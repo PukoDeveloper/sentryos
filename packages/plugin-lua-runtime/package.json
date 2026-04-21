@@ -1,0 +1,30 @@
+{
+  "name": "sentryos-plugin-lua-runtime",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SentryOS built-in plugin — Lua 5.3 runtime engine powered by Fengari",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fengari-web": "^0.1.4",
+    "sentryos-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}
