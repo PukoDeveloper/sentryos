@@ -8,14 +8,15 @@
 
 | 分類 | 文件 | 說明 |
 |------|------|------|
-| **架構總覽** | [overview](./docs/architecture/overview.md) | 目錄結構、啟動流程、分層架構 |
-| **核心元件** | [PermissionsManager](./docs/core/permissions-manager.md) | 萬用字元權限系統 |
+| **架構總覽** | [overview](./docs/architecture/overview.md) | 目錄結構、啟動流程、分層架構、Runtime 架構 |
+| **核心元件** | [RuntimeRegistry](./docs/core/runtime-registry.md) | 多引擎管理 + 中央 Host API 註冊 |
+| | [ScriptRuntime](./docs/core/script-runtime.md) | QuickJS 沙箱執行引擎 |
+| | [PermissionsManager](./docs/core/permissions-manager.md) | 萬用字元權限系統 |
 | | [EventBus](./docs/core/event-bus.md) | 權限門控事件匯流排 |
 | | [ApplicationManager](./docs/core/application-manager.md) | 應用定義登錄簿 |
 | | [ProcessManager](./docs/core/process-manager.md) | 程序生命週期管理 |
-| | [ScriptRuntime](./docs/core/script-runtime.md) | QuickJS 沙箱 & Host API |
 | | [WindowManager](./docs/core/window-manager.md) | 視窗管理 |
-| | [WebFileSystemAdapter](./docs/core/file-system.md) | 虛擬檔案系統 |
+| | [FileSystem](./docs/core/file-system.md) | 分層虛擬檔案系統 |
 | | [ApplicationCatalog](./docs/core/application-catalog.md) | Manifest 載入 |
 | | [EnvironmentManager](./docs/core/environment-manager.md) | 環境變數、程式庫快取、命令註冊表 |
 | | [NotificationManager](./docs/core/notification-manager.md) | 全域通知系統 |
@@ -28,36 +29,47 @@
 | **應用開發** | [Host API](./docs/app-development/host-api.md) | 沙箱內 `OS` 全域 API |
 | | [Manifest](./docs/app-development/manifest.md) | manifest.json 規格 |
 | | [開發指南](./docs/app-development/guide.md) | 新增 App 步驟與範本 |
+| **插件開發** | [插件指南](./docs/plugin-development/guide.md) | 插件結構、PluginContext API、引擎擴充 |
 | **資料流** | [資料流](./docs/data-flow/data-flow.md) | 啟動、事件、關閉、IPC 流程 |
-| **型別定義** | [types/](./docs/types/README.md) | Plugin SDK 型別定義檔 |
+| **型別定義** | [SDK README](./packages/sdk/README.md) | sentryos-sdk 型別定義與常數 |
 
 ---
 
 ## 快速架構概覽
 
+### Monorepo 結構
+
+| 套件 | 路徑 | 說明 |
+|------|------|------|
+| **主應用** | `apps/sentryos/` | Vite + TypeScript 主程式 |
+| **SDK** | `packages/sdk/` | `sentryos-sdk` — 型別定義與常數，供 App / Plugin 開發使用 |
+
 ### 分層
 
 | 層級 | 路徑 | 職責 |
 |------|------|------|
-| **Entry** | `src/main.ts` | 唯一入口 |
-| **Bootstrap** | `src/bootstrap/` | 流程編排，不持有業務狀態 |
-| **Kernel** | `src/kernel/` | 服務容器、共用型別與系統常數 |
-| **API** | `src/api/` | Host API 註冊層，橋接核心服務與沙箱 |
-| **Core Modules** | `src/application/`, `src/process/`, `src/runtime/`, `src/permissions/`, `src/events/`, `src/environment/`, `src/storage/`, `src/monitor/`, `src/notification/`, `src/network/`, `src/dialog/`, `src/registry/`, `src/language/`, `src/console/`, `src/plugin/` | 各自獨立的系統模組 |
-| **Window** | `src/window/` | 視窗生命週期、UI 渲染 |
-| **UI** | `src/ui/` | 桌面 DOM 組裝與互動 |
-| **Public Apps** | `public/apps/` | 只透過 Host API 與系統溝通 |
+| **Entry** | `apps/sentryos/src/main.ts` | 唯一入口 |
+| **Bootstrap** | `apps/sentryos/src/bootstrap/` | 流程編排，不持有業務狀態 |
+| **Kernel** | `apps/sentryos/src/kernel/` | 服務容器、共用型別與系統常數 |
+| **Runtime** | `apps/sentryos/src/runtime/` | RuntimeRegistry、BaseRuntime、ScriptRuntime（QuickJS）、IRuntime 介面 |
+| **API** | `apps/sentryos/src/api/` | Host API 註冊層（16 個模組），橋接核心服務與沙箱 |
+| **Core Modules** | `apps/sentryos/src/application/`, `src/process/`, `src/permissions/`, `src/events/`, `src/environment/`, `src/storage/`, `src/monitor/`, `src/notification/`, `src/network/`, `src/dialog/`, `src/registry/`, `src/language/`, `src/console/`, `src/plugin/`, `src/clipboard/`, `src/audio/` | 各自獨立的系統模組 |
+| **Window** | `apps/sentryos/src/window/` | 視窗生命週期、UI 元件 Registry |
+| **UI** | `apps/sentryos/src/ui/` | 桌面 DOM 組裝與互動 |
+| **Public Apps** | `apps/sentryos/public/apps/` | 只透過 Host API 與系統溝通 |
+| **Plugins** | `apps/sentryos/public/plugins/` | 插件（lua-runtime、monaco-editor 等） |
 
 ### 啟動摘要
 
 1. `main.ts` → `bootstrapSystem()`
-2. 初始化 Core 服務 → 載入 App Catalog → 掛載 DesktopShell
+2. 初始化 Core 服務（含 RuntimeRegistry）→ 載入 App Catalog → 掛載 DesktopShell
 3. 建立 WindowManager → 註冊通知覆蓋層
-4. `registerAllHostApis()` — 註冊 12 個 API 模組（ui、system、storage、env、console、shell、notification、monitor、settings、network、registry、dialog），扁平化注入至 `OS` 全域物件
-5. 逐一啟動 App（Library → Service → Window/Console）
+4. `registerAllHostApis()` — 將 16 個 API 模組（ui、system、storage、env、console、shell、notification、monitor、settings、network、registry、dialog、install、clipboard、audio 等）注入 RuntimeRegistry
+5. 載入插件（拓撲排序後依序 `setup(context)`）
+6. 逐一啟動 App（Library → Service → Window/Console）
 
 ### 新增 App 速查
 
-1. 建立 `public/apps/<name>/manifest.json` + `main.js`
-2. 加入 `public/app.json`：`"app/<name>"`
+1. 建立 `apps/sentryos/public/apps/<name>/manifest.json` + `main.js`
+2. 加入 `apps/sentryos/public/app.json`：`"app/<name>"`
 3. 詳見 [開發指南](./docs/app-development/guide.md)
