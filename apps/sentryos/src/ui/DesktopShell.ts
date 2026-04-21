@@ -41,6 +41,8 @@ type ThemeSettings = {
 
 type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
 
+type ShellMode = 'desktop' | 'mobile';
+
 class DesktopShell {
   private root: HTMLDivElement | null = null;
   private overlayLayer: HTMLDivElement | null = null;
@@ -87,6 +89,17 @@ class DesktopShell {
   private compactExpanded = false;
   private compactDragging = false;
   private compactDragOffset = { x: 0, y: 0 };
+
+  // ── Mobile mode ───────────────────────────────────────────────
+  private shellMode: ShellMode = 'desktop';
+  private mobileNavBar: HTMLDivElement | null = null;
+  private mobileAppDrawer: HTMLDivElement | null = null;
+  private mobileRecentPanel: HTMLDivElement | null = null;
+  private mobileAppDrawerOpen = false;
+  private mobileRecentOpen = false;
+  private orientationMql: MediaQueryList | null = null;
+  private orientationChangeHandler: (() => void) | null = null;
+  private shellModeChangeHandler: ((mode: ShellMode) => void) | null = null;
 
   /** 翻譯輔助：透過外部注入的翻譯函式取得翻譯文字 */
   private t(key: string): string {
@@ -277,6 +290,26 @@ class DesktopShell {
     this.renderFoldersTab();
     this.updateClock();
     this.startClock();
+
+    // ── Device mode detection: apply mobile layout if portrait phone ──
+    const initialMode = DesktopShell.detectShellMode();
+    if (initialMode === 'mobile') {
+      // Set shellMode directly (without animation guard) before adding the class,
+      // so applyShellMode's guard doesn't skip the first call.
+      this.shellMode = 'desktop'; // will be changed by applyShellMode
+      this.applyShellMode('mobile');
+    }
+
+    // Listen for orientation changes so the shell switches modes dynamically
+    this.orientationMql = window.matchMedia('(orientation: portrait)');
+    this.orientationChangeHandler = () => {
+      const newMode = DesktopShell.detectShellMode();
+      if (newMode !== this.shellMode) {
+        this.applyShellMode(newMode);
+      }
+    };
+    this.orientationMql.addEventListener('change', this.orientationChangeHandler);
+
     return true;
   }
 
@@ -312,6 +345,12 @@ class DesktopShell {
     }
     this.closeGroupPopup();
     this.renderTaskbar();
+
+    // Refresh mobile recent panel if open
+    if (this.mobileRecentOpen) {
+      this.closeMobileRecentPanel();
+      this.openMobileRecentPanel();
+    }
   }
 
   registerOverlay(registration: DesktopOverlayRegistration): void {
@@ -358,6 +397,18 @@ class DesktopShell {
     this.editingFolderName = null;
     this.pinnedAppIds = [];
     this.closeContextMenu();
+
+    // ── Mobile mode cleanup ──
+    if (this.orientationMql && this.orientationChangeHandler) {
+      this.orientationMql.removeEventListener('change', this.orientationChangeHandler);
+      this.orientationMql = null;
+      this.orientationChangeHandler = null;
+    }
+    this.mobileNavBar = null;
+    this.mobileAppDrawer = null;
+    this.mobileRecentPanel = null;
+    this.mobileAppDrawerOpen = false;
+    this.mobileRecentOpen = false;
   }
 
   applyTheme(theme: ThemeSettings): void {
@@ -1442,6 +1493,322 @@ class DesktopShell {
       this.updateClock();
     }, CLOCK_UPDATE_INTERVAL_MS);
   }
+
+  // ── Shell mode detection ──────────────────────────────────────
+
+  /** Detect whether the current viewport is a portrait mobile device. */
+  static detectShellMode(): ShellMode {
+    return window.innerWidth <= 768 && window.innerHeight > window.innerWidth ? 'mobile' : 'desktop';
+  }
+
+  /** Return the current shell mode ('desktop' | 'mobile'). */
+  getShellMode(): ShellMode {
+    return this.shellMode;
+  }
+
+  /** Register a callback that fires when the shell mode changes due to orientation change. */
+  onShellModeChange(handler: (mode: ShellMode) => void): void {
+    this.shellModeChangeHandler = handler;
+  }
+
+  // ── Mobile nav bar ────────────────────────────────────────────
+
+  /** Build and append the mobile bottom navigation bar to the root. */
+  private mountMobileNavBar(): void {
+    if (!this.root) return;
+
+    const nav = document.createElement('div');
+    nav.className = 'mobile-nav-bar';
+
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'mobile-nav-btn';
+    backBtn.setAttribute('aria-label', 'Back');
+    backBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<polyline points="15 18 9 12 15 6"/>' +
+      '</svg>';
+    backBtn.addEventListener('click', () => {
+      // Close the focused window as "back" action
+      const focused = this.getFocusedWindowId();
+      if (focused) {
+        this.taskbarWindowClickHandler?.(focused.windowId, focused.processAppId);
+      }
+    });
+
+    // Home button
+    const homeBtn = document.createElement('button');
+    homeBtn.type = 'button';
+    homeBtn.className = 'mobile-nav-btn mobile-nav-btn-home';
+    homeBtn.setAttribute('aria-label', 'Home');
+    homeBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' +
+      '<polyline points="9 22 9 12 15 12 15 22"/>' +
+      '</svg>';
+    homeBtn.addEventListener('click', () => {
+      this.closeMobileRecentPanel();
+      this.toggleMobileAppDrawer();
+    });
+
+    // Recent apps button
+    const recentBtn = document.createElement('button');
+    recentBtn.type = 'button';
+    recentBtn.className = 'mobile-nav-btn';
+    recentBtn.setAttribute('aria-label', 'Recent apps');
+    recentBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="3" y="3" width="7" height="7" rx="1"/>' +
+      '<rect x="14" y="3" width="7" height="7" rx="1"/>' +
+      '<rect x="3" y="14" width="7" height="7" rx="1"/>' +
+      '<rect x="14" y="14" width="7" height="7" rx="1"/>' +
+      '</svg>';
+    recentBtn.addEventListener('click', () => {
+      this.closeMobileAppDrawer();
+      this.toggleMobileRecentPanel();
+    });
+
+    nav.appendChild(backBtn);
+    nav.appendChild(homeBtn);
+    nav.appendChild(recentBtn);
+
+    this.root.appendChild(nav);
+    this.mobileNavBar = nav;
+  }
+
+  /** Remove the mobile nav bar from the DOM. */
+  private unmountMobileNavBar(): void {
+    this.mobileNavBar?.remove();
+    this.mobileNavBar = null;
+  }
+
+  // ── Mobile app drawer ─────────────────────────────────────────
+
+  private toggleMobileAppDrawer(): void {
+    if (this.mobileAppDrawerOpen) {
+      this.closeMobileAppDrawer();
+    } else {
+      this.openMobileAppDrawer();
+    }
+  }
+
+  private openMobileAppDrawer(): void {
+    if (!this.root || this.mobileAppDrawerOpen) return;
+    this.mobileAppDrawerOpen = true;
+
+    const drawer = document.createElement('div');
+    drawer.className = 'mobile-app-drawer';
+
+    const header = document.createElement('div');
+    header.className = 'mobile-app-drawer-header';
+
+    const title = document.createElement('span');
+    title.className = 'mobile-app-drawer-title';
+    title.textContent = this.t('mobile.allApps');
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.className = 'mobile-app-drawer-search';
+    searchInput.placeholder = this.t('search.placeholder');
+
+    header.appendChild(title);
+    header.appendChild(searchInput);
+
+    const grid = document.createElement('div');
+    grid.className = 'mobile-app-drawer-grid';
+
+    const renderGrid = (keyword: string) => {
+      grid.replaceChildren();
+      const lower = keyword.trim().toLowerCase();
+      const apps = lower
+        ? this.allApps.filter(a =>
+            `${a.name} ${a.description ?? ''} ${a.packageName ?? ''}`.toLowerCase().includes(lower)
+          )
+        : this.allApps;
+
+      for (const app of apps) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'mobile-app-tile';
+
+        const iconEl = document.createElement('span');
+        iconEl.className = 'mobile-app-tile-icon';
+        if (app.icon) {
+          const img = document.createElement('img');
+          img.src = app.icon;
+          img.alt = '';
+          img.draggable = false;
+          img.addEventListener('error', () => {
+            img.remove();
+            iconEl.textContent = app.name.charAt(0).toUpperCase();
+          });
+          iconEl.appendChild(img);
+        } else {
+          iconEl.textContent = app.name.charAt(0).toUpperCase();
+        }
+
+        const label = document.createElement('span');
+        label.className = 'mobile-app-tile-label';
+        label.textContent = app.name;
+
+        tile.appendChild(iconEl);
+        tile.appendChild(label);
+
+        tile.addEventListener('click', () => {
+          this.closeMobileAppDrawer();
+          this.launchHandler?.(app);
+        });
+
+        grid.appendChild(tile);
+      }
+    };
+
+    renderGrid('');
+    searchInput.addEventListener('input', () => renderGrid(searchInput.value));
+
+    drawer.appendChild(header);
+    drawer.appendChild(grid);
+
+    this.root.appendChild(drawer);
+    this.mobileAppDrawer = drawer;
+
+    requestAnimationFrame(() => drawer.classList.add('is-open'));
+  }
+
+  private closeMobileAppDrawer(): void {
+    if (!this.mobileAppDrawer || !this.mobileAppDrawerOpen) return;
+    this.mobileAppDrawerOpen = false;
+    const drawer = this.mobileAppDrawer;
+    drawer.classList.remove('is-open');
+    drawer.addEventListener('transitionend', () => drawer.remove(), { once: true });
+    this.mobileAppDrawer = null;
+  }
+
+  // ── Mobile recent apps panel ──────────────────────────────────
+
+  private toggleMobileRecentPanel(): void {
+    if (this.mobileRecentOpen) {
+      this.closeMobileRecentPanel();
+    } else {
+      this.openMobileRecentPanel();
+    }
+  }
+
+  private openMobileRecentPanel(): void {
+    if (!this.root || this.mobileRecentOpen) return;
+    this.mobileRecentOpen = true;
+
+    const panel = document.createElement('div');
+    panel.className = 'mobile-recent-panel';
+
+    const title = document.createElement('div');
+    title.className = 'mobile-recent-title';
+    title.textContent = this.t('mobile.recentApps');
+    panel.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'mobile-recent-list';
+
+    for (const windowInfo of this.openedWindows.values()) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'mobile-recent-card';
+
+      const iconEl = document.createElement('span');
+      iconEl.className = 'mobile-recent-card-icon';
+      if (windowInfo.icon) {
+        const img = document.createElement('img');
+        img.src = windowInfo.icon;
+        img.alt = '';
+        img.draggable = false;
+        img.addEventListener('error', () => {
+          img.remove();
+          iconEl.textContent = windowInfo.title.charAt(0).toUpperCase();
+        });
+        iconEl.appendChild(img);
+      } else {
+        iconEl.textContent = windowInfo.title.charAt(0).toUpperCase();
+      }
+
+      const label = document.createElement('span');
+      label.className = 'mobile-recent-card-label';
+      label.textContent = windowInfo.title;
+
+      card.appendChild(iconEl);
+      card.appendChild(label);
+
+      card.addEventListener('click', () => {
+        this.closeMobileRecentPanel();
+        this.taskbarWindowClickHandler?.(windowInfo.windowId, windowInfo.processAppId);
+      });
+
+      list.appendChild(card);
+    }
+
+    if (this.openedWindows.size === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'mobile-recent-empty';
+      empty.textContent = this.t('mobile.noRecentApps');
+      list.appendChild(empty);
+    }
+
+    panel.appendChild(list);
+    this.root.appendChild(panel);
+    this.mobileRecentPanel = panel;
+
+    requestAnimationFrame(() => panel.classList.add('is-open'));
+  }
+
+  private closeMobileRecentPanel(): void {
+    if (!this.mobileRecentPanel || !this.mobileRecentOpen) return;
+    this.mobileRecentOpen = false;
+    const panel = this.mobileRecentPanel;
+    panel.classList.remove('is-open');
+    panel.addEventListener('transitionend', () => panel.remove(), { once: true });
+    this.mobileRecentPanel = null;
+  }
+
+  /** Return the focused window's id and processAppId, if any. Used by mobile back button. */
+  private getFocusedWindowId(): { windowId: string; processAppId: string } | null {
+    for (const [, info] of this.openedWindows) {
+      // Use the last entry as a proxy for "most recently focused" — this is used only
+      // by the mobile back button to bring an app to focus (not to close it).
+      return { windowId: info.windowId, processAppId: info.processAppId };
+    }
+    return null;
+  }
+
+  // ── Shell mode switching ──────────────────────────────────────
+
+  /** Switch the shell between desktop and mobile layouts. */
+  private applyShellMode(mode: ShellMode): void {
+    if (!this.root) return;
+    if (mode === this.shellMode) return;
+
+    this.shellMode = mode;
+
+    if (mode === 'mobile') {
+      this.root.classList.add('is-mobile');
+      // Hide desktop taskbar & start panel
+      if (this.taskbarEl) this.taskbarEl.style.display = 'none';
+      if (this.taskbarTrigger) this.taskbarTrigger.style.display = 'none';
+      if (this.startPanel) this.startPanel.classList.add('is-hidden');
+      this.mountMobileNavBar();
+    } else {
+      this.root.classList.remove('is-mobile');
+      // Restore desktop taskbar
+      if (this.taskbarEl) this.taskbarEl.style.removeProperty('display');
+      if (this.taskbarMode === 'floating-compact' && this.taskbarTrigger) {
+        this.taskbarTrigger.style.display = 'flex';
+      }
+      this.unmountMobileNavBar();
+      this.closeMobileAppDrawer();
+      this.closeMobileRecentPanel();
+    }
+
+    this.shellModeChangeHandler?.(mode);
+  }
 }
 
-export { DesktopShell, type DesktopOverlayRegistration, type ThemeSettings, type TaskbarMode };
+export { DesktopShell, type DesktopOverlayRegistration, type ThemeSettings, type TaskbarMode, type ShellMode };

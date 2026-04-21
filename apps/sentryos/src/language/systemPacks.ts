@@ -25,6 +25,9 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': '重新命名',
     'hint.dragApp': '從搜尋拖曳應用程式到此資料夾',
     'tooltip.removeFromFolder': '從資料夾移除',
+    'mobile.allApps': '所有應用程式',
+    'mobile.recentApps': '最近使用',
+    'mobile.noRecentApps': '沒有最近使用的應用程式',
   },
   'en': {
     'tab.folders': 'Folders',
@@ -44,6 +47,9 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': 'Rename',
     'hint.dragApp': 'Drag apps from Search into this folder',
     'tooltip.removeFromFolder': 'Remove from folder',
+    'mobile.allApps': 'All Apps',
+    'mobile.recentApps': 'Recent',
+    'mobile.noRecentApps': 'No recent apps',
   },
   'ja': {
     'tab.folders': 'フォルダ',
@@ -63,6 +69,9 @@ export const desktopShellPack: LanguagePack = {
     'tooltip.rename': '名前を変更',
     'hint.dragApp': '検索からアプリをこのフォルダにドラッグ',
     'tooltip.removeFromFolder': 'フォルダから削除',
+    'mobile.allApps': 'すべてのアプリ',
+    'mobile.recentApps': '最近使用したアプリ',
+    'mobile.noRecentApps': '最近使用したアプリはありません',
   },
 };
 

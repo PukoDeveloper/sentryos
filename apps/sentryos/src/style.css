@@ -1767,3 +1767,314 @@ body {
 	outline: 2px solid var(--sos-color-border-focus);
 	outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Mobile Shell — Portrait Phone Mode
+   Activated when .desktop-shell has .is-mobile class.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* In mobile mode, remove the window layer padding so apps fill the screen */
+.desktop-shell.is-mobile .desktop-window-layer {
+	padding: 0;
+	/* Reserve space for the mobile nav bar at the bottom */
+	padding-bottom: 60px;
+}
+
+/* Mobile full-screen windows: no floating style, fill the layer */
+.desktop-shell.is-mobile .window-shell.is-mobile-fullscreen {
+	position: absolute;
+	inset: 0;
+	width: 100% !important;
+	height: 100% !important;
+	left: 0 !important;
+	top: 0 !important;
+	border-radius: 0;
+}
+
+.desktop-shell.is-mobile .window-shell.is-mobile-fullscreen .window-frame {
+	border-radius: 0;
+	border-left: none;
+	border-right: none;
+	border-top: none;
+}
+
+/* Hide minimize and restore buttons in mobile full-screen mode */
+.desktop-shell.is-mobile .window-shell.is-mobile-fullscreen .window-action-button:not(:last-child) {
+	display: none;
+}
+
+/* Hide resize handles in mobile mode */
+.desktop-shell.is-mobile .window-resize-handle {
+	display: none;
+}
+
+/* ── Mobile Nav Bar ─────────────────────────────────────── */
+
+.mobile-nav-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 60px;
+	display: flex;
+	align-items: center;
+	justify-content: space-around;
+	padding: 0 24px;
+	background: var(--sos-color-taskbar);
+	border-top: 1px solid var(--sos-color-taskbar-border);
+	backdrop-filter: blur(18px);
+	z-index: 200;
+	/* Keep nav bar above windows */
+}
+
+.mobile-nav-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 52px;
+	height: 44px;
+	border: none;
+	border-radius: 14px;
+	background: transparent;
+	color: var(--sos-color-text);
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.12s ease;
+	opacity: 0.82;
+}
+
+.mobile-nav-btn:hover {
+	background: var(--sos-color-surface-hover);
+	opacity: 1;
+}
+
+.mobile-nav-btn:active {
+	transform: scale(0.88);
+}
+
+.mobile-nav-btn-home {
+	color: var(--sos-color-accent);
+	opacity: 1;
+}
+
+/* ── Mobile App Drawer ──────────────────────────────────── */
+
+.mobile-app-drawer {
+	position: absolute;
+	inset: 0;
+	bottom: 60px; /* above nav bar */
+	z-index: 150;
+	display: flex;
+	flex-direction: column;
+	background: var(--sos-color-surface);
+	backdrop-filter: blur(22px);
+	opacity: 0;
+	transform: translateY(24px);
+	transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+	            transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+	pointer-events: none;
+}
+
+.mobile-app-drawer.is-open {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+.mobile-app-drawer-header {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 20px 16px 10px;
+	flex-shrink: 0;
+}
+
+.mobile-app-drawer-title {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--sos-color-text);
+	letter-spacing: 0.02em;
+}
+
+.mobile-app-drawer-search {
+	width: 100%;
+	padding: 10px 14px;
+	border: 1px solid var(--sos-color-border);
+	border-radius: 12px;
+	background: var(--sos-color-surface-input);
+	color: var(--sos-color-text);
+	font-family: inherit;
+	font-size: 15px;
+	outline: none;
+	box-sizing: border-box;
+	transition: border-color 0.2s ease;
+}
+
+.mobile-app-drawer-search:focus {
+	border-color: var(--sos-color-border-focus);
+}
+
+.mobile-app-drawer-search::placeholder {
+	color: var(--sos-color-text-secondary);
+}
+
+.mobile-app-drawer-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+	padding: 12px 16px 16px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+/* ── Mobile App Tile ─────────────────────────────────────── */
+
+.mobile-app-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 14px 6px 10px;
+	border: none;
+	border-radius: 16px;
+	background: var(--sos-color-surface-hover);
+	color: var(--sos-color-text);
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.12s ease;
+	min-width: 0;
+}
+
+.mobile-app-tile:hover {
+	background: var(--sos-color-border);
+}
+
+.mobile-app-tile:active {
+	transform: scale(0.92);
+}
+
+.mobile-app-tile-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 52px;
+	height: 52px;
+	border-radius: 14px;
+	background: var(--sos-color-surface-input);
+	font-size: 22px;
+	font-weight: 700;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.mobile-app-tile-icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.mobile-app-tile-label {
+	font-size: 11px;
+	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	width: 100%;
+	line-height: 1.3;
+}
+
+/* ── Mobile Recent Apps Panel ────────────────────────────── */
+
+.mobile-recent-panel {
+	position: absolute;
+	inset: 0;
+	bottom: 60px;
+	z-index: 150;
+	display: flex;
+	flex-direction: column;
+	background: var(--sos-color-surface);
+	backdrop-filter: blur(22px);
+	opacity: 0;
+	transform: translateY(24px);
+	transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+	            transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+	pointer-events: none;
+}
+
+.mobile-recent-panel.is-open {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+.mobile-recent-title {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--sos-color-text);
+	padding: 20px 16px 12px;
+	flex-shrink: 0;
+}
+
+.mobile-recent-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 0 12px 16px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+.mobile-recent-card {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 14px 16px;
+	border: 1px solid var(--sos-color-border);
+	border-radius: 16px;
+	background: var(--sos-color-surface-hover);
+	color: var(--sos-color-text);
+	cursor: pointer;
+	text-align: left;
+	transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.mobile-recent-card:hover {
+	background: var(--sos-color-border);
+}
+
+.mobile-recent-card:active {
+	transform: scale(0.97);
+}
+
+.mobile-recent-card-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	background: var(--sos-color-surface-input);
+	font-size: 20px;
+	font-weight: 700;
+	flex-shrink: 0;
+	overflow: hidden;
+}
+
+.mobile-recent-card-icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.mobile-recent-card-label {
+	font-size: 15px;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mobile-recent-empty {
+	text-align: center;
+	color: var(--sos-color-text-secondary);
+	font-size: 14px;
+	padding: 40px 0;
+}
