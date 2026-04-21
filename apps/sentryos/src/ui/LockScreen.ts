@@ -49,6 +49,16 @@ function getLockoutSeconds(failCount: number): number {
  */
 export class LockScreen {
   private overlay: HTMLDivElement | null = null;
+  private injectedContainer: HTMLElement | null = null;
+
+  /**
+   * Override the container used for the lock-screen overlay.
+   * When set, `getAppDiv()` is bypassed entirely.  Call this before `show()`
+   * when embedding SentryOS inside a host page element.
+   */
+  setContainer(container: HTMLElement): void {
+    this.injectedContainer = container;
+  }
 
   /**
    * Render the lock screen and wait for a successful login.
@@ -68,7 +78,7 @@ export class LockScreen {
       return text;
     };
     return new Promise((resolve) => {
-      const root = getAppDiv();
+      const root = this.injectedContainer ?? getAppDiv();
       if (!root) {
         resolve({ username: DEFAULT_USERNAME, userkey: `local_${DEFAULT_USERNAME}` });
         return;

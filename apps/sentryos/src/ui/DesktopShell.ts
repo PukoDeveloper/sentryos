@@ -103,8 +103,8 @@ class DesktopShell {
     return this.allApps.find(a => (a.manifestId ?? a.mainPath) === stableId);
   }
 
-  mount(_applications: Application[]): boolean {
-    const appRoot = getAppDiv();
+  mount(_applications: Application[], container?: HTMLElement): boolean {
+    const appRoot = container ?? getAppDiv();
     if (!appRoot) {
       return false;
     }
