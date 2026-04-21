@@ -1283,6 +1283,41 @@ body {
 		bottom: 118px;
 		font-size: 22px;
 	}
+
+	/* ── Notification toast (mobile) ────────────────────────────── */
+
+	.notification-container {
+		top: calc(env(safe-area-inset-top, 0px) + 12px);
+		left: 12px;
+		right: 12px;
+		max-width: none;
+		width: auto;
+	}
+
+	.notification-toast {
+		padding: 8px 10px;
+		gap: 8px;
+		font-size: 12px;
+		transform: translateY(-20px);
+	}
+
+	.notification-toast.is-visible {
+		transform: translateY(0);
+	}
+
+	.notification-toast.is-dismissed {
+		transform: translateY(-20px);
+	}
+
+	.notification-icon {
+		width: 20px;
+		height: 20px;
+		font-size: 12px;
+	}
+
+	.notification-body {
+		display: none;
+	}
 }
 
 /* ── Console window ────────────────────────────────────────────── */
