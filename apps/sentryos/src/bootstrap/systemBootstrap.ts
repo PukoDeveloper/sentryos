@@ -466,7 +466,14 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   for (const lib of libraries) {
     await launcher.launchApplication({ app: lib, type: 'Library', callerAppId: systemAppIdForBoot });
   }
-  for (const app of autoStartApps) {
+  // Services have no UI and are independent, so they can be started in parallel.
+  // Window/Console apps launch sequentially to preserve their z-order and cascade positions.
+  const serviceApps = autoStartApps.filter(a => a.runtimeType === 'Service');
+  const uiApps = autoStartApps.filter(a => a.runtimeType !== 'Service');
+  await Promise.all(serviceApps.map(app =>
+    launcher.launchApplication({ app, type: app.runtimeType, callerAppId: systemAppIdForBoot })
+  ));
+  for (const app of uiApps) {
     await launcher.launchApplication({ app, type: app.runtimeType, callerAppId: systemAppIdForBoot });
   }
 

@@ -137,6 +137,9 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	/** 增量記錄每個 tier 的已用位元組數，避免每次寫入時全量掃描 */
 	private readonly tierUsedBytes: Record<StorageTier, number> = { sys: 0, app: 0, user: 0, cache: 0 };
 	private totalUsedBytes = 0;
+	/** 節流：每個 tier 持久化的延遲計時器 */
+	private readonly persistDebounceTimers: Partial<Record<StorageTier, ReturnType<typeof setTimeout>>> = {};
+	private static readonly PERSIST_DEBOUNCE_MS = 100;
 
 	constructor(kernel: Kernel, options: FileSystemOptions = {}) {
 		this.kernel = kernel;
@@ -428,6 +431,19 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 	// ── Persistence ────────────────────────────────────────────
 
 	private persistTier(tier: StorageTier): void {
+		if (!this.persistenceKey) return;
+		// Debounce: cancel any pending flush for this tier and reschedule.
+		// This prevents serializing the entire tier on every individual write/delete
+		// during burst operations.
+		const existing = this.persistDebounceTimers[tier];
+		if (existing !== undefined) clearTimeout(existing);
+		this.persistDebounceTimers[tier] = setTimeout(() => {
+			delete this.persistDebounceTimers[tier];
+			this.flushTier(tier);
+		}, WebFileSystemAdapter.PERSIST_DEBOUNCE_MS);
+	}
+
+	private flushTier(tier: StorageTier): void {
 		if (!this.persistenceKey) return;
 		try {
 			const tierMap = this.storage.get(tier)!;
