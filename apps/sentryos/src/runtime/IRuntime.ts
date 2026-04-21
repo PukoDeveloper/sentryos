@@ -34,6 +34,11 @@ interface IRuntime {
     dispatchKeyboardEvent(processAppId: string, event: Record<string, unknown>): RuntimeResult<unknown>;
     dispatchFileOpen(processAppId: string, fileInfo: Record<string, unknown>): RuntimeResult<unknown>;
     dispatchDialogResult(processAppId: string, result: Record<string, unknown>): RuntimeResult<unknown>;
+    /**
+     * 在指定程序的沙箱上下文中直接執行程式碼，不呼叫任何 handler。
+     * 用於執行 html-view 插件從 <script> 標籤中提取的腳本。
+     */
+    dispatchHtmlViewScript(processAppId: string, code: string): RuntimeResult<unknown>;
 }
 
 export type { IRuntime };

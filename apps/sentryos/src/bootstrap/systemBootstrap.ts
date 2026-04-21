@@ -389,6 +389,13 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     }
   });
 
+  // Wire html-view script dispatcher: extracts from <script> tags are evaluated in the process sandbox
+  windowManager.setScriptDispatcher((processAppId, code) => {
+    try {
+      runtimeRegistry.getForProcessAppId(processAppId).dispatchHtmlViewScript(processAppId, code);
+    } catch { /* process may be gone */ }
+  });
+
   // 6. Register all Host APIs via modular registrars
   registerAllHostApis(kernel);
 

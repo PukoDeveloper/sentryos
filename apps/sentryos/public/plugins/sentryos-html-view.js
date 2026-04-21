@@ -1,20 +1,32 @@
 // ── sentryos-html-view plugin ─────────────────────────────
 // 以純 DOM 渲染 HTML 字串，不使用 iframe 沙盒。
 // 所有邏輯透過 data-event 屬性宣告，事件回傳至應用程式 Runtime 執行。
+// <script> 標籤內容會被提取後送回沙箱 Runtime 執行，而非在主頁面執行。
 
 /**
- * 對 HTML 字串進行靜態清理：
+ * 對 HTML 字串進行靜態清理，並提取 <script> 標籤的內容：
+ * - 提取所有 <script> 元素的內容（供後續丟回沙箱執行）
  * - 移除 <script>、<iframe>、<object>、<embed> 元素
  * - 移除所有行內 on* 事件處理器屬性
  *
  * @param {string} html
- * @returns {HTMLDivElement} 已清理的容器元素（其子節點為安全 HTML）
+ * @returns {{ container: HTMLDivElement, scripts: string[] }}
+ *   container - 已清理的容器元素（其子節點為安全 HTML）
+ *   scripts   - 從 <script> 標籤中提取的程式碼陣列
  */
 function sanitizeHtml(html) {
     const temp = document.createElement('div');
     temp.innerHTML = html;
 
-    for (const el of temp.querySelectorAll('script, iframe, object, embed')) {
+    const scripts = [];
+    for (const el of temp.querySelectorAll('script')) {
+        if (el.textContent && el.textContent.trim()) {
+            scripts.push(el.textContent);
+        }
+        el.remove();
+    }
+
+    for (const el of temp.querySelectorAll('iframe, object, embed')) {
         el.remove();
     }
 
@@ -26,7 +38,7 @@ function sanitizeHtml(html) {
         }
     }
 
-    return temp;
+    return { container: temp, scripts };
 }
 
 /**
@@ -76,19 +88,29 @@ const htmlViewRenderer = {
         container.classList.add('window-ui-html-view');
         ctx.applyStyle(container, node.style);
 
-        const sanitized = sanitizeHtml(node.html || '');
+        const { container: sanitized, scripts } = sanitizeHtml(node.html || '');
         container.append(...Array.from(sanitized.childNodes));
 
         bindDataEvents(container, ctx);
         ctx.registerNode(node.id, container);
+
+        if (scripts.length > 0) {
+            ctx.dispatchScript(scripts.join('\n'));
+        }
+
         return container;
     },
 
     patch(element, patch, ctx) {
         if (patch.html !== undefined) {
-            const sanitized = sanitizeHtml(patch.html);
+            const { container: sanitized, scripts } = sanitizeHtml(patch.html);
             element.replaceChildren(...Array.from(sanitized.childNodes));
             bindDataEvents(element, ctx);
+
+            if (scripts.length > 0) {
+                ctx.dispatchScript(scripts.join('\n'));
+            }
+
             return true;
         }
         return false;
@@ -105,6 +127,64 @@ function htmlViewApiBuilder(html, style, id) {
 
 function setup(context) {
     context.registerUiComponent('html-view', htmlViewRenderer, htmlViewApiBuilder);
+
+    // Register OS.htmlView — DOM manipulation APIs for use inside <script> blocks
+    context.registerApi('htmlView', ({ process }) => {
+        const windowManager = context.resolve('windowManager');
+
+        return {
+            /**
+             * 在指定的 html-view 節點末尾追加 HTML 片段。
+             * HTML 會經過安全清理（移除 <script>、iframe、on* 屬性），
+             * 其中的 <script> 內容會立即在沙箱中執行。
+             *
+             * @param {string} windowId
+             * @param {string} viewId   - html-view 節點的 id
+             * @param {string} html     - 要追加的 HTML 字串
+             */
+            append(windowId, viewId, html) {
+                const container = windowManager.getNodeElement(
+                    process.processAppId, windowId, viewId
+                );
+                if (!container) return { success: false, error: 'NodeNotFound' };
+
+                const ctx = windowManager.buildRenderContextFor(process.processAppId, windowId);
+                if (!ctx) return { success: false, error: 'WindowNotFound' };
+
+                const { container: sanitized, scripts } = sanitizeHtml(typeof html === 'string' ? html : '');
+                const nodes = Array.from(sanitized.childNodes);
+                for (const n of nodes) container.appendChild(n);
+                bindDataEvents(container, ctx);
+
+                if (scripts.length > 0) {
+                    ctx.dispatchScript(scripts.join('\n'));
+                }
+
+                return { success: true };
+            },
+
+            /**
+             * 移除 html-view 節點內帶有指定 data-id 屬性的第一個子元素。
+             *
+             * @param {string} windowId
+             * @param {string} viewId      - html-view 節點的 id
+             * @param {string} elementId   - 要移除的子元素的 data-id 屬性值
+             */
+            remove(windowId, viewId, elementId) {
+                const container = windowManager.getNodeElement(
+                    process.processAppId, windowId, viewId
+                );
+                if (!container) return { success: false, error: 'NodeNotFound' };
+
+                const target = container.querySelector(`[data-id="${CSS.escape(String(elementId))}"]`);
+                if (!target) return { success: false, error: 'NodeNotFound' };
+                target.remove();
+
+                return { success: true };
+            },
+        };
+    }, ['window'], 'htmlView');
+
     context.log('INFO', 'html-view component registered');
 }
 
@@ -115,7 +195,7 @@ function teardown(context) {
 export default {
     pluginName: 'sentryos-html-view',
     pluginVersion: '1.0.0',
-    pluginDescription: '提供 html-view UI 元件，以純 DOM 渲染 HTML，事件透過 data-event 屬性橋接回 Runtime 執行。',
+    pluginDescription: '提供 html-view UI 元件，以純 DOM 渲染 HTML，事件透過 data-event 屬性橋接回 Runtime 執行。<script> 標籤會被提取後送回沙箱 Runtime 執行。',
     author: 'SentryOS',
     setup,
     teardown,

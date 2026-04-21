@@ -57,6 +57,8 @@ class WindowManager {
     private static readonly WINDOW_RATE_WINDOW_MS = 1000;
     /** 貼靠預覽遮罩 */
     private snapPreviewEl: HTMLElement | null = null;
+    /** html-view script 執行回呼（由 systemBootstrap 注入） */
+    private scriptDispatcher: ((processAppId: string, code: string) => void) | null = null;
 
     constructor(host: HTMLElement, uiEventHandler: (event: WindowUiEvent) => void) {
         this.host = host;
@@ -65,6 +67,32 @@ class WindowManager {
 
     setWindowChangeListener(listener: (event: WindowLifecycleEvent) => void): void {
         this.windowChangeListener = listener;
+    }
+
+    /** 注入 html-view script 派送器（在 systemBootstrap 中連接 RuntimeRegistry）。 */
+    setScriptDispatcher(dispatcher: (processAppId: string, code: string) => void): void {
+        this.scriptDispatcher = dispatcher;
+    }
+
+    /**
+     * 依 nodeId 取得已渲染的 HTMLElement，供外部（例如插件 API）直接操作 DOM。
+     * 若視窗或節點不存在則回傳 null。
+     */
+    getNodeElement(processAppId: string, windowId: string, nodeId: string): HTMLElement | null {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) return null;
+        return this.windowNodeMaps.get(windowId)?.get(nodeId) ?? null;
+    }
+
+    /**
+     * 為已存在的視窗建立 RenderContext，供外部（例如插件 API）
+     * 在動態新增 HTML 節點時進行事件綁定。
+     * 若視窗不存在則回傳 null。
+     */
+    buildRenderContextFor(processAppId: string, windowId: string): RenderContext | null {
+        const descriptor = this.getOwnedWindow(processAppId, windowId);
+        if (!descriptor.success) return null;
+        return this.buildRenderContext(descriptor.data!, processAppId);
     }
 
     /** 清理所有視窗、DOM 元素及內部狀態。應在系統關閉時呼叫。 */
@@ -813,6 +841,13 @@ class WindowManager {
             },
             registerNode: (nodeId, element) => this.registerNode(descriptor.id, nodeId, element),
             applyStyle: (element, style) => this.applyNodeStyle(element, style),
+            dispatchScript: (code) => {
+                try {
+                    this.scriptDispatcher?.(processAppId, code);
+                } catch (err) {
+                    console.warn('[WindowManager] html-view script dispatch failed:', err);
+                }
+            },
         };
     }
 
