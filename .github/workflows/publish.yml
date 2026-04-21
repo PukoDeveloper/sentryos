@@ -1,0 +1,82 @@
+name: Publish to npm
+
+on:
+  # 手動觸發，可選擇要發布哪些套件
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: '要發布的套件（逗號分隔：sentryos, sdk, create-sentryos）'
+        required: false
+        default: 'sentryos,sdk,create-sentryos'
+  # 推送 v* tag 時自動全部發布
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── sentryos-sdk ─────────────────────────────────────────────────────────
+      - name: Build sentryos-sdk
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'sdk')
+        run: pnpm --filter sentryos-sdk build
+
+      - name: Publish sentryos-sdk
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'sdk')
+        working-directory: packages/sdk
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # ── sentryos（本體）─────────────────────────────────────────────────────
+      - name: Build sentryos
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'sentryos')
+        run: pnpm --filter sentryos build:lib
+
+      - name: Publish sentryos
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'sentryos')
+        working-directory: apps/sentryos
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # ── create-sentryos ───────────────────────────────────────────────────────
+      # create-sentryos 是純 Node.js CLI 腳本（index.js），無需編譯，直接發布即可。
+      - name: Publish create-sentryos
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'create-sentryos')
+        working-directory: packages/create-sentryos
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

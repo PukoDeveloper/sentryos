@@ -1,8 +1,20 @@
 {
   "name": "sentryos",
-  "private": true,
   "version": "0.0.0",
   "type": "module",
+  "description": "SentryOS — A lightweight plugin-based OS-like runtime for the browser",
+  "license": "MIT",
+  "module": "./dist/sentryos.js",
+  "types": "./dist/sentryos.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/sentryos.d.ts",
+      "import": "./dist/sentryos.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
