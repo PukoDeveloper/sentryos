@@ -249,7 +249,8 @@ function setup(context) {
                 if (!monacoInstance) return;
                 for (const [key, ed] of editorMap) {
                     if (key.startsWith(`${process.processAppId}::`)) {
-                        unobserveResize(ed.getDomNode());
+                        const domNode = ed.getDomNode();
+                        if (domNode) unobserveResize(domNode);
                         ed.dispose();
                         editorMap.delete(key);
                     }
@@ -270,7 +271,8 @@ function setup(context) {
 function teardown(context) {
     for (const [key, ed] of editorMap) {
         try {
-            unobserveResize(ed.getDomNode());
+            const domNode = ed.getDomNode();
+            if (domNode) unobserveResize(domNode);
             ed.dispose();
         } catch {
             // ignore disposal errors during teardown
