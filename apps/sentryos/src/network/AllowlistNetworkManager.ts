@@ -5,7 +5,26 @@ import type {
   NetworkResult,
   NetworkStatus,
   AllowlistEntry,
+  WebSocketResult,
+  WebSocketStatus,
+  WebSocketEventCallback,
 } from './NetworkAdapter';
+
+/** Maximum number of simultaneous WebSocket connections per process (appId). */
+const MAX_WS_PER_APP = 8;
+
+/** Composite key used to address a single socket: "<appId>:<socketId>" */
+function socketKey(appId: string, socketId: string): string {
+  return `${appId}:${socketId}`;
+}
+
+/** Internal record for a tracked WebSocket connection. */
+interface SocketRecord {
+  socket: WebSocket;
+  url: string;
+  appId: string;
+  socketId: string;
+}
 
 /**
  * Concrete NetworkAdapter that enforces a host/pattern allowlist.
@@ -16,6 +35,9 @@ export class AllowlistNetworkManager implements NetworkAdapter {
   private allowlist: AllowlistEntry[] = [];
   private totalRequests = 0;
   private blockedRequests = 0;
+
+  /** All live WebSocket connections keyed by "<appId>:<socketId>". */
+  private readonly sockets = new Map<string, SocketRecord>();
 
   // ── Enable / Disable ────────────────────────────────────────
 
@@ -157,6 +179,149 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     }
   }
 
+  // ── WebSocket ───────────────────────────────────────────────
+
+  wsConnect(
+    appId: string,
+    socketId: string,
+    url: string,
+    callback: WebSocketEventCallback,
+  ): WebSocketResult<string> {
+    if (!this.enabled) {
+      return { success: false, error: 'Disabled' };
+    }
+
+    // Validate and normalise the URL
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return { success: false, error: 'InvalidUrl' };
+    }
+    if (parsedUrl.protocol !== 'ws:' && parsedUrl.protocol !== 'wss:') {
+      return { success: false, error: 'InvalidUrl' };
+    }
+
+    // Allowlist check uses the hostname (same policy as HTTP)
+    if (!this.isAllowedHost(parsedUrl.hostname)) {
+      return { success: false, error: 'NotAllowed' };
+    }
+
+    const key = socketKey(appId, socketId);
+    if (this.sockets.has(key)) {
+      // Caller reused a socketId that is still live – reject to avoid confusion
+      return { success: false, error: 'UnknownError' };
+    }
+
+    // Enforce per-process connection limit
+    const appSocketCount = this.countSocketsForApp(appId);
+    if (appSocketCount >= MAX_WS_PER_APP) {
+      return { success: false, error: 'TooManyConnections' };
+    }
+
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return { success: false, error: 'ConnectionFailed' };
+    }
+
+    const record: SocketRecord = { socket: ws, url, appId, socketId };
+    this.sockets.set(key, record);
+
+    ws.addEventListener('open', () => {
+      callback({ socketId, type: 'open' });
+    });
+
+    ws.addEventListener('message', (ev: MessageEvent) => {
+      const data = typeof ev.data === 'string' ? ev.data : String(ev.data);
+      callback({ socketId, type: 'message', data });
+    });
+
+    ws.addEventListener('error', () => {
+      callback({ socketId, type: 'error' });
+    });
+
+    ws.addEventListener('close', (ev: CloseEvent) => {
+      this.sockets.delete(key);
+      callback({ socketId, type: 'close', code: ev.code, reason: ev.reason });
+    });
+
+    return { success: true, data: socketId };
+  }
+
+  wsSend(appId: string, socketId: string, data: string): WebSocketResult<null> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    if (record.socket.readyState !== WebSocket.OPEN) {
+      return { success: false, error: 'ConnectionFailed' };
+    }
+    try {
+      record.socket.send(data);
+      return { success: true, data: null };
+    } catch {
+      return { success: false, error: 'UnknownError' };
+    }
+  }
+
+  wsClose(appId: string, socketId: string, code?: number, reason?: string): WebSocketResult<null> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    try {
+      if (code !== undefined) {
+        record.socket.close(code, reason);
+      } else {
+        record.socket.close();
+      }
+      // The 'close' event handler will remove the record from the map.
+      return { success: true, data: null };
+    } catch {
+      return { success: false, error: 'UnknownError' };
+    }
+  }
+
+  wsCloseAllForApp(appId: string): void {
+    for (const [key, record] of this.sockets) {
+      if (record.appId === appId) {
+        try { record.socket.close(); } catch { /* ignore */ }
+        this.sockets.delete(key);
+      }
+    }
+  }
+
+  wsGetStatus(appId: string, socketId: string): WebSocketResult<WebSocketStatus> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    return {
+      success: true,
+      data: {
+        socketId,
+        url: record.url,
+        readyState: record.socket.readyState as 0 | 1 | 2 | 3,
+      },
+    };
+  }
+
+  wsListConnections(appId: string): WebSocketResult<WebSocketStatus[]> {
+    const result: WebSocketStatus[] = [];
+    for (const record of this.sockets.values()) {
+      if (record.appId === appId) {
+        result.push({
+          socketId: record.socketId,
+          url: record.url,
+          readyState: record.socket.readyState as 0 | 1 | 2 | 3,
+        });
+      }
+    }
+    return { success: true, data: result };
+  }
+
   // ── Internal helpers ────────────────────────────────────────
 
   private extractHost(url: string): string | null {
@@ -165,6 +330,18 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     } catch {
       return null;
     }
+  }
+
+  private isAllowedHost(hostname: string): boolean {
+    return this.allowlist.some(entry => this.matchPattern(entry.pattern, hostname.toLowerCase()));
+  }
+
+  private countSocketsForApp(appId: string): number {
+    let count = 0;
+    for (const record of this.sockets.values()) {
+      if (record.appId === appId) count++;
+    }
+    return count;
   }
 
   /**

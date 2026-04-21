@@ -39,6 +39,13 @@ interface IRuntime {
      * 用於執行 html-view 插件從 <script> 標籤中提取的腳本。
      */
     dispatchHtmlViewScript(processAppId: string, code: string): RuntimeResult<unknown>;
+
+    /**
+     * 在指定程序的沙箱中呼叫任意全域 handler 函式。
+     * 用於 WebSocket 等非同步事件回呼，將事件推送到沙箱。
+     * 若程序不存在或 handler 未定義，靜默回傳錯誤。
+     */
+    dispatchCustomEvent(processAppId: string, handlerName: string, arg: unknown): RuntimeResult<unknown>;
 }
 
 export type { IRuntime };

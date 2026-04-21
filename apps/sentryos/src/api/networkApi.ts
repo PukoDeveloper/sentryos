@@ -5,6 +5,9 @@ import { Permissions } from '../kernel/constants';
 const NETWORK_SETTINGS_KEY = 'network-settings';
 const NETWORK_TIER = 'sys' as const;
 
+/** Counter for generating unique socket IDs within a process. */
+let socketIdCounter = 0;
+
 export function registerNetworkApi(kernel: Kernel): void {
   const runtimeRegistry = kernel.resolve('runtimeRegistry');
   const permissions = kernel.resolve('permissions');
@@ -149,6 +152,102 @@ export function registerNetworkApi(kernel: Kernel): void {
       networkManager.setEnabled(!!enabled);
       persistNetworkState();
       return { success: true, data: null };
+    },
+
+    // ── WebSocket ─────────────────────────────────────────────
+
+    /**
+     * 建立 WebSocket 連線。
+     * @param url         WebSocket 伺服器網址（ws:// 或 wss://）
+     * @param handlerName 沙箱中接收 WebSocket 事件的全域函式名稱
+     * @returns { success, data: socketId } 或錯誤
+     *
+     * 沙箱範例：
+     *   function onWsEvent(e) {
+     *     if (e.type === 'message') OS.console.log(e.data);
+     *   }
+     *   const r = OS.network.wsConnect('wss://echo.example.com', 'onWsEvent');
+     *   if (r.success) OS.network.wsSend(r.data, 'hello');
+     */
+    wsConnect: (url: unknown, handlerName: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_WEBSOCKET)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof url !== 'string') {
+        return { success: false, error: 'InvalidUrl' };
+      }
+      if (typeof handlerName !== 'string' || !handlerName) {
+        return { success: false, error: 'UnknownError' };
+      }
+
+      const socketId = `ws_${++socketIdCounter}`;
+      const processAppId = process.processAppId;
+
+      const result = networkManager.wsConnect(
+        processAppId,
+        socketId,
+        url,
+        (event) => {
+          // Push the WebSocket event into the sandboxed process.
+          const runtime = runtimeRegistry.getForProcessAppId(processAppId);
+          runtime.dispatchCustomEvent(processAppId, handlerName, event);
+        },
+      );
+
+      return result;
+    },
+
+    /**
+     * 透過已開啟的 WebSocket 連線傳送文字訊息。
+     * @param socketId 由 wsConnect 回傳的 socketId
+     * @param data     要傳送的文字字串
+     */
+    wsSend: (socketId: unknown, data: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_WEBSOCKET)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof socketId !== 'string') return { success: false, error: 'NotFound' };
+      if (typeof data !== 'string') return { success: false, error: 'UnknownError' };
+      return networkManager.wsSend(process.processAppId, socketId, data);
+    },
+
+    /**
+     * 關閉指定的 WebSocket 連線。
+     * @param socketId 由 wsConnect 回傳的 socketId
+     * @param code     選填關閉狀態碼（RFC 6455，例如 1000 = 正常關閉）
+     * @param reason   選填關閉原因字串（最多 123 位元組）
+     */
+    wsClose: (socketId: unknown, code?: unknown, reason?: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_WEBSOCKET)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof socketId !== 'string') return { success: false, error: 'NotFound' };
+      const closeCode = typeof code === 'number' ? code : undefined;
+      const closeReason = typeof reason === 'string' ? reason : undefined;
+      return networkManager.wsClose(process.processAppId, socketId, closeCode, closeReason);
+    },
+
+    /**
+     * 取得指定 WebSocket 連線的狀態快照。
+     * @param socketId 由 wsConnect 回傳的 socketId
+     * @returns { socketId, url, readyState } 其中 readyState: 0=CONNECTING 1=OPEN 2=CLOSING 3=CLOSED
+     */
+    wsGetStatus: (socketId: unknown) => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_WEBSOCKET)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof socketId !== 'string') return { success: false, error: 'NotFound' };
+      return networkManager.wsGetStatus(process.processAppId, socketId);
+    },
+
+    /**
+     * 列出此程序目前所有 WebSocket 連線的狀態。
+     */
+    wsListConnections: () => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_WEBSOCKET)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      return networkManager.wsListConnections(process.processAppId);
     },
   }), ['network'], 'network');
 }
