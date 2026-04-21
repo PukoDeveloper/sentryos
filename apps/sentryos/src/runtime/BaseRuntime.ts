@@ -117,6 +117,14 @@ abstract class BaseRuntime implements IRuntime {
         return this.dispatchToHandler(processAppId, 'onDialogResult', result);
     }
 
+    dispatchHtmlViewScript(processAppId: string, code: string): RuntimeResult<unknown> {
+        const proc = this.processManager.getByProcessAppId(processAppId);
+        if (proc && proc.status === 'running' && this.processStates.has(proc.pid)) {
+            return this.evaluateInContext(proc.pid, code);
+        }
+        return { success: false, error: 'ProcessNotFound' };
+    }
+
     // ── 內建 API 註冊 ───────────────────────────────────────
 
     private registerBuiltinApis(): void {

@@ -22,6 +22,8 @@ export interface RenderContext {
      * 呼叫 dispatch(extraFields?) 即可觸發 UI event。
      */
     bindEvent(controlId: string | undefined, type: string): (extra?: Partial<WindowUiEvent>) => void;
+    /** 將從 html-view 的 <script> 提取到的程式碼派送至沙箱 Runtime 執行 */
+    dispatchScript(code: string): void;
     /** 註冊 node 到 nodeMap */
     registerNode(nodeId: string | undefined, element: HTMLElement): void;
     /** 套用 style 物件到 HTMLElement */
