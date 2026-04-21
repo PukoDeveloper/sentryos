@@ -10,7 +10,10 @@ type WindowControlType =
     | 'image' | 'separator' | 'progress' | 'list'
     | 'html-view' | 'video';
 
-type WindowUiEventType = 'click' | 'change' | 'submit' | 'dblclick' | 'contextmenu' | 'contextmenu-select' | 'play' | 'pause' | 'ended';
+type WindowUiEventType =
+    | 'click' | 'change' | 'submit' | 'dblclick'
+    | 'contextmenu' | 'contextmenu-select'
+    | 'play' | 'pause' | 'ended';
 
 interface ContextMenuItem {
     id: string;

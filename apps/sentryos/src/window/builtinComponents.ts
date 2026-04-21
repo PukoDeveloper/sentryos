@@ -431,7 +431,7 @@ const videoRenderer: UiComponentRenderer = {
         video.src = n.src;
         if (n.poster) video.poster = n.poster;
         video.autoplay = n.autoplay === true;
-        video.controls = n.controls !== false;
+        video.controls = n.controls ?? true;
         video.loop = n.loop === true;
         video.muted = n.muted === true;
         ctx.applyStyle(video, n.style);
