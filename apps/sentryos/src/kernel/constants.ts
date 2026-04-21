@@ -18,6 +18,7 @@ export const Z_INDEX_ERROR_SCREEN = 10000;
 
 // ── Timing ──────────────────────────────────────────────────
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 300;
+export const MAX_EXTENDED_TIMEOUT_MS = 30_000;
 export const CLOCK_UPDATE_INTERVAL_MS = 1000;
 
 // ── Console Defaults ────────────────────────────────────────

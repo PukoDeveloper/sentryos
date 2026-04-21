@@ -16,6 +16,14 @@ interface IRuntime {
     destroyProcessRuntime(pid: number): void;
     destroyAll(): void;
 
+    // ── 執行逾時管理 ────────────────────────────────────────
+    /**
+     * 設定指定 PID 程序的自訂執行逾時（毫秒）。
+     * 傳入 `undefined` 可重設為系統預設值。
+     * 僅在程序存在時生效；若程序尚未建立則靜默忽略。
+     */
+    setProcessTimeout(pid: number, timeoutMs: number | undefined): void;
+
     // ── 記憶體使用量 ────────────────────────────────────────
     /** 回傳此 Runtime 引擎的記憶體使用量估算。 */
     getMemoryUsage(): RuntimeMemoryUsage;

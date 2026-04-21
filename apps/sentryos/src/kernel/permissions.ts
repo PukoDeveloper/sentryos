@@ -86,6 +86,9 @@ export const Permissions = {
 
   // Audio
   AUDIO_PLAY: 'audio.play',
+
+  // Runtime
+  RUNTIME_EXTENDED_TIMEOUT: 'runtime.extended-timeout',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
