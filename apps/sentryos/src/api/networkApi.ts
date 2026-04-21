@@ -1,4 +1,5 @@
 import type { Kernel } from '../kernel/Kernel';
+import type { HttpMethod } from '../network/NetworkAdapter';
 import { Permissions } from '../kernel/constants';
 
 const NETWORK_SETTINGS_KEY = 'network-settings';
@@ -19,6 +20,34 @@ export function registerNetworkApi(kernel: Kernel): void {
   }
 
   runtimeRegistry.registerApi('networkApi', ({ process }) => ({
+    // ── Request (async) ──────────────────────────────────────
+    // 非同步 HTTP 請求，使用 fetch() 進行真正的非同步 I/O。
+    // 沙箱程式碼可使用 `await OS.network.requestAsync(url, options)` 呼叫。
+    requestAsync: async (url: unknown, options?: Record<string, unknown>) => {
+      if (!permissions.has(process.processAppId, Permissions.NETWORK_REQUEST)) {
+        return { success: false, error: 'PermissionDenied' };
+      }
+      if (typeof url !== 'string') {
+        return { success: false, error: 'InvalidUrl' };
+      }
+      const method = typeof options?.method === 'string' ? options.method.toUpperCase() : 'GET';
+      const headers: Record<string, string> = {};
+      if (options?.headers && typeof options.headers === 'object') {
+        for (const [k, v] of Object.entries(options.headers as Record<string, unknown>)) {
+          if (typeof v === 'string') headers[k] = v;
+        }
+      }
+      const body = method !== 'GET' && method !== 'HEAD' && typeof options?.body === 'string'
+        ? options.body
+        : undefined;
+      return networkManager.request(process.processAppId, {
+        url,
+        method: method as HttpMethod,
+        headers,
+        body,
+      });
+    },
+
     // ── Request ──────────────────────────────────────────────
     // QuickJS runs in a synchronous context and cannot await a Promise.
     // We perform the HTTP request via synchronous XMLHttpRequest so the result

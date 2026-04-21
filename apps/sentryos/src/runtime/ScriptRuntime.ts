@@ -247,7 +247,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
         const surface = this.buildApiSurface(process);
 
         for (const [name, value] of Object.entries(surface)) {
-            const handle = this.toHandle(context, value);
+            const handle = this.toHandle(context, value, process.pid);
             context.setProp(osApi, name, handle);
             handle.dispose();
         }
@@ -575,7 +575,14 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
     // ── 型別轉換（JS 值 → QuickJS Handle）──────────────────
 
-    private toHandle(context: QuickJSContext, value: HostApiValue): QuickJSHandle {
+    /**
+     * 將 Host 端的值轉換為 QuickJS Handle。
+     * 若 `value` 是 function 且呼叫後回傳 Promise，
+     * 則自動建立 QuickJSDeferredPromise 橋接非同步結果，
+     * 讓沙箱程式碼可以直接使用 `await OS.<api>.<method>()` 語法。
+     * @param pid 可選的 PID，用於在 Promise 結算前檢查程序是否仍存活。
+     */
+    private toHandle(context: QuickJSContext, value: HostApiValue, pid?: number): QuickJSHandle {
         if (value === null) return context.null;
         if (value === undefined) return context.undefined;
         if (typeof value === 'boolean') return value ? context.true : context.false;
@@ -586,14 +593,44 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             return context.newFunction('hostApiFn', (...args: any[]) => {
                 const jsArgs = args.map((arg) => context.dump(arg));
                 const out = (value as HostApiFunction)(...jsArgs);
-                return this.toHandle(context, this.normalizeReturnValue(out));
+
+                // 非同步橋接：若 Host API 回傳 Promise，建立 QuickJS DeferredPromise
+                // 並在 Promise 結算後呼叫 executePendingJobs() 驅動沙箱微任務隊列。
+                if (out instanceof Promise) {
+                    const deferred = context.newPromise();
+                    out.then((resolved) => {
+                        // 若程序已銷毀則放棄（QuickJS context 已被 dispose）
+                        if (pid !== undefined && !this.processStates.has(pid)) return;
+                        try {
+                            const handle = this.toHandle(context, this.normalizeReturnValue(resolved), pid);
+                            deferred.resolve(handle);
+                            handle.dispose();
+                            context.runtime.executePendingJobs();
+                        } catch { /* context may already be disposed */ }
+                    }).catch((err: unknown) => {
+                        if (pid !== undefined && !this.processStates.has(pid)) return;
+                        try {
+                            const errMsg = err instanceof Error ? err.message : String(err);
+                            const errHandle = context.newString(errMsg);
+                            deferred.reject(errHandle);
+                            errHandle.dispose();
+                            context.runtime.executePendingJobs();
+                        } catch { /* context may already be disposed */ }
+                    });
+                    // 根據 QuickJSDeferredPromise 文件：從 VmFunctionImplementation 回傳
+                    // deferred.handle 時，QuickJS 接管該 handle 的生命週期，
+                    // 無需額外呼叫 handle.dispose()；只需確保 resolve/reject 之一會被呼叫。
+                    return deferred.handle;
+                }
+
+                return this.toHandle(context, this.normalizeReturnValue(out), pid);
             });
         }
 
         if (Array.isArray(value)) {
             const arr = context.newArray();
             value.forEach((item, index) => {
-                const itemHandle = this.toHandle(context, item);
+                const itemHandle = this.toHandle(context, item, pid);
                 context.setProp(arr, index, itemHandle);
                 itemHandle.dispose();
             });
@@ -602,7 +639,7 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
         const obj = context.newObject();
         for (const [k, v] of Object.entries(value)) {
-            const child = this.toHandle(context, v as HostApiValue);
+            const child = this.toHandle(context, v as HostApiValue, pid);
             context.setProp(obj, k, child);
             child.dispose();
         }

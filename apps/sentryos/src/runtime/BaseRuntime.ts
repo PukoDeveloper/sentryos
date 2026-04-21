@@ -248,9 +248,26 @@ abstract class BaseRuntime implements IRuntime {
                 wrapped[key] = ((...args: unknown[]) => {
                     const start = performance.now();
                     const result = originalFn(...args);
-                    const duration = performance.now() - start;
-                    const success = result != null && typeof result === 'object' && 'success' in result ? !!(result as Record<string, unknown>).success : true;
-                    monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);
+                    // 非同步 API：在 Promise 結算後記錄耗時與成功狀態
+                    if (result instanceof Promise) {
+                        result.then(
+                            (resolved) => {
+                                const duration = performance.now() - start;
+                                const success = resolved != null && typeof resolved === 'object' && 'success' in resolved
+                                    ? !!(resolved as Record<string, unknown>).success
+                                    : true;
+                                monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);
+                            },
+                            () => {
+                                const duration = performance.now() - start;
+                                monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, false);
+                            }
+                        );
+                    } else {
+                        const duration = performance.now() - start;
+                        const success = result != null && typeof result === 'object' && 'success' in result ? !!(result as Record<string, unknown>).success : true;
+                        monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);
+                    }
                     return result;
                 }) as HostApiFunction;
             } else {
