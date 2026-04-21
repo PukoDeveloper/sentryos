@@ -1476,12 +1476,15 @@ class DesktopShell {
     }
   }
 
-  private updateClock(): void {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString(this.locale, {
+  private formatCurrentTime(): string {
+    return new Date().toLocaleTimeString(this.locale, {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  private updateClock(): void {
+    const timeStr = this.formatCurrentTime();
     if (this.clockLabel) {
       this.clockLabel.textContent = timeStr;
     }
@@ -1546,7 +1549,7 @@ class DesktopShell {
 
     const infoClock = document.createElement('div');
     infoClock.className = 'mobile-info-clock';
-    infoClock.textContent = new Date().toLocaleTimeString(this.locale, { hour: '2-digit', minute: '2-digit' });
+    infoClock.textContent = this.formatCurrentTime();
 
     const notifIndicator = document.createElement('div');
     notifIndicator.className = 'mobile-info-notif';
