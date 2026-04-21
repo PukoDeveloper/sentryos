@@ -618,8 +618,10 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
                         } catch { /* context may already be disposed */ }
                     });
                     // 根據 QuickJSDeferredPromise 文件：從 VmFunctionImplementation 回傳
-                    // deferred.handle 時，QuickJS 接管該 handle 的生命週期，
-                    // 無需額外呼叫 handle.dispose()；只需確保 resolve/reject 之一會被呼叫。
+                    // deferred.handle 時，QuickJS 接管該 handle 的生命週期，無需額外呼叫
+                    // handle.dispose()。若程序在 Promise 結算前被銷毀，回呼會提前返回而不
+                    // 呼叫 resolve/reject；此時整個 QuickJS context 已被 dispose，所有相關
+                    // handle 的記憶體均由 QuickJS 統一釋放，不會造成洩漏。
                     return deferred.handle;
                 }
 

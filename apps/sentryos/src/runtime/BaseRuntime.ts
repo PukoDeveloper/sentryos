@@ -258,7 +258,7 @@ abstract class BaseRuntime implements IRuntime {
                                     : true;
                                 monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, success);
                             },
-                            () => {
+                            (_err: unknown) => {
                                 const duration = performance.now() - start;
                                 monitor.recordApiCall(apiName, key, process.processAppId, process.pid, duration, false);
                             }
