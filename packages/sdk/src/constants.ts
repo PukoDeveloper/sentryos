@@ -64,6 +64,8 @@ export const Permissions = {
   CLIPBOARD_WRITE: 'clipboard.write',
 
   AUDIO_PLAY: 'audio.play',
+
+  RUNTIME_EXTENDED_TIMEOUT: 'runtime.extended-timeout',
 } as const;
 
 export const Events = {

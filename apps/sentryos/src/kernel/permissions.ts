@@ -86,6 +86,9 @@ export const Permissions = {
 
   // Audio
   AUDIO_PLAY: 'audio.play',
+
+  // Runtime
+  RUNTIME_EXTENDED_TIMEOUT: 'runtime.extended-timeout',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
@@ -96,6 +99,7 @@ export const Events = {
   CONSOLE_INPUT: 'console.input',
   PROCESS_STARTED: 'process.started',
   PROCESS_STOPPED: 'process.stopped',
+  PROCESS_INBOX_NEAR_FULL: 'process.inbox.near-full',
   NOTIFICATION: 'notification',
   KEYBOARD: 'keyboard',
   LANGUAGE_CHANGED: 'language.changed',

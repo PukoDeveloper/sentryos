@@ -171,7 +171,7 @@ export class AllowlistNetworkManager implements NetworkAdapter {
    * Match a glob-like pattern against a hostname.
    * Supports:
    *  - exact match: "api.example.com"
-   *  - wildcard subdomain: "*.example.com"  (matches a.example.com, b.c.example.com)
+   *  - wildcard subdomain: "*.example.com"  (matches a.example.com, b.c.example.com, but NOT example.com itself)
    *  - full wildcard: "*" (matches everything)
    */
   private matchPattern(pattern: string, host: string): boolean {
@@ -179,7 +179,7 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     if (pattern === host) return true;
     if (pattern.startsWith('*.')) {
       const suffix = pattern.slice(1);  // ".example.com"
-      return host.endsWith(suffix) || host === pattern.slice(2);
+      return host.endsWith(suffix);
     }
     return false;
   }

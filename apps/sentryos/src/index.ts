@@ -20,3 +20,26 @@
 export { createSentryOS } from './bootstrap/systemBootstrap';
 export type { SentryOSOptions, SentryOSInstance } from './bootstrap/systemBootstrap';
 export type { PluginModule } from './plugin/PluginManager';
+
+// ── Filesystem ────────────────────────────────────────────────────────────────
+// Re-exported so that host applications can implement a custom FileSystemAdapter
+// and pass it to `createSentryOS({ fileSystem: (kernel) => new MyAdapter(kernel) })`.
+export { WebFileSystemAdapter } from './storage/FileSystem';
+export type {
+  FileSystemAdapter,
+  FileSystemOptions,
+  StorageTier,
+  StorageData,
+  StorageRecord,
+  StorageEntry,
+  StorageError,
+  StorageResult,
+  StorageUsage,
+  WriteOptions,
+} from './storage/FileSystem';
+
+// ── Kernel ────────────────────────────────────────────────────────────────────
+// Exported so that host applications can type factory parameters, e.g.
+//   fileSystem: (kernel: Kernel) => FileSystemAdapter
+export { Kernel } from './kernel/Kernel';
+export type { ServiceMap, ValueMap } from './kernel/Kernel';

@@ -199,6 +199,47 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
 
     // ── API 注入 / 編排 ──────────────────────────────────────
 
+    /**
+     * 覆寫 BaseRuntime 的字串注入實作，使用 QuickJS 原生函式呼叫。
+     * 直接查找沙箱中的全域函式並以 `callFunction` 呼叫，
+     * 避免動態組裝程式碼字串，提升效能與穩定性。
+     */
+    protected override invokeHandler(pid: number, handlerName: string, arg: unknown): RuntimeResult<unknown> {
+        const runtimeProcess = this.processStates.get(pid) as RuntimeProcess | undefined;
+        if (!runtimeProcess) return { success: false, error: 'ProcessNotFound' };
+
+        const timeoutMs = runtimeProcess.customTimeoutMs ?? DEFAULT_EXECUTION_TIMEOUT_MS;
+        // QuickJS interrupt handler is deadline-based: a fresh absolute deadline
+        // must be computed from the current wall-clock time for every invocation.
+        runtimeProcess.runtime.setInterruptHandler(
+            shouldInterruptAfterDeadline(Date.now() + timeoutMs)
+        );
+
+        const ctx = runtimeProcess.context;
+        const global = ctx.global;
+        const handlerHandle = ctx.getProp(global, handlerName);
+        global.dispose();
+
+        if (ctx.typeof(handlerHandle) !== 'function') {
+            handlerHandle.dispose();
+            return { success: true, data: undefined };
+        }
+
+        const argHandle = this.toHandle(ctx, this.normalizeReturnValue(arg));
+        const result = ctx.callFunction(handlerHandle, ctx.undefined, argHandle);
+        handlerHandle.dispose();
+        argHandle.dispose();
+
+        if (result.error) {
+            const err = ctx.dump(result.error);
+            result.error.dispose();
+            return { success: false, error: 'RuntimeError', data: err };
+        }
+        const value = ctx.dump(result.value);
+        result.value.dispose();
+        return { success: true, data: value };
+    }
+
     private injectApis(context: QuickJSContext, process: ProcessView): void {
         const runtimeProcess = this.processStates.get(process.pid) as RuntimeProcess | undefined;
         const global = context.global;

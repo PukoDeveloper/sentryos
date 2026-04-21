@@ -103,7 +103,7 @@ function cloneStorageData<TData extends StorageData>(value: TData): TData {
 }
 
 function isValidKey(key: string): boolean {
-	return key.trim().length > 0 && !key.includes('..');
+	return /^[\w\-.:]+$/.test(key) && !key.includes('..');
 }
 
 const textEncoder = new TextEncoder();
@@ -449,7 +449,9 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			const tierMap = this.storage.get(tier)!;
 			const entries = Array.from(tierMap.values());
 			localStorage.setItem(`${this.persistenceKey}:${tier}`, JSON.stringify(entries));
-		} catch { /* quota exceeded or unavailable — silently skip */ }
+		} catch {
+			console.warn(`[FileSystem] Failed to persist tier '${tier}' to localStorage (quota exceeded or storage unavailable). Data may be lost on page reload.`);
+		}
 	}
 
 	private loadFromStorage(): void {
@@ -458,11 +460,24 @@ class WebFileSystemAdapter implements FileSystemAdapter {
 			try {
 				const raw = localStorage.getItem(`${this.persistenceKey}:${tier}`);
 				if (!raw) continue;
-				const entries: StorageEntry[] = JSON.parse(raw);
+				const parsed: unknown = JSON.parse(raw);
+				if (!Array.isArray(parsed)) continue;
 				const tierMap = this.storage.get(tier)!;
-				for (const entry of entries) {
-					tierMap.set(entry.key, entry);
-					const entrySize = calculateEntryByteSize(entry);
+				for (const entry of parsed) {
+					if (
+						entry === null ||
+						typeof entry !== 'object' ||
+						typeof entry.key !== 'string' ||
+						!STORAGE_TIERS.includes(entry.tier as StorageTier) ||
+						typeof entry.ownerAppId !== 'string' ||
+						typeof entry.createdAt !== 'number' ||
+						typeof entry.updatedAt !== 'number'
+					) {
+						continue;
+					}
+					const validated = entry as StorageEntry;
+					tierMap.set(validated.key, validated);
+					const entrySize = calculateEntryByteSize(validated);
 					this.tierUsedBytes[tier] += entrySize;
 					this.totalUsedBytes += entrySize;
 				}

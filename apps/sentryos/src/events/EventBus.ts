@@ -14,6 +14,7 @@ class EventBus {
     // 依應用程式 ID 索引：appId -> [{event, listener}]
     private appListeners: Map<string, Array<{ event: string; listener: (...args: unknown[]) => void }>>;
     private readonly kernel: Kernel;
+    private static readonly MAX_LISTENERS_PER_EVENT = 256;
 
     constructor(kernel: Kernel) {
         this.eventListeners = new Map();
@@ -27,6 +28,10 @@ class EventBus {
     on(appId: string, event: string, listener: (...args: unknown[]) => void): EventBusResult {
         if (!this.permissions.has(appId, Permissions.eventSubscribe(event))) {
             return { success: false, error: 'PermissionDenied' };
+        }
+        const entries = this.eventListeners.get(event) ?? [];
+        if (entries.length >= EventBus.MAX_LISTENERS_PER_EVENT) {
+            return { success: false, error: 'MaxListenersReached' };
         }
         const entry: ListenerEntry = { appId, listener };
         if (!this.eventListeners.has(event)) {
@@ -44,9 +49,8 @@ class EventBus {
 
 
     off(appId: string, event: string, listener: (...args: unknown[]) => void): EventBusResult {
-        if (!this.permissions.has(appId, Permissions.eventSubscribe(event))) {
-            return { success: false, error: 'PermissionDenied' };
-        }
+        // No permission check: an app must always be able to remove its own listeners,
+        // even if the eventSubscribe permission was revoked after subscription.
 
         const entries = this.eventListeners.get(event);
         if (entries) {

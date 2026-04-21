@@ -18,13 +18,13 @@ function matchesPermission(granted: Permission, required: Permission): boolean {
 }
 
 class PermissionsManager {
-    private appPermissions: { [appId: string]: Set<string> };
+    private appPermissions: Map<string, Set<string>>;
     private inited = false;
     private readonly kernel: Kernel;
     private idCounter = 0;
     constructor(kernel: Kernel) {
         this.kernel = kernel;
-        this.appPermissions = {};
+        this.appPermissions = new Map();
     }
 
     /** 產生唯一 ID，結合時間戳與遞增計數器避免碰撞 */
@@ -32,17 +32,17 @@ class PermissionsManager {
         let id: string;
         do {
             id = `${prefix}${Date.now()}_${this.idCounter++}`;
-        } while (this.appPermissions[id] !== undefined);
+        } while (this.appPermissions.has(id));
         return id;
     }
 
     private get monitor() { return this.kernel.has('systemMonitor') ? this.kernel.resolve('systemMonitor') : null; }
     init(): PermissionResult {
-        if (this.inited) return { success: false, error: 'UnknownError' };
+        if (this.inited) return { success: false, error: 'AlreadyInitialized' };
         // Load permissions from storage or initialize defaults
         this.inited = true;
         const systemAppId = this.generateId(ID_PREFIX_SYSTEM);
-        this.appPermissions[systemAppId] = new Set([Permissions.WILDCARD]);
+        this.appPermissions.set(systemAppId, new Set([Permissions.WILDCARD]));
         return { success: true, data: systemAppId };
     }
     /**
@@ -57,7 +57,7 @@ class PermissionsManager {
             return { success: false, error: 'PermissionDenied' };
         }
         const userAppId = this.generateId(ID_PREFIX_USER);
-        this.appPermissions[userAppId] = new Set(permissions);
+        this.appPermissions.set(userAppId, new Set(permissions));
         return { success: true, data: userAppId };
     }
     new(fromAppId: string, permissions: string[]): PermissionResult {
@@ -70,11 +70,11 @@ class PermissionsManager {
         const newAppId = this.generateId(ID_PREFIX_APP_INSTANCE);
         // 使用 has() 做萬用字元匹配，確保父應用持有 * 時子應用能繼承具體權限
         const allowedPermissions = permissions.filter(p => this.has(fromAppId, p));
-        this.appPermissions[newAppId] = new Set(allowedPermissions);
+        this.appPermissions.set(newAppId, new Set(allowedPermissions));
         return { success: true, data: newAppId };
     }
     has(appId: string, permission: string): boolean {
-        const perms = this.appPermissions[appId];
+        const perms = this.appPermissions.get(appId);
         let granted = false;
         if (perms) {
             for (const p of perms) {
@@ -95,19 +95,31 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        if (this.appPermissions[appId]) {
+        if (this.appPermissions.has(appId)) {
             return { success: false, error: 'UnknownError' };
         }
         const allowedPermissions = permissions.filter(p => this.has(fromAppId, p));
-        this.appPermissions[appId] = new Set(allowedPermissions);
+        this.appPermissions.set(appId, new Set(allowedPermissions));
         return { success: true, data: appId };
     }
     /** 檢查應用程式是否持有指定命名空間下的任一權限 */
     hasAnyUnder(appId: string, namespace: string): boolean {
-        const perms = this.appPermissions[appId];
+        const perms = this.appPermissions.get(appId);
         if (!perms) return false;
         const prefix = namespace + '.';
-        return Array.from(perms).some(p => p === '*' || p.startsWith(prefix) || p === namespace);
+        return Array.from(perms).some(p => {
+            if (p === '*') return true;
+            if (p === namespace) return true;
+            if (p.startsWith(prefix)) return true;
+            // 支援 'namespace.*' 及 'parent.*'（涵蓋子命名空間）等萬用字元權限
+            // 例：p='event.*' 能覆蓋 namespace='event'
+            //     p='event.*' 不能覆蓋 namespace='other'
+            if (p.endsWith('.*')) {
+                const wildcardPrefix = p.slice(0, -2); // remove trailing '.*'
+                if (wildcardPrefix === namespace || namespace.startsWith(wildcardPrefix + '.')) return true;
+            }
+            return false;
+        });
     }
     grant(fromAppId: string, toAppId: string, permission: string): PermissionResult {
         if (!this.inited) {
@@ -116,13 +128,13 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        if (!this.appPermissions[toAppId]) {
+        if (!this.appPermissions.has(toAppId)) {
             return { success: false, error: 'UnknownError' };
         }
         if (!this.has(fromAppId, permission)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        this.appPermissions[toAppId].add(permission);
+        this.appPermissions.get(toAppId)!.add(permission);
         return { success: true };
     }
     revoke(fromAppId: string, toAppId: string, permission: string): PermissionResult {
@@ -132,10 +144,10 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        if (!this.appPermissions[toAppId]) {
+        if (!this.appPermissions.has(toAppId)) {
             return { success: false, error: 'UnknownError' };
         }
-        this.appPermissions[toAppId].delete(permission);
+        this.appPermissions.get(toAppId)!.delete(permission);
         return { success: true };
     }
     removeApp(fromAppId: string, targetAppId: string): PermissionResult {
@@ -145,7 +157,7 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.REMOVE_APP)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        delete this.appPermissions[targetAppId];
+        this.appPermissions.delete(targetAppId);
         return { success: true };
     }
     getPermissions(fromAppId: string, targetAppId: string): PermissionResult {
@@ -155,10 +167,10 @@ class PermissionsManager {
         if (!this.has(fromAppId, Permissions.MANAGE_PERMISSIONS)) {
             return { success: false, error: 'PermissionDenied' };
         }
-        if (!this.appPermissions[targetAppId]) {
+        if (!this.appPermissions.has(targetAppId)) {
             return { success: false, error: 'UnknownError' };
         }
-        return { success: true, data: Array.from(this.appPermissions[targetAppId]) };
+        return { success: true, data: Array.from(this.appPermissions.get(targetAppId)!) };
     }
 }
 

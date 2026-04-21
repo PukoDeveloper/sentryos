@@ -5,14 +5,14 @@ type Result<DataT, ErrorT> = {
     error?: ErrorT;
 }
 
-type EventBusError = 'PermissionDenied' | 'EventNotFound' | 'UnknownError';
+type EventBusError = 'PermissionDenied' | 'EventNotFound' | 'MaxListenersReached' | 'UnknownError';
 
 type EventBusResult = {
     success: boolean;
     error?: EventBusError;
 } & Result<any, EventBusError>;
 
-type PermissionError = 'PermissionDenied' | 'InvalidPermission' | 'NotInitialized' | 'UnknownError';
+type PermissionError = 'PermissionDenied' | 'InvalidPermission' | 'NotInitialized' | 'AlreadyInitialized' | 'UnknownError';
 
 type PermissionResult = {
     success: boolean;

@@ -53,6 +53,9 @@ type BaseProcessState = {
     eventSubscriptions: Map<string, (...args: unknown[]) => void>;
     /** 應用程式套件根目錄（用於模組路徑解析） */
     entryPath: string | null;
+    /** 應用程式透過 runtimeApi.setExecutionTimeout 請求的自訂執行逾時（毫秒）。
+     *  未設定時使用 DEFAULT_EXECUTION_TIMEOUT_MS。 */
+    customTimeoutMs?: number;
 };
 
 /** QuickJS 引擎的完整程序狀態（繼承自 BaseProcessState）。 */

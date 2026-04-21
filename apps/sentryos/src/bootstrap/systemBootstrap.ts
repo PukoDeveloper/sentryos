@@ -8,6 +8,7 @@ import { ProcessManager } from '../process/ProcessManager';
 import { loadApplicationCatalog, loadRemoteApplicationCatalog, normalizeCatalogEntry, type RegisteredApplication, type OsRejectedApp } from '../application/ApplicationCatalog';
 import { AppInstaller } from '../application/AppInstaller';
 import { WebFileSystemAdapter } from '../storage/FileSystem';
+import type { FileSystemAdapter } from '../storage/FileSystem';
 import { WindowManager } from '../window/WindowManager';
 import { EnvironmentManager } from '../environment/EnvironmentManager';
 import { DesktopShell } from '../ui/DesktopShell';
@@ -49,6 +50,27 @@ export interface SentryOSOptions {
    * These are resolved before any plugins listed in `plugins.json`.
    */
   pluginInstances?: PluginModule[];
+  /**
+   * Optional factory for creating the kernel's filesystem adapter.
+   *
+   * Called during kernel initialization with the partially-constructed `Kernel`.
+   * The following services are already registered at call time:
+   * `permissions`, `eventBus`, `appManager`, `processManager`, `runtime`,
+   * and `runtimeRegistry`.
+   * The returned adapter is registered as the `'fileSystem'` service.
+   *
+   * If omitted, the default {@link WebFileSystemAdapter} backed by
+   * `localStorage` is used.
+   *
+   * @example
+   * ```ts
+   * createSentryOS({
+   *   container,
+   *   fileSystem: (kernel) => new MyIndexedDbAdapter(kernel),
+   * });
+   * ```
+   */
+  fileSystem?: (kernel: Kernel) => FileSystemAdapter;
   /** Optional URL overrides for catalog / auth endpoints. */
   config?: {
     authConfigUrl?: string;
@@ -136,7 +158,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   // 1. Initialize kernel & core services
   let kernel: Kernel;
   try {
-    kernel = await initializeCore(bufferedLog);
+    kernel = await initializeCore(bufferedLog, options.fileSystem);
   } catch (err) {
     showSystemError('核心服務初始化失敗', err);
     container.removeEventListener('contextmenu', handleContextMenu);
@@ -528,7 +550,7 @@ function createShutdownOnlyInstance(
   };
 }
 
-async function initializeCore(bufferedLog: BufferedLog): Promise<Kernel> {
+async function initializeCore(bufferedLog: BufferedLog, fileSystemFactory?: (kernel: Kernel) => FileSystemAdapter): Promise<Kernel> {
   await initializeQuickJS();
   bufferedLog('BOOT', 'INFO', 'QuickJS WASM runtime loaded');
 
@@ -569,7 +591,7 @@ async function initializeCore(bufferedLog: BufferedLog): Promise<Kernel> {
   runtimeRegistry.register('quickjs', runtime);
   kernel.register('runtimeRegistry', runtimeRegistry);
 
-  const fileSystem = new WebFileSystemAdapter(kernel);
+  const fileSystem = fileSystemFactory ? fileSystemFactory(kernel) : new WebFileSystemAdapter(kernel);
   kernel.register('fileSystem', fileSystem);
 
   const environmentManager = new EnvironmentManager();

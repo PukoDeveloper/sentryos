@@ -26,6 +26,13 @@ export class AuthProvider {
   private readonly envManager: EnvironmentManager;
   private readonly networkManager: NetworkAdapter;
 
+  /** Remote auth rate-limiting state */
+  private remoteFailureCount = 0;
+  private remoteLockedUntil = 0;
+  private static readonly MAX_REMOTE_FAILURES = 5;
+  private static readonly BASE_LOCKOUT_MS = 1000;
+  private static readonly MAX_LOCKOUT_MS = 60 * 60 * 1000; // 1 hour
+
   constructor(envManager: EnvironmentManager, networkManager: NetworkAdapter) {
     this.envManager = envManager;
     this.networkManager = networkManager;
@@ -95,6 +102,11 @@ export class AuthProvider {
   }
 
   private async remoteAuthenticate(username: string, password: string): Promise<AuthResult> {
+    const now = Date.now();
+    if (now < this.remoteLockedUntil) {
+      return { success: false, error: 'InvalidCredentials' };
+    }
+
     const endpoint = this.authEndpoint!;
 
     // Ensure the endpoint hostname is in the network allowlist
@@ -120,6 +132,14 @@ export class AuthProvider {
 
     // Treat any non-2xx response as invalid credentials (no info leakage)
     if (status < 200 || status >= 300) {
+      this.remoteFailureCount++;
+      if (this.remoteFailureCount >= AuthProvider.MAX_REMOTE_FAILURES) {
+        const lockoutMs = Math.min(
+          AuthProvider.BASE_LOCKOUT_MS * Math.pow(2, this.remoteFailureCount - AuthProvider.MAX_REMOTE_FAILURES),
+          AuthProvider.MAX_LOCKOUT_MS
+        );
+        this.remoteLockedUntil = Date.now() + lockoutMs;
+      }
       return { success: false, error: 'InvalidCredentials' };
     }
 
@@ -132,6 +152,8 @@ export class AuthProvider {
         typeof (data as Record<string, unknown>).userkey === 'string'
       ) {
         const userKey = (data as Record<string, string>).userkey;
+        this.remoteFailureCount = 0;
+        this.remoteLockedUntil = 0;
         return { success: true, data: { username, userKey } };
       }
       return { success: false, error: 'ServerError' };

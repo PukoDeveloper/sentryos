@@ -58,6 +58,21 @@ abstract class BaseRuntime implements IRuntime {
     abstract destroyAll(): void;
     abstract getMemoryUsage(): RuntimeMemoryUsage;
 
+    // ── IRuntime: 執行逾時管理 ──────────────────────────────
+
+    /** 設定指定 PID 程序的自訂執行逾時（毫秒）。傳入 undefined 重設為預設值。 */
+    setProcessTimeout(pid: number, timeoutMs: number | undefined): void {
+        const state = this.processStates.get(pid);
+        if (state) {
+            state.customTimeoutMs = timeoutMs;
+        }
+    }
+
+    /** 取得指定 PID 程序的有效執行逾時（毫秒）。 */
+    protected getProcessTimeout(pid: number): number {
+        return this.processStates.get(pid)?.customTimeoutMs ?? DEFAULT_EXECUTION_TIMEOUT_MS;
+    }
+
     // ── IRuntime: 事件派發 ──────────────────────────────────
 
     /**
@@ -70,7 +85,7 @@ abstract class BaseRuntime implements IRuntime {
         const safePayload = JSON.stringify(arg);
         const safeHandler = JSON.stringify(handlerName);
         const code = `(function(){var _h=${safeHandler};if(typeof globalThis[_h]==='function'){return globalThis[_h](${safePayload})}})()`;
-        return this.execute(pid, code, DEFAULT_EXECUTION_TIMEOUT_MS);
+        return this.execute(pid, code, this.getProcessTimeout(pid));
     }
 
     /** 在指定 processAppId 的執行中程序上呼叫 handler。 */
@@ -285,7 +300,7 @@ abstract class BaseRuntime implements IRuntime {
             try {
                 const safeChannel = JSON.stringify(eventName);
                 const safePayload = JSON.stringify(args[0] ?? null);
-                this.execute(pid, `if(typeof onEvent==='function'){onEvent(${safeChannel},${safePayload})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+                this.execute(pid, `if(typeof onEvent==='function'){onEvent(${safeChannel},${safePayload})}`, this.getProcessTimeout(pid));
             } catch (err) { console.warn('[Runtime] onEvent dispatch failed (runtime may be destroyed):', err); }
         };
 
@@ -344,6 +359,7 @@ abstract class BaseRuntime implements IRuntime {
 
     protected pushMessage(fromPid: number, toPid: number, channel: string, payload: unknown): RuntimeResult<boolean> {
         const MAX_INBOX_SIZE = 256;
+        const INBOX_WARN_THRESHOLD = Math.floor(MAX_INBOX_SIZE * 0.8);
         const targetProc = this.getProcess(toPid);
         if (!targetProc || targetProc.status !== 'running') {
             return { success: false, error: 'ProcessNotFound' };
@@ -368,10 +384,18 @@ abstract class BaseRuntime implements IRuntime {
         };
         targetState.inbox.push(message);
 
+        if (targetState.inbox.length === INBOX_WARN_THRESHOLD) {
+            this.eventBus.emit(targetProc.processAppId, Events.PROCESS_INBOX_NEAR_FULL, {
+                pid: toPid,
+                inboxSize: targetState.inbox.length,
+                maxInboxSize: MAX_INBOX_SIZE,
+            });
+        }
+
         // 自動呼叫目標程序的 onMessage 回呼（若存在）
         try {
             const safeMsg = JSON.stringify({ fromPid: message.fromPid, channel: message.channel, payload: message.payload, timestamp: message.timestamp });
-            this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, DEFAULT_EXECUTION_TIMEOUT_MS);
+            this.execute(toPid, `if(typeof onMessage==='function'){onMessage(${safeMsg})}`, this.getProcessTimeout(toPid));
         } catch (err) {
             // JSON.stringify may fail on circular references; log and continue
             console.warn('[Runtime] onMessage dispatch failed:', err);
