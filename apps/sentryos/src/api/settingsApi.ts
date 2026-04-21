@@ -74,7 +74,7 @@ export function registerSettingsApi(kernel: Kernel): void {
   /** Strip taskbar-related settings when in mobile mode where the taskbar is not used. */
   function stripTaskbarSettingsInMobileMode(theme: ThemeSettings): ThemeSettings {
     if (desktopShell.getShellMode() !== 'mobile') return theme;
-    const { taskbarMode: _taskbarMode, taskbarOpacity: _taskbarOpacity, ...rest } = theme;
+    const { taskbarMode: _m, taskbarOpacity: _o, ...rest } = theme;
     return rest;
   }
 
