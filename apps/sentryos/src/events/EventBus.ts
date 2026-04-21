@@ -31,7 +31,7 @@ class EventBus {
         }
         const entries = this.eventListeners.get(event) ?? [];
         if (entries.length >= EventBus.MAX_LISTENERS_PER_EVENT) {
-            return { success: false, error: 'UnknownError' };
+            return { success: false, error: 'MaxListenersReached' };
         }
         const entry: ListenerEntry = { appId, listener };
         if (!this.eventListeners.has(event)) {

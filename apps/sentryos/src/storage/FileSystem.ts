@@ -103,7 +103,7 @@ function cloneStorageData<TData extends StorageData>(value: TData): TData {
 }
 
 function isValidKey(key: string): boolean {
-	return /^[\w\-.:]+$/.test(key);
+	return /^[\w\-.:]+$/.test(key) && !key.includes('..');
 }
 
 const textEncoder = new TextEncoder();

@@ -5,7 +5,7 @@ type Result<DataT, ErrorT> = {
     error?: ErrorT;
 }
 
-type EventBusError = 'PermissionDenied' | 'EventNotFound' | 'UnknownError';
+type EventBusError = 'PermissionDenied' | 'EventNotFound' | 'MaxListenersReached' | 'UnknownError';
 
 type EventBusResult = {
     success: boolean;

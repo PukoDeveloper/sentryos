@@ -111,8 +111,13 @@ class PermissionsManager {
             if (p === '*') return true;
             if (p === namespace) return true;
             if (p.startsWith(prefix)) return true;
-            // 支援 'namespace.*' 及 'namespace.sub.*' 等萬用字元格式
-            if (p.endsWith('.*') && (namespace + '.').startsWith(p.slice(0, -1))) return true;
+            // 支援 'namespace.*' 及 'parent.*'（涵蓋子命名空間）等萬用字元權限
+            // 例：p='event.*' 能覆蓋 namespace='event'
+            //     p='event.*' 不能覆蓋 namespace='other'
+            if (p.endsWith('.*')) {
+                const wildcardPrefix = p.slice(0, -2); // remove trailing '.*'
+                if (wildcardPrefix === namespace || namespace.startsWith(wildcardPrefix + '.')) return true;
+            }
             return false;
         });
     }
