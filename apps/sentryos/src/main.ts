@@ -2,13 +2,19 @@ import './style.css';
 import { createSentryOS } from './bootstrap/systemBootstrap';
 import { bios } from './ui/Bios';
 import htmlViewPlugin from 'sentryos-plugin-html-view';
+import monacoEditorPlugin from 'sentryos-plugin-monaco-editor';
+import luaRuntimePlugin from 'sentryos-plugin-lua-runtime';
 
 const container = document.getElementById('app');
 if (!container) {
   throw new Error('[BOOT] [CRITICAL] #app element not found — cannot mount SentryOS');
 }
 
-createSentryOS({ container, onRestart: () => location.reload(), pluginInstances: [htmlViewPlugin] }).catch((error) => {
+createSentryOS({
+  container,
+  onRestart: () => location.reload(),
+  pluginInstances: [htmlViewPlugin, monacoEditorPlugin, luaRuntimePlugin],
+}).catch((error) => {
   console.error('[BOOT] [CRITICAL] Fatal boot error', error);
   const details = error instanceof Error
     ? [`${error.message}`, ...(error.stack?.split('\n').slice(1, 6).map((l: string) => `  ${l.trim()}`) ?? [])]
