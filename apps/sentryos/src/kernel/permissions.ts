@@ -71,6 +71,7 @@ export const Permissions = {
   NETWORK_REQUEST: 'network.request',
   NETWORK_STATUS: 'network.status',
   NETWORK_MANAGE: 'network.manage',
+  NETWORK_WEBSOCKET: 'network.websocket',
 
   // Registry
   REGISTRY_READ: 'registry.read',

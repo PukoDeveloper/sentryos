@@ -5,7 +5,26 @@ import type {
   NetworkResult,
   NetworkStatus,
   AllowlistEntry,
+  WebSocketResult,
+  WebSocketStatus,
+  WebSocketEventCallback,
 } from './NetworkAdapter';
+
+/** Maximum number of simultaneous WebSocket connections per process (appId). */
+const MAX_WS_PER_APP = 8;
+
+/** Composite key used to address a single socket: "<appId>:<socketId>" */
+function socketKey(appId: string, socketId: string): string {
+  return `${appId}:${socketId}`;
+}
+
+/** Internal record for a tracked WebSocket connection. */
+interface SocketRecord {
+  socket: WebSocket;
+  url: string;
+  appId: string;
+  socketId: string;
+}
 
 /**
  * Concrete NetworkAdapter that enforces a host/pattern allowlist.
@@ -16,6 +35,16 @@ export class AllowlistNetworkManager implements NetworkAdapter {
   private allowlist: AllowlistEntry[] = [];
   private totalRequests = 0;
   private blockedRequests = 0;
+
+  /** All live WebSocket connections keyed by "<appId>:<socketId>". */
+  private readonly sockets = new Map<string, SocketRecord>();
+  /**
+   * Secondary index for O(1) per-process operations (count / close-all).
+   * Maps appId → Set of composite socket keys.
+   */
+  private readonly appSockets = new Map<string, Set<string>>();
+  /** Per-process socket ID counters, cleaned up in wsCloseAllForApp. */
+  private readonly wsCounters = new Map<string, number>();
 
   // ── Enable / Disable ────────────────────────────────────────
 
@@ -157,6 +186,166 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     }
   }
 
+  // ── WebSocket ───────────────────────────────────────────────
+
+  wsConnect(
+    appId: string,
+    url: string,
+    callback: WebSocketEventCallback,
+  ): WebSocketResult<string> {
+    if (!this.enabled) {
+      return { success: false, error: 'Disabled' };
+    }
+
+    // Validate and normalise the URL
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return { success: false, error: 'InvalidUrl' };
+    }
+    if (parsedUrl.protocol !== 'ws:' && parsedUrl.protocol !== 'wss:') {
+      return { success: false, error: 'InvalidUrl' };
+    }
+
+    // Allowlist check uses the hostname (same policy as HTTP)
+    if (!this.isAllowedHost(parsedUrl.hostname)) {
+      return { success: false, error: 'NotAllowed' };
+    }
+
+    // Enforce per-process connection limit using the secondary index (O(1))
+    const appKeys = this.appSockets.get(appId);
+    if ((appKeys?.size ?? 0) >= MAX_WS_PER_APP) {
+      return { success: false, error: 'TooManyConnections' };
+    }
+
+    // Generate a socketId scoped to this process
+    const n = (this.wsCounters.get(appId) ?? 0) + 1;
+    this.wsCounters.set(appId, n);
+    const socketId = `ws_${n}`;
+    const key = socketKey(appId, socketId);
+
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return { success: false, error: 'ConnectionFailed' };
+    }
+
+    const record: SocketRecord = { socket: ws, url, appId, socketId };
+    this.sockets.set(key, record);
+
+    // Register in the secondary index
+    if (!this.appSockets.has(appId)) {
+      this.appSockets.set(appId, new Set());
+    }
+    this.appSockets.get(appId)!.add(key);
+
+    ws.addEventListener('open', () => {
+      callback({ socketId, type: 'open' });
+    });
+
+    ws.addEventListener('message', (ev: MessageEvent) => {
+      const data = typeof ev.data === 'string' ? ev.data : String(ev.data);
+      callback({ socketId, type: 'message', data });
+    });
+
+    ws.addEventListener('error', () => {
+      callback({ socketId, type: 'error' });
+    });
+
+    ws.addEventListener('close', (ev: CloseEvent) => {
+      this.removeSocket(appId, key);
+      callback({ socketId, type: 'close', code: ev.code, reason: ev.reason });
+    });
+
+    return { success: true, data: socketId };
+  }
+
+  wsSend(appId: string, socketId: string, data: string): WebSocketResult<null> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    if (record.socket.readyState !== WebSocket.OPEN) {
+      return { success: false, error: 'ConnectionFailed' };
+    }
+    try {
+      record.socket.send(data);
+      return { success: true, data: null };
+    } catch {
+      return { success: false, error: 'UnknownError' };
+    }
+  }
+
+  wsClose(appId: string, socketId: string, code?: number, reason?: string): WebSocketResult<null> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    try {
+      if (code !== undefined) {
+        record.socket.close(code, reason);
+      } else {
+        record.socket.close();
+      }
+      // The 'close' event handler will remove the record from both indexes.
+      return { success: true, data: null };
+    } catch {
+      return { success: false, error: 'UnknownError' };
+    }
+  }
+
+  wsCloseAllForApp(appId: string): void {
+    const keys = this.appSockets.get(appId);
+    if (!keys) return;
+    for (const key of Array.from(keys)) {
+      const record = this.sockets.get(key);
+      if (record) {
+        try {
+          record.socket.close();
+        } catch (err) {
+          console.warn(`[AllowlistNetworkManager] Failed to close socket '${record.socketId}' for app '${appId}':`, err);
+        }
+        this.sockets.delete(key);
+      }
+    }
+    this.appSockets.delete(appId);
+    this.wsCounters.delete(appId);
+  }
+
+  wsGetStatus(appId: string, socketId: string): WebSocketResult<WebSocketStatus> {
+    const record = this.sockets.get(socketKey(appId, socketId));
+    if (!record) {
+      return { success: false, error: 'NotFound' };
+    }
+    return {
+      success: true,
+      data: {
+        socketId,
+        url: record.url,
+        readyState: record.socket.readyState as 0 | 1 | 2 | 3,
+      },
+    };
+  }
+
+  wsListConnections(appId: string): WebSocketResult<WebSocketStatus[]> {
+    const keys = this.appSockets.get(appId);
+    if (!keys) return { success: true, data: [] };
+    const result: WebSocketStatus[] = [];
+    for (const key of keys) {
+      const record = this.sockets.get(key);
+      if (record) {
+        result.push({
+          socketId: record.socketId,
+          url: record.url,
+          readyState: record.socket.readyState as 0 | 1 | 2 | 3,
+        });
+      }
+    }
+    return { success: true, data: result };
+  }
+
   // ── Internal helpers ────────────────────────────────────────
 
   private extractHost(url: string): string | null {
@@ -164,6 +353,23 @@ export class AllowlistNetworkManager implements NetworkAdapter {
       return new URL(url).hostname.toLowerCase();
     } catch {
       return null;
+    }
+  }
+
+  private isAllowedHost(hostname: string): boolean {
+    // hostname from new URL() is already lowercase for ASCII hostnames
+    return this.allowlist.some(entry => this.matchPattern(entry.pattern, hostname));
+  }
+
+  /** Remove a socket from both the primary map and the secondary index. */
+  private removeSocket(appId: string, key: string): void {
+    this.sockets.delete(key);
+    const appKeys = this.appSockets.get(appId);
+    if (appKeys) {
+      appKeys.delete(key);
+      if (appKeys.size === 0) {
+        this.appSockets.delete(appId);
+      }
     }
   }
 

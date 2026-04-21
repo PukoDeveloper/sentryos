@@ -124,6 +124,11 @@ class ProcessManager {
         this.eventBus.removeApp(proc.processAppId);
         this.permissions.removeApp(this.systemAppId, proc.processAppId);
 
+        // 關閉此程序所有 WebSocket 連線
+        if (this.kernel.has('networkManager')) {
+            this.kernel.resolve('networkManager').wsCloseAllForApp(proc.processAppId);
+        }
+
         this.appProcesses.get(proc.appDefId)?.delete(pid);
         this.processAppIdIndex.delete(proc.processAppId);
         this.processes.delete(pid);

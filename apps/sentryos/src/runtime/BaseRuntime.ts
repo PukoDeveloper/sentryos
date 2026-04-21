@@ -125,6 +125,10 @@ abstract class BaseRuntime implements IRuntime {
         return { success: false, error: 'ProcessNotFound' };
     }
 
+    dispatchCustomEvent(processAppId: string, handlerName: string, arg: unknown): RuntimeResult<unknown> {
+        return this.dispatchToHandler(processAppId, handlerName, arg);
+    }
+
     // ── 內建 API 註冊 ───────────────────────────────────────
 
     private registerBuiltinApis(): void {
