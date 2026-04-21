@@ -15,6 +15,7 @@ import { registerInstallApi } from './installApi';
 import { registerClipboardApi } from './clipboardApi';
 import { registerAudioApi } from './audioApi';
 import { registerRuntimeApi } from './runtimeApi';
+import { registerIntrospectApi } from './introspectApi';
 
 export function registerAllHostApis(kernel: Kernel): void {
   registerUiApi(kernel);
@@ -33,4 +34,5 @@ export function registerAllHostApis(kernel: Kernel): void {
   registerClipboardApi(kernel);
   registerAudioApi(kernel);
   registerRuntimeApi(kernel);
+  registerIntrospectApi(kernel);
 }

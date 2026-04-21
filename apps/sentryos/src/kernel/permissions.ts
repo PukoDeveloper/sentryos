@@ -90,6 +90,9 @@ export const Permissions = {
 
   // Runtime
   RUNTIME_EXTENDED_TIMEOUT: 'runtime.extended-timeout',
+
+  // Introspection
+  INTROSPECT: 'introspect',
 } as const;
 
 // ── Event Names ─────────────────────────────────────────────
@@ -175,4 +178,7 @@ export const USER_DEFAULT_PERMISSIONS: string[] = [
 
   // 權限：建立子應用權限槽（供 DesktopShell 啟動使用）
   Permissions.NEW_APP,
+
+  // 內省（唯讀查詢已載入的插件與 UI 元件）
+  Permissions.INTROSPECT,
 ];
