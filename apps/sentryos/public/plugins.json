@@ -1,4 +1,5 @@
 [
     "/plugins/sentryos-monaco-editor.js",
-    "/plugins/lua-runtime.js"
+    "/plugins/lua-runtime.js",
+    "/plugins/sentryos-html-view.js"
 ]
