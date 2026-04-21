@@ -101,6 +101,7 @@ export const Events = {
   LANGUAGE_CHANGED: 'language.changed',
   THEME_CHANGED: 'theme.changed',
   CLIPBOARD_CHANGED: 'clipboard.changed',
+  SHELL_MODE_CHANGED: 'shell.mode-changed',
 } as const;
 
 // ── User Default Permissions ────────────────────────────────

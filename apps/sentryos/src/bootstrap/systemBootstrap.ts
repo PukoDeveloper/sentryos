@@ -270,6 +270,14 @@ async function bootstrapSystem(): Promise<void> {
       const height = taskbarMode === 'docked' ? 96 : taskbarMode === 'fullwidth' ? 64 : 0;
       windowManager.setMaximizedTaskbarHeight(height, false);
     }
+    // Emit event so sandboxed apps can react to shell mode changes.
+    // Use lazy kernel resolution — eventBus / systemAppId are registered after this
+    // handler is wired, but orientation changes only fire post-boot.
+    try {
+      const eb = kernel.resolve('eventBus');
+      const sysId = kernel.get('systemAppId');
+      eb.emit(sysId, Events.SHELL_MODE_CHANGED, { mode });
+    } catch { /* eventBus not yet available on the very first synchronous call */ }
   };
   desktopShell.onShellModeChange(applyShellModeToWindowManager);
   // Apply current mode immediately (shell may already be in mobile mode from mount)

@@ -164,6 +164,7 @@ export interface OsMonitor {
 export interface OsSettings {
   getTheme(): unknown;
   setTheme(theme: unknown): void;
+  getShellMode(): 'desktop' | 'mobile';
   getNotificationSettings(): unknown;
   setNotificationSettings(settings: unknown): void;
   getLanguage(): string;
