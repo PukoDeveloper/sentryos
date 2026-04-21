@@ -27,52 +27,106 @@ import { bios } from '../ui/Bios';
 import { lockScreen } from '../ui/LockScreen';
 import { AuthProvider } from '../auth/AuthProvider';
 import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
-import { PluginManager } from '../plugin/PluginManager';
+import { PluginManager, type PluginModule } from '../plugin/PluginManager';
 import { LanguageManager } from '../language/LanguageManager';
 import { desktopShellPack, systemAlertPack, bootstrapPack, kernelConsolePack, appInstallerPack, lockScreenPack } from '../language/systemPacks';
 
-// ── Boot log buffer (for error screen) ──────────────────────────
-const bootLog: string[] = [];
-const originalLog = bios.log.bind(bios);
-function bufferedLog(source: string, level: Parameters<typeof bios.log>[1], message: string): void {
-  bootLog.push(`[${source}] [${level}] ${message}`);
-  originalLog(source, level, message);
+// ── Public API types ─────────────────────────────────────────────
+
+/**
+ * Options passed to {@link createSentryOS} to configure the OS instance.
+ */
+export interface SentryOSOptions {
+  /** The host element that SentryOS will be mounted into. */
+  container: HTMLElement;
+  /**
+   * Called when the OS needs to restart (e.g. after a boot error).
+   * Defaults to `() => location.reload()` in standalone mode.
+   */
+  onRestart?: () => void;
+  /**
+   * Pre-imported plugin modules to load at boot time.
+   * These are resolved before any plugins listed in `plugins.json`.
+   */
+  pluginInstances?: PluginModule[];
+  /** Optional URL overrides for catalog / auth endpoints. */
+  config?: {
+    authConfigUrl?: string;
+    appCatalogUrl?: string;
+    pluginListUrl?: string;
+  };
 }
 
-// ── System-level error: show BIOS error screen ──────────────────
-function bootT(kernel: Kernel | undefined, key: string, fallback: string): string {
-  try {
-    if (kernel) {
-      const lm = kernel.resolve('languageManager') as LanguageManager;
-      return lm.t('bootstrap', key);
-    }
-  } catch { /* languageManager may not be available yet */ }
-  return fallback;
-}
-
-function showSystemError(title: string, error?: unknown, kernel?: Kernel): void {
-  const restartLabel = bootT(kernel, 'boot.btn.restart', '重新啟動系統');
-
-  const details = [...bootLog];
-  if (error instanceof Error) {
-    details.push('', `[CRITICAL] ${error.message}`);
-    if (error.stack) {
-      for (const line of error.stack.split('\n').slice(1, 6)) {
-        details.push(`  ${line.trim()}`);
-      }
-    }
-  } else if (error !== undefined) {
-    details.push('', `[CRITICAL] ${String(error)}`);
-  }
-
-  bios.destroyBootTerminal();
-  bios.showErrorScreen(title, details, [
-    { label: restartLabel, handler: () => location.reload() },
-  ]);
+/**
+ * Handle returned by {@link createSentryOS} representing a running OS instance.
+ */
+export interface SentryOSInstance {
+  /** The kernel of this OS instance — use for advanced host-page integration. */
+  readonly kernel: Kernel;
+  /**
+   * Gracefully shuts down the OS: unloads all plugins, terminates all
+   * processes, removes DOM nodes and event listeners added by this instance.
+   */
+  shutdown(): Promise<void>;
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────
-async function bootstrapSystem(): Promise<void> {
+
+/**
+ * Boot SentryOS inside `options.container` and resolve with a handle that
+ * lets the caller shut the instance down later.
+ */
+export async function createSentryOS(options: SentryOSOptions): Promise<SentryOSInstance> {
+  const { container, onRestart = () => location.reload(), pluginInstances = [] } = options;
+
+  // Point the singletons at our container instead of the global `#app` element.
+  bios.setContainer(container);
+  lockScreen.setContainer(container);
+
+  // ── Per-instance boot log buffer ────────────────────────────
+  const bootLog: string[] = [];
+  const originalLog = bios.log.bind(bios);
+  function bufferedLog(source: string, level: Parameters<typeof bios.log>[1], message: string): void {
+    bootLog.push(`[${source}] [${level}] ${message}`);
+    originalLog(source, level, message);
+  }
+
+  // ── System-level error: show BIOS error screen ──────────────
+  function bootT(kernel: Kernel | undefined, key: string, fallback: string): string {
+    try {
+      if (kernel) {
+        const lm = kernel.resolve('languageManager') as LanguageManager;
+        return lm.t('bootstrap', key);
+      }
+    } catch { /* languageManager may not be available yet */ }
+    return fallback;
+  }
+
+  function showSystemError(title: string, error?: unknown, kernel?: Kernel): void {
+    const restartLabel = bootT(kernel, 'boot.btn.restart', '重新啟動系統');
+
+    const details = [...bootLog];
+    if (error instanceof Error) {
+      details.push('', `[CRITICAL] ${error.message}`);
+      if (error.stack) {
+        for (const line of error.stack.split('\n').slice(1, 6)) {
+          details.push(`  ${line.trim()}`);
+        }
+      }
+    } else if (error !== undefined) {
+      details.push('', `[CRITICAL] ${String(error)}`);
+    }
+
+    bios.destroyBootTerminal();
+    bios.showErrorScreen(title, details, [
+      { label: restartLabel, handler: onRestart },
+    ]);
+  }
+
+  // ── Contextmenu suppression (scoped to container) ───────────
+  const handleContextMenu = (e: Event) => e.preventDefault();
+  container.addEventListener('contextmenu', handleContextMenu);
+
   bios.createBootTerminal();
   bios.init();
   bufferedLog('BOOT', 'INFO', 'Preparing core services');
@@ -80,10 +134,11 @@ async function bootstrapSystem(): Promise<void> {
   // 1. Initialize kernel & core services
   let kernel: Kernel;
   try {
-    kernel = await initializeCore();
+    kernel = await initializeCore(bufferedLog);
   } catch (err) {
     showSystemError('核心服務初始化失敗', err);
-    return;
+    container.removeEventListener('contextmenu', handleContextMenu);
+    throw err;
   }
 
   const desktopShell = kernel.resolve('desktopShell');
@@ -109,13 +164,15 @@ async function bootstrapSystem(): Promise<void> {
     const catalogResult = await loadApplicationCatalog();
     if (!catalogResult.success || !catalogResult.data) {
       showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
-      return;
+      container.removeEventListener('contextmenu', handleContextMenu);
+      return createShutdownOnlyInstance(kernel, container, handleContextMenu);
     }
     catalogApps = catalogResult.data.apps;
     allRejectedApps = catalogResult.data.rejected;
   } catch (err) {
     showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
-    return;
+    container.removeEventListener('contextmenu', handleContextMenu);
+    return createShutdownOnlyInstance(kernel, container, handleContextMenu);
   }
 
   // 2.5. Load remote apps from sys:app.js
@@ -180,10 +237,11 @@ async function bootstrapSystem(): Promise<void> {
   populateDefaultRegistry(kernel, catalogApps);
 
   // 4. Mount desktop shell
-  const mounted = desktopShell.mount(applications);
+  const mounted = desktopShell.mount(applications, container);
   if (!mounted) {
     showSystemError(bootT(kernel, 'boot.shellMountFailed', '桌面外殼掛載失敗'), 'Desktop shell mount failed — app container is unavailable', kernel);
-    return;
+    container.removeEventListener('contextmenu', handleContextMenu);
+    return createShutdownOnlyInstance(kernel, container, handleContextMenu);
   }
 
   desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
@@ -230,13 +288,14 @@ async function bootstrapSystem(): Promise<void> {
   // For each entry in sys/app.js, verify that the user has previously consented to the
   // app's permissions. If new permissions were added since last install, show re-consent.
   // Apps whose consent is declined are removed from the catalog and from sys/app.js.
-  await checkRemoteAppConsent(kernel, appInstallerService, catalogApps);
+  await checkRemoteAppConsent(kernel, appInstallerService, catalogApps, bufferedLog);
 
   // 5. Create window manager
   const windowHost = desktopShell.getWindowHost();
   if (!windowHost) {
     showSystemError(bootT(kernel, 'boot.shellMountFailed', '桌面外殼掛載失敗'), 'Desktop shell has no window host element', kernel);
-    return;
+    container.removeEventListener('contextmenu', handleContextMenu);
+    return createShutdownOnlyInstance(kernel, container, handleContextMenu);
   }
 
   // Create the application launcher (resolves deps from kernel)
@@ -328,7 +387,7 @@ async function bootstrapSystem(): Promise<void> {
     }
   });
 
-  // 7.5 Wire keyboard events
+  // 7.5 Wire keyboard events (scoped to container, not the whole document)
   // 有焦點視窗時 → 直接 dispatch 給該程序的 onKeyboardEvent
   // 無焦點視窗時 → 透過 EventBus 廣播 keyboard 事件
   const handleKeyboardEvent = (e: KeyboardEvent) => {
@@ -358,15 +417,28 @@ async function bootstrapSystem(): Promise<void> {
       eventBus.emit(systemAppId, Events.KEYBOARD, keyEvent);
     }
   };
-  document.addEventListener('keydown', handleKeyboardEvent);
-  document.addEventListener('keyup', handleKeyboardEvent);
+  container.addEventListener('keydown', handleKeyboardEvent);
+  container.addEventListener('keyup', handleKeyboardEvent);
 
   // 8. Load plugins
-  try {
-    const pluginManager = new PluginManager(kernel);
-    kernel.register('pluginManager', pluginManager);
+  const pluginManager = new PluginManager(kernel);
+  kernel.register('pluginManager', pluginManager);
 
-    const pluginListRes = await fetch('/plugins.json');
+  try {
+    // 8a. Load pre-imported plugin instances (from host page / NPM packages)
+    if (pluginInstances.length > 0) {
+      const instanceResult = await pluginManager.loadPluginModules(pluginInstances);
+      for (const name of instanceResult.loaded) {
+        bufferedLog('BOOT', 'INFO', `Plugin (instance) loaded: ${name}`);
+      }
+      for (const { name, error } of instanceResult.failed) {
+        bufferedLog('BOOT', 'WARN', `Plugin (instance) failed: ${name} — ${error}`);
+      }
+    }
+
+    // 8b. Load path-based plugins from plugins.json
+    const pluginListUrl = options.config?.pluginListUrl ?? '/plugins.json';
+    const pluginListRes = await fetch(pluginListUrl);
     if (pluginListRes.ok) {
       const pluginPaths: string[] = await pluginListRes.json();
       const result = await pluginManager.loadPlugins(pluginPaths);
@@ -397,9 +469,54 @@ async function bootstrapSystem(): Promise<void> {
   }
 
   bios.destroyBootTerminal();
+
+  // ── Return instance handle ────────────────────────────────────
+  return {
+    kernel,
+    async shutdown(): Promise<void> {
+      container.removeEventListener('keydown', handleKeyboardEvent);
+      container.removeEventListener('keyup', handleKeyboardEvent);
+      container.removeEventListener('contextmenu', handleContextMenu);
+
+      if (kernel.has('pluginManager')) {
+        await (kernel.resolve('pluginManager') as PluginManager).unloadAll();
+      }
+
+      const pm = kernel.resolve('processManager');
+      for (const proc of pm.getAllProcesses()) {
+        try {
+          runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
+          runtimeRegistry.unbindProcess(proc.pid, proc.processAppId);
+          pm.terminate(systemAppId, proc.pid);
+        } catch { /* already gone */ }
+      }
+
+      container.replaceChildren();
+    },
+  };
 }
 
-async function initializeCore(): Promise<Kernel> {
+/**
+ * Creates a minimal shutdown-only instance for early-abort error paths where
+ * the full boot sequence did not complete.
+ */
+function createShutdownOnlyInstance(
+  kernel: Kernel,
+  container: HTMLElement,
+  handleContextMenu: (e: Event) => void,
+): SentryOSInstance {
+  return {
+    kernel,
+    async shutdown(): Promise<void> {
+      container.removeEventListener('contextmenu', handleContextMenu);
+      container.replaceChildren();
+    },
+  };
+}
+
+type BufferedLog = (source: string, level: Parameters<typeof bios.log>[1], message: string) => void;
+
+async function initializeCore(bufferedLog: BufferedLog): Promise<Kernel> {
   await initializeQuickJS();
   bufferedLog('BOOT', 'INFO', 'QuickJS WASM runtime loaded');
 
@@ -618,7 +735,8 @@ function isRemoteUrl(url: string): boolean {
 async function checkRemoteAppConsent(
   kernel: Kernel,
   appInstaller: import('../application/AppInstaller').AppInstaller,
-  catalogApps: RegisteredApplication[]
+  catalogApps: RegisteredApplication[],
+  bufferedLog: BufferedLog,
 ): Promise<void> {
   const fileSystem = kernel.resolve('fileSystem');
   const systemAppId = kernel.get('systemAppId');
@@ -710,5 +828,3 @@ async function checkRemoteAppConsent(
   const desktopShell = kernel.resolve('desktopShell');
   desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 }
-
-export { bootstrapSystem };

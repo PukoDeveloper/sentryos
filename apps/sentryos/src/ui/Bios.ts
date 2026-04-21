@@ -25,6 +25,16 @@ class BIOS {
   private terminalLogArea: HTMLDivElement | null = null;
   private errorOverlay: HTMLDivElement | null = null;
   private hasWarnedAboutMissingAppDiv = false;
+  private injectedContainer: HTMLElement | null = null;
+
+  /**
+   * Override the container used for boot-terminal and error-screen overlays.
+   * When set, `getAppDiv()` is bypassed entirely.  Call this before any other
+   * BIOS method when embedding SentryOS inside a host page element.
+   */
+  setContainer(container: HTMLElement): void {
+    this.injectedContainer = container;
+  }
 
   private getActiveLogArea(): HTMLDivElement | null {
     if (!this.terminalOverlay || !this.terminalLogArea) {
@@ -41,6 +51,23 @@ class BIOS {
   }
 
   private ensureAppDiv(): HTMLDivElement | null {
+    // Prefer the explicitly injected container when available.
+    if (this.injectedContainer) {
+      if (!this.injectedContainer.isConnected) {
+        if (!this.hasWarnedAboutMissingAppDiv) {
+          console.warn(this.formatLine('BIOS', 'WARN', 'injected container is disconnected; falling back to console output'));
+          this.hasWarnedAboutMissingAppDiv = true;
+        }
+        this.terminalOverlay = null;
+        this.terminalLogArea = null;
+        return null;
+      }
+      this.hasWarnedAboutMissingAppDiv = false;
+      // The injected container may be any element type; BIOS only needs an
+      // HTMLElement to appendChild overlays, so cast is safe here.
+      return this.injectedContainer as HTMLDivElement;
+    }
+
     const root = getAppDiv();
     if (root) {
       this.hasWarnedAboutMissingAppDiv = false;

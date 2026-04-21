@@ -1,27 +1,10 @@
+/* ── Standalone-app host resets (only applied when SentryOS owns the full page) ── */
 html,
 body,
 #app {
 	margin: 0;
 	width: 100%;
 	height: 100%;
-}
-
-:root {
-	/* ── SentryOS Theme Tokens ─────────────────────────────── */
-	--sos-color-surface: rgba(10, 14, 20, 0.92);
-	--sos-color-surface-alt: rgba(255, 255, 255, 0.05);
-	--sos-color-surface-input: rgba(255, 255, 255, 0.06);
-	--sos-color-surface-hover: rgba(255, 255, 255, 0.08);
-	--sos-color-border: rgba(255, 255, 255, 0.12);
-	--sos-color-border-focus: rgba(118, 185, 255, 0.42);
-	--sos-color-text: #f4f7fb;
-	--sos-color-text-secondary: rgba(255, 255, 255, 0.3);
-	--sos-color-accent: #67b8ff;
-	--sos-color-accent-glow: rgba(109, 213, 255, 0.35);
-	--sos-color-shadow: rgba(0, 0, 0, 0.32);
-	--sos-color-shadow-heavy: rgba(0, 0, 0, 0.42);
-	--sos-color-taskbar: rgba(7, 12, 20, 0.64);
-	--sos-color-taskbar-border: rgba(255, 255, 255, 0.15);
 }
 
 body {
@@ -56,6 +39,26 @@ body {
 
 ::-webkit-scrollbar-corner {
 	background: transparent;
+}
+
+/* ── SentryOS Theme Tokens ──────────────────────────────── */
+/* Declared on :root for standalone mode and on .desktop-shell for embedded mode. */
+:root,
+.desktop-shell {
+	--sos-color-surface: rgba(10, 14, 20, 0.92);
+	--sos-color-surface-alt: rgba(255, 255, 255, 0.05);
+	--sos-color-surface-input: rgba(255, 255, 255, 0.06);
+	--sos-color-surface-hover: rgba(255, 255, 255, 0.08);
+	--sos-color-border: rgba(255, 255, 255, 0.12);
+	--sos-color-border-focus: rgba(118, 185, 255, 0.42);
+	--sos-color-text: #f4f7fb;
+	--sos-color-text-secondary: rgba(255, 255, 255, 0.3);
+	--sos-color-accent: #67b8ff;
+	--sos-color-accent-glow: rgba(109, 213, 255, 0.35);
+	--sos-color-shadow: rgba(0, 0, 0, 0.32);
+	--sos-color-shadow-heavy: rgba(0, 0, 0, 0.42);
+	--sos-color-taskbar: rgba(7, 12, 20, 0.64);
+	--sos-color-taskbar-border: rgba(255, 255, 255, 0.15);
 }
 
 .desktop-shell {

@@ -96,6 +96,61 @@ export class PluginManager {
     return { loaded, failed };
   }
 
+  /**
+   * Load pre-imported plugin module objects at boot time.
+   * Unlike `loadPlugins()`, this method accepts already-imported JS objects
+   * directly (e.g. from NPM packages) and skips the fetch / Blob-URL step.
+   * Dependency sorting and `setup()` invocation follow the same logic.
+   *
+   * @returns Loaded plugin names and any failures.
+   */
+  async loadPluginModules(modules: PluginModule[]): Promise<{ loaded: string[]; failed: { name: string; error: string }[] }> {
+    const loaded: string[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    // Validate each module before sorting
+    const entries: PluginEntry[] = [];
+    for (const plugin of modules) {
+      const label = plugin.pluginName || '(unknown)';
+      if (typeof plugin.setup !== 'function') {
+        failed.push({ name: label, error: `Plugin "${label}" does not export a setup function` });
+        continue;
+      }
+      if (typeof plugin.teardown !== 'function') {
+        failed.push({ name: label, error: `Plugin "${label}" does not export a teardown function` });
+        continue;
+      }
+      if (!plugin.pluginName || typeof plugin.pluginName !== 'string') {
+        failed.push({ name: label, error: `Plugin does not have a valid pluginName` });
+        continue;
+      }
+      if (this.plugins.has(plugin.pluginName)) {
+        failed.push({ name: label, error: `Plugin "${plugin.pluginName}" is already loaded` });
+        continue;
+      }
+      // Use pluginName as path identifier for instance-based plugins
+      entries.push({ path: `instance:${plugin.pluginName}`, module: plugin });
+    }
+
+    // Phase 2: sort by dependencies
+    const { sorted, failed: sortFailed } = this.sortByDependencies(entries);
+    for (const f of sortFailed) {
+      failed.push({ name: f.path, error: f.error });
+    }
+
+    // Phase 3: setup in dependency order
+    for (const { path, module } of sorted) {
+      try {
+        await this.setupPlugin(path, module);
+        loaded.push(module.pluginName);
+      } catch (err) {
+        failed.push({ name: module.pluginName, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    return { loaded, failed };
+  }
+
   async loadPlugin(path: string): Promise<void> {
     const plugin = await this.fetchPluginModule(path);
     await this.setupPlugin(path, plugin);
