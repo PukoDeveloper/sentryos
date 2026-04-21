@@ -111,7 +111,12 @@ export class PluginManager {
     // Validate each module before sorting
     const entries: PluginEntry[] = [];
     for (const plugin of modules) {
-      const label = plugin.pluginName || '(unknown)';
+      // Validate pluginName first so error messages are always accurate
+      if (!plugin.pluginName || typeof plugin.pluginName !== 'string') {
+        failed.push({ name: '(unknown)', error: 'Plugin does not have a valid pluginName' });
+        continue;
+      }
+      const label = plugin.pluginName;
       if (typeof plugin.setup !== 'function') {
         failed.push({ name: label, error: `Plugin "${label}" does not export a setup function` });
         continue;
@@ -120,12 +125,8 @@ export class PluginManager {
         failed.push({ name: label, error: `Plugin "${label}" does not export a teardown function` });
         continue;
       }
-      if (!plugin.pluginName || typeof plugin.pluginName !== 'string') {
-        failed.push({ name: label, error: `Plugin does not have a valid pluginName` });
-        continue;
-      }
       if (this.plugins.has(plugin.pluginName)) {
-        failed.push({ name: label, error: `Plugin "${plugin.pluginName}" is already loaded` });
+        failed.push({ name: label, error: `Plugin "${label}" is already loaded` });
         continue;
       }
       // Use pluginName as path identifier for instance-based plugins

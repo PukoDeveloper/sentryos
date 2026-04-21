@@ -72,6 +72,8 @@ export interface SentryOSInstance {
 
 // ── Bootstrap ───────────────────────────────────────────────────
 
+type BufferedLog = (source: string, level: Parameters<typeof bios.log>[1], message: string) => void;
+
 /**
  * Boot SentryOS inside `options.container` and resolve with a handle that
  * lets the caller shut the instance down later.
@@ -485,10 +487,15 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
       const pm = kernel.resolve('processManager');
       for (const proc of pm.getAllProcesses()) {
         try {
-          runtimeRegistry.getForPid(proc.pid).destroyProcessRuntime(proc.pid);
+          const runtime = runtimeRegistry.getForPid(proc.pid);
+          if (runtime) {
+            runtime.destroyProcessRuntime(proc.pid);
+          }
+        } catch { /* runtime may already be gone */ }
+        try {
           runtimeRegistry.unbindProcess(proc.pid, proc.processAppId);
           pm.terminate(systemAppId, proc.pid);
-        } catch { /* already gone */ }
+        } catch { /* process may already be gone */ }
       }
 
       container.replaceChildren();
@@ -513,8 +520,6 @@ function createShutdownOnlyInstance(
     },
   };
 }
-
-type BufferedLog = (source: string, level: Parameters<typeof bios.log>[1], message: string) => void;
 
 async function initializeCore(bufferedLog: BufferedLog): Promise<Kernel> {
   await initializeQuickJS();
