@@ -13,11 +13,9 @@ type RuntimeError =
     | 'InboxFull'
     | 'TooManyChildren';
 
-type RuntimeResult<T> = {
-    success: boolean;
-    data?: T;
-    error?: RuntimeError;
-};
+type RuntimeResult<T> =
+    | { success: true; data?: T }
+    | { success: false; error: RuntimeError; data?: unknown };
 
 type ProcessView = {
     pid: number;

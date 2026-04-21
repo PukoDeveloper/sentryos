@@ -118,12 +118,49 @@ const MAX_RECENT_API_CALLS = 200;
 const MAX_RECENT_EXECUTIONS = 100;
 const MAX_PROCESS_HISTORY = 500;
 
+/**
+ * Fixed-capacity circular buffer. Appending is O(1) — the oldest entry is
+ * overwritten in-place once the buffer is full, avoiding the O(n) Array.shift()
+ * cost of a naïve bounded array.
+ */
+class CircularBuffer<T> {
+    private readonly buf: T[];
+    private head = 0; // index of the oldest entry (wraps around on overflow)
+    private count = 0;
+    private readonly capacity: number;
+
+    constructor(capacity: number) {
+        this.capacity = capacity;
+        this.buf = new Array(capacity);
+    }
+
+    push(item: T): void {
+        if (this.count < this.capacity) {
+            this.buf[(this.head + this.count) % this.capacity] = item;
+            this.count++;
+        } else {
+            // Buffer full — overwrite the oldest slot and advance head
+            this.buf[this.head] = item;
+            this.head = (this.head + 1) % this.capacity;
+        }
+    }
+
+    /** Returns all items in insertion order (oldest → newest). */
+    toArray(): T[] {
+        if (this.count === 0) return [];
+        if (this.count < this.capacity) return this.buf.slice(0, this.count);
+        return [...this.buf.slice(this.head), ...this.buf.slice(0, this.head)];
+    }
+
+    get length(): number { return this.count; }
+}
+
 class SystemMonitor {
     // ── Event tracking ──
     private eventEmitCounts = new Map<string, number>();
     private eventSubscriberCounts = new Map<string, number>();
     private eventLastEmitTime = new Map<string, number>();
-    private recentEvents: EventRecord[] = [];
+    private recentEvents = new CircularBuffer<EventRecord>(MAX_RECENT_EVENTS);
     private totalEmits = 0;
 
     // ── API call tracking ──
@@ -131,7 +168,7 @@ class SystemMonitor {
     private apiCallCounts = new Map<string, number>();
     private apiCallDurations = new Map<string, number>();
     private apiLastCallTime = new Map<string, number>();
-    private recentApiCalls: ApiCallRecord[] = [];
+    private recentApiCalls = new CircularBuffer<ApiCallRecord>(MAX_RECENT_API_CALLS);
     private totalApiCalls = 0;
 
     // ── Permission tracking ──
@@ -141,13 +178,13 @@ class SystemMonitor {
     private permissionByPerm = new Map<string, { checks: number; denied: number }>();
 
     // ── Process tracking ──
-    private processHistory: ProcessUsageRecord[] = [];
+    private processHistory = new CircularBuffer<ProcessUsageRecord>(MAX_PROCESS_HISTORY);
     private totalLaunched = 0;
     private totalTerminated = 0;
     private processCountByApp = new Map<string, { launched: number; terminated: number }>();
 
     // ── Performance tracking ──
-    private executionDurations: Array<{ pid: number; duration: number; timestamp: number }> = [];
+    private executionDurations = new CircularBuffer<{ pid: number; duration: number; timestamp: number }>(MAX_RECENT_EXECUTIONS);
     private totalExecutionTime = 0;
     private totalExecutions = 0;
 
@@ -172,9 +209,6 @@ class SystemMonitor {
         this.eventEmitCounts.set(event, (this.eventEmitCounts.get(event) ?? 0) + 1);
         this.eventLastEmitTime.set(event, now);
         this.recentEvents.push({ event, emitterAppId: appId, timestamp: now });
-        if (this.recentEvents.length > MAX_RECENT_EVENTS) {
-            this.recentEvents.shift();
-        }
     }
 
     recordEventSubscribe(event: string): void {
@@ -198,9 +232,6 @@ class SystemMonitor {
         this.apiCallDurations.set(key, (this.apiCallDurations.get(key) ?? 0) + duration);
         this.apiLastCallTime.set(key, now);
         this.recentApiCalls.push({ apiName, method, processAppId, pid, duration, timestamp: now, success });
-        if (this.recentApiCalls.length > MAX_RECENT_API_CALLS) {
-            this.recentApiCalls.shift();
-        }
     }
 
     // ── Permission hooks ─────────────────────────────────────
@@ -243,16 +274,13 @@ class SystemMonitor {
             launchedAt: Date.now(),
             terminatedAt: null,
         });
-        if (this.processHistory.length > MAX_PROCESS_HISTORY) {
-            this.processHistory.shift();
-        }
     }
 
     recordProcessTerminate(pid: number, appDefId: string): void {
         this.totalTerminated++;
         const entry = this.processCountByApp.get(appDefId);
         if (entry) entry.terminated++;
-        const historyEntry = this.processHistory.find(h => h.pid === pid && h.terminatedAt === null);
+        const historyEntry = this.processHistory.toArray().reverse().find(h => h.pid === pid && h.terminatedAt === null);
         if (historyEntry) historyEntry.terminatedAt = Date.now();
     }
 
@@ -262,9 +290,6 @@ class SystemMonitor {
         this.totalExecutions++;
         this.totalExecutionTime += duration;
         this.executionDurations.push({ pid, duration, timestamp: Date.now() });
-        if (this.executionDurations.length > MAX_RECENT_EXECUTIONS) {
-            this.executionDurations.shift();
-        }
     }
 
     // ── Snapshot ─────────────────────────────────────────────
@@ -334,13 +359,13 @@ class SystemMonitor {
             uptime: now - this.bootTime,
             events: {
                 stats: eventStats,
-                recentEmits: [...this.recentEvents].reverse(),
+                recentEmits: this.recentEvents.toArray().reverse(),
                 totalEmits: this.totalEmits,
                 activeSubscriptions,
             },
             api: {
                 stats: apiStats,
-                recentCalls: [...this.recentApiCalls].reverse(),
+                recentCalls: this.recentApiCalls.toArray().reverse(),
                 totalCalls: this.totalApiCalls,
             },
             permissions: {
@@ -354,12 +379,12 @@ class SystemMonitor {
                 totalTerminated: this.totalTerminated,
                 activeProcesses: activeProcessCount,
                 byApp: procByApp,
-                history: [...this.processHistory],
+                history: this.processHistory.toArray(),
             },
             performance: {
                 avgExecutionTime: this.totalExecutions > 0 ? this.totalExecutionTime / this.totalExecutions : 0,
                 totalExecutions: this.totalExecutions,
-                recentExecutions: [...this.executionDurations].reverse(),
+                recentExecutions: this.executionDurations.toArray().reverse(),
             },
             memory: this.buildMemorySnapshot(),
         };
@@ -449,15 +474,15 @@ class SystemMonitor {
     }
 
     getRecentEvents(limit = 50): EventRecord[] {
-        return this.recentEvents.slice(-limit).reverse();
+        return this.recentEvents.toArray().slice(-limit).reverse();
     }
 
     getRecentApiCalls(limit = 50): ApiCallRecord[] {
-        return this.recentApiCalls.slice(-limit).reverse();
+        return this.recentApiCalls.toArray().slice(-limit).reverse();
     }
 
     getProcessHistory(): ProcessUsageRecord[] {
-        return [...this.processHistory];
+        return this.processHistory.toArray();
     }
 }
 

@@ -11,18 +11,18 @@
 
 ### 🔧 效能優化
 
-- [ ] Auto-start apps 中 Services 可並行啟動（systemBootstrap.ts ~L460）
-- [ ] `FileSystem.persistTier` 每次寫入/刪除序列化整個 tier 到 localStorage，高頻寫入需節流（FileSystem.ts ~L430）
-- [ ] `SystemMonitor` 的 `recentEvents.shift()` 是 O(n)，建議改用環形緩衝區（SystemMonitor.ts ~L176）
+- [x] Auto-start apps 中 Services 可並行啟動（systemBootstrap.ts ~L460）
+- [x] `FileSystem.persistTier` 每次寫入/刪除序列化整個 tier 到 localStorage，高頻寫入需節流（FileSystem.ts ~L430）
+- [x] `SystemMonitor` 的 `recentEvents.shift()` 是 O(n)，建議改用環形緩衝區（SystemMonitor.ts ~L176）
 - [ ] 多層 `backdrop-filter: blur()` 疊加（taskbar + start panel + context menu + notifications），低階設備效能差（style.css）
 
 ---
 
 ### 🧹 程式碼品質
 
-- [ ] `RuntimeResult<T>` 應改為 discriminated union 以獲得型別安全（runtime/types.ts ~L18）
-- [ ] `networkApi.request` 宣告為 async 但 QuickJS 同步環境無法處理 Promise 回傳（networkApi.ts ~L28）
-- [ ] 部分互動元素缺少 `:focus-visible` 樣式，影響鍵盤無障礙
+- [x] `RuntimeResult<T>` 應改為 discriminated union 以獲得型別安全（runtime/types.ts ~L18）
+- [x] `networkApi.request` 宣告為 async 但 QuickJS 同步環境無法處理 Promise 回傳（networkApi.ts ~L28）
+- [x] 部分互動元素缺少 `:focus-visible` 樣式，影響鍵盤無障礙
 
 ---
 

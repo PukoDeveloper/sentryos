@@ -370,6 +370,11 @@ body {
 	transform: scale(0.92);
 }
 
+.window-action-button:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
+}
+
 .window-content {
 	flex: 1;
 	overflow: auto;
@@ -388,6 +393,11 @@ body {
 .window-ui-button {
 	border: 0;
 	cursor: pointer;
+}
+
+.window-ui-button:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
 }
 
 .window-ui-input {
@@ -578,6 +588,11 @@ body {
 	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
 }
 
+.desktop-taskbar-trigger:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
+}
+
 .desktop-taskbar-trigger:active {
 	cursor: grabbing;
 }
@@ -626,6 +641,11 @@ body {
 .desktop-taskbar-start:active {
 	transform: scale(0.94);
 	filter: brightness(0.96);
+}
+
+.desktop-taskbar-start:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 3px;
 }
 
 .desktop-taskbar-apps {
@@ -843,6 +863,11 @@ body {
 	box-shadow: inset 0 -2px 0 var(--sos-color-accent);
 }
 
+.desktop-start-tab:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: -2px;
+}
+
 /* ── Panes ── */
 
 .desktop-start-pane {
@@ -907,6 +932,11 @@ body {
 	background: var(--sos-color-border-focus);
 }
 
+.desktop-start-folder-add:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
+}
+
 .desktop-start-folder-list {
 	display: flex;
 	flex-direction: column;
@@ -936,6 +966,11 @@ body {
 
 .desktop-start-folder:hover {
 	background: var(--sos-color-surface-hover);
+}
+
+.desktop-start-folder:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
 }
 
 .desktop-start-folder.is-drag-over {
@@ -1110,6 +1145,11 @@ body {
 	background: var(--sos-color-surface-hover);
 }
 
+.desktop-context-menu-item:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: -2px;
+}
+
 .desktop-context-menu-item--danger {
 	color: #ff5555;
 }
@@ -1154,6 +1194,11 @@ body {
 
 .desktop-start-item:active {
 	background: var(--sos-color-border-focus);
+}
+
+.desktop-start-item:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: 2px;
 }
 
 .desktop-start-item-icon {
@@ -1210,6 +1255,11 @@ body {
 
 .desktop-start-package-header:hover {
 	background: var(--sos-color-surface-hover);
+}
+
+.desktop-start-package-header:focus-visible {
+	outline: 2px solid var(--sos-color-border-focus);
+	outline-offset: -2px;
 }
 
 .desktop-start-package-badge {
