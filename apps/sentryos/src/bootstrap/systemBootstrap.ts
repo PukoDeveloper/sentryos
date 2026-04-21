@@ -53,10 +53,11 @@ export interface SentryOSOptions {
   /**
    * Optional factory for creating the kernel's filesystem adapter.
    *
-   * Called during kernel initialization with the partially-constructed `Kernel`
-   * (permissions, EventBus, ApplicationManager, ProcessManager and the runtime
-   * registry are already registered at call time).  The returned adapter is
-   * registered as the `'fileSystem'` service.
+   * Called during kernel initialization with the partially-constructed `Kernel`.
+   * The following services are already registered at call time:
+   * `permissions`, `eventBus`, `appManager`, `processManager`, `runtime`,
+   * and `runtimeRegistry`.
+   * The returned adapter is registered as the `'fileSystem'` service.
    *
    * If omitted, the default {@link WebFileSystemAdapter} backed by
    * `localStorage` is used.
