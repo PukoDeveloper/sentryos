@@ -135,8 +135,8 @@ function setup(context) {
         return {
             /**
              * 在指定的 html-view 節點末尾追加 HTML 片段。
-             * HTML 會經過安全清理（移除 <script>、iframe、on* 屬性），
-             * 其中的 <script> 內容會立即在沙箱中執行。
+             * HTML 會經過安全清理（提取 <script> 內容送往沙箱執行、移除 iframe 及 on* 屬性），
+             * 其中的 <script> 內容會在沙箱中執行。
              *
              * @param {string} windowId
              * @param {string} viewId   - html-view 節點的 id
