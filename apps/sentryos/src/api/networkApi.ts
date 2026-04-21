@@ -5,8 +5,14 @@ import { Permissions } from '../kernel/constants';
 const NETWORK_SETTINGS_KEY = 'network-settings';
 const NETWORK_TIER = 'sys' as const;
 
-/** Counter for generating unique socket IDs within a process. */
-let socketIdCounter = 0;
+/** Per-process WebSocket socket ID counters, keyed by processAppId. */
+const wsCounters = new Map<string, number>();
+
+function nextSocketId(processAppId: string): string {
+  const n = (wsCounters.get(processAppId) ?? 0) + 1;
+  wsCounters.set(processAppId, n);
+  return `ws_${n}`;
+}
 
 export function registerNetworkApi(kernel: Kernel): void {
   const runtimeRegistry = kernel.resolve('runtimeRegistry');
@@ -180,7 +186,7 @@ export function registerNetworkApi(kernel: Kernel): void {
         return { success: false, error: 'UnknownError' };
       }
 
-      const socketId = `ws_${++socketIdCounter}`;
+      const socketId = nextSocketId(process.processAppId);
       const processAppId = process.processAppId;
 
       const result = networkManager.wsConnect(

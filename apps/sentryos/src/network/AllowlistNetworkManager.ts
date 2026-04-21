@@ -38,6 +38,11 @@ export class AllowlistNetworkManager implements NetworkAdapter {
 
   /** All live WebSocket connections keyed by "<appId>:<socketId>". */
   private readonly sockets = new Map<string, SocketRecord>();
+  /**
+   * Secondary index for O(1) per-process operations (count / close-all).
+   * Maps appId → Set of composite socket keys.
+   */
+  private readonly appSockets = new Map<string, Set<string>>();
 
   // ── Enable / Disable ────────────────────────────────────────
 
@@ -213,9 +218,9 @@ export class AllowlistNetworkManager implements NetworkAdapter {
       return { success: false, error: 'UnknownError' };
     }
 
-    // Enforce per-process connection limit
-    const appSocketCount = this.countSocketsForApp(appId);
-    if (appSocketCount >= MAX_WS_PER_APP) {
+    // Enforce per-process connection limit using the secondary index (O(1))
+    const appKeys = this.appSockets.get(appId);
+    if ((appKeys?.size ?? 0) >= MAX_WS_PER_APP) {
       return { success: false, error: 'TooManyConnections' };
     }
 
@@ -228,6 +233,12 @@ export class AllowlistNetworkManager implements NetworkAdapter {
 
     const record: SocketRecord = { socket: ws, url, appId, socketId };
     this.sockets.set(key, record);
+
+    // Register in the secondary index
+    if (!this.appSockets.has(appId)) {
+      this.appSockets.set(appId, new Set());
+    }
+    this.appSockets.get(appId)!.add(key);
 
     ws.addEventListener('open', () => {
       callback({ socketId, type: 'open' });
@@ -243,7 +254,7 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     });
 
     ws.addEventListener('close', (ev: CloseEvent) => {
-      this.sockets.delete(key);
+      this.removeSocket(appId, key);
       callback({ socketId, type: 'close', code: ev.code, reason: ev.reason });
     });
 
@@ -277,7 +288,7 @@ export class AllowlistNetworkManager implements NetworkAdapter {
       } else {
         record.socket.close();
       }
-      // The 'close' event handler will remove the record from the map.
+      // The 'close' event handler will remove the record from both indexes.
       return { success: true, data: null };
     } catch {
       return { success: false, error: 'UnknownError' };
@@ -285,12 +296,20 @@ export class AllowlistNetworkManager implements NetworkAdapter {
   }
 
   wsCloseAllForApp(appId: string): void {
-    for (const [key, record] of this.sockets) {
-      if (record.appId === appId) {
-        try { record.socket.close(); } catch { /* ignore */ }
+    const keys = this.appSockets.get(appId);
+    if (!keys) return;
+    for (const key of Array.from(keys)) {
+      const record = this.sockets.get(key);
+      if (record) {
+        try {
+          record.socket.close();
+        } catch (err) {
+          console.warn(`[AllowlistNetworkManager] Failed to close socket '${record.socketId}' for app '${appId}':`, err);
+        }
         this.sockets.delete(key);
       }
     }
+    this.appSockets.delete(appId);
   }
 
   wsGetStatus(appId: string, socketId: string): WebSocketResult<WebSocketStatus> {
@@ -309,9 +328,12 @@ export class AllowlistNetworkManager implements NetworkAdapter {
   }
 
   wsListConnections(appId: string): WebSocketResult<WebSocketStatus[]> {
+    const keys = this.appSockets.get(appId);
+    if (!keys) return { success: true, data: [] };
     const result: WebSocketStatus[] = [];
-    for (const record of this.sockets.values()) {
-      if (record.appId === appId) {
+    for (const key of keys) {
+      const record = this.sockets.get(key);
+      if (record) {
         result.push({
           socketId: record.socketId,
           url: record.url,
@@ -336,12 +358,16 @@ export class AllowlistNetworkManager implements NetworkAdapter {
     return this.allowlist.some(entry => this.matchPattern(entry.pattern, hostname.toLowerCase()));
   }
 
-  private countSocketsForApp(appId: string): number {
-    let count = 0;
-    for (const record of this.sockets.values()) {
-      if (record.appId === appId) count++;
+  /** Remove a socket from both the primary map and the secondary index. */
+  private removeSocket(appId: string, key: string): void {
+    this.sockets.delete(key);
+    const appKeys = this.appSockets.get(appId);
+    if (appKeys) {
+      appKeys.delete(key);
+      if (appKeys.size === 0) {
+        this.appSockets.delete(appId);
+      }
     }
-    return count;
   }
 
   /**
