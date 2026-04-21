@@ -7,7 +7,8 @@ type WindowState = 'normal' | 'minimized' | 'maximized' | 'closed';
 type WindowControlType =
     | 'label' | 'button' | 'stack' | 'panel'
     | 'input' | 'textarea' | 'checkbox' | 'select'
-    | 'image' | 'separator' | 'progress' | 'list';
+    | 'image' | 'separator' | 'progress' | 'list'
+    | 'html-view';
 
 type WindowUiEventType = 'click' | 'change' | 'submit' | 'dblclick' | 'contextmenu' | 'contextmenu-select';
 
@@ -171,10 +172,16 @@ interface WindowListNode extends WindowUiNodeBase {
     children?: WindowUiNode[];
 }
 
+interface WindowHtmlViewNode extends WindowUiNodeBase {
+    type: 'html-view';
+    html: string;
+}
+
 type WindowUiNode =
     | WindowLabelNode | WindowButtonNode | WindowPanelNode | WindowStackNode
     | WindowInputNode | WindowTextareaNode | WindowCheckboxNode | WindowSelectNode
-    | WindowImageNode | WindowSeparatorNode | WindowProgressNode | WindowListNode;
+    | WindowImageNode | WindowSeparatorNode | WindowProgressNode | WindowListNode
+    | WindowHtmlViewNode;
 
 interface WindowUiNodePatch {
     text?: string;
@@ -188,6 +195,7 @@ interface WindowUiNodePatch {
     label?: string;
     color?: string;
     rows?: number;
+    html?: string;
 }
 
 interface WindowUiEvent {
@@ -256,6 +264,7 @@ export type {
     WindowCommand,
     WindowControlType,
     WindowDescriptor,
+    WindowHtmlViewNode,
     WindowImageNode,
     WindowInitOptions,
     WindowInputNode,
