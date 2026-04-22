@@ -39,12 +39,16 @@
 
 ### 1. 啟用插件
 
-在 `public/plugins.json` 中加入 python-runtime 插件：
+在宿主應用程式中載入 `sentryos-plugin-python-runtime`：
 
-```json
-[
-    "/plugins/python-runtime.js"
-]
+```typescript
+import { createSentryOS } from 'sentryos';
+import pythonRuntimePlugin from 'sentryos-plugin-python-runtime';
+
+createSentryOS({
+    container: document.getElementById('app')!,
+    pluginInstances: [pythonRuntimePlugin],
+});
 ```
 
 ### 2. 建立應用目錄
@@ -419,23 +423,16 @@ import os  # ❌ ImportError: Module 'os' is blocked in the SentryOS sandbox
 
 ## 載入插件
 
-### 方式 A：從 SentryOS 插件目錄載入（推薦）
-
-在 `public/plugins/` 中加入插件 JS 檔案，並在 `public/plugins.json` 中登錄：
-
-```json
-["/plugins/python-runtime.js"]
-```
-
-### 方式 B：從 npm 套件整合（TypeScript 開發）
-
-如果你正在開發 SentryOS 本體或自訂 fork，可以直接引用 npm 套件：
+安裝 `sentryos-plugin-python-runtime` 後，在宿主應用程式的 `pluginInstances` 中加入：
 
 ```typescript
+import { createSentryOS } from 'sentryos';
 import pythonRuntimePlugin from 'sentryos-plugin-python-runtime';
 
-// 在插件列表中加入
-const plugins = [pythonRuntimePlugin, ...otherPlugins];
+createSentryOS({
+    container: document.getElementById('app')!,
+    pluginInstances: [pythonRuntimePlugin],
+});
 ```
 
 ### 注意事項

@@ -44,6 +44,10 @@
 |------|------|------|
 | **主應用** | `apps/sentryos/` | Vite + TypeScript 主程式 |
 | **SDK** | `packages/sdk/` | `sentryos-sdk` — 型別定義與常數，供 App / Plugin 開發使用 |
+| **腳手架工具** | `packages/sentryos-create/` | `sentryos-create` — 互動式插件 / 應用程式骨架產生器 |
+| **HTML View 插件** | `packages/plugin-html-view/` | `sentryos-plugin-html-view` — 沙箱 HTML 渲染元件 |
+| **Code Editor 插件** | `packages/plugin-monaco-editor/` | `sentryos-plugin-code-editor` — Monaco Editor 程式碼編輯器 |
+| **Lite Editor 插件** | `packages/plugin-codemirror-editor/` | `sentryos-plugin-lite-editor` — CodeMirror 輕量版編輯器 |
 | **Lua Runtime 插件** | `packages/plugin-lua-runtime/` | `sentryos-plugin-lua-runtime` — Lua 5.3 引擎（Fengari） |
 | **Python Runtime 插件** | `packages/plugin-python-runtime/` | `sentryos-plugin-python-runtime` — Python 3 引擎（Pyodide） |
 
@@ -60,7 +64,6 @@
 | **Window** | `apps/sentryos/src/window/` | 視窗生命週期、UI 元件 Registry |
 | **UI** | `apps/sentryos/src/ui/` | 桌面 DOM 組裝與互動 |
 | **Public Apps** | `apps/sentryos/public/apps/` | 只透過 Host API 與系統溝通 |
-| **Plugins** | `apps/sentryos/public/plugins/` | 插件（lua-runtime、monaco-editor 等） |
 
 ### 啟動摘要
 

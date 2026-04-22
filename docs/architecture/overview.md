@@ -126,7 +126,7 @@ SentryOS 是一個基於瀏覽器的作業系統模擬器，使用 Vite + TypeSc
  9. 建立 ApplicationLauncher、DialogManager、WindowManager
 10. 連接事件（視窗生命週期、鍵盤、工作列互動）
 11. 註冊所有 Host API 到 RuntimeRegistry
-12. 載入插件（fetch /plugins.json → PluginManager.loadPlugins()）
+12. 載入插件（NPM 套件實例 → PluginManager.loadPluginModules()；/plugins.json → loadPlugins()）
 13. 啟動 Library 類應用（程式庫預載）
 14. 啟動 autoStart 應用（Service 等自動啟動的應用）
 15. 銷毀啟動畫面
@@ -228,14 +228,25 @@ interface IRuntime {
 
 ### 載入流程
 
+插件透過兩種方式載入，均由 `PluginManager` 統一管理：
+
 ```
-/plugins.json → 插件路徑列表
+方式 A（推薦）：NPM 套件實例
+createSentryOS({ pluginInstances: [htmlViewPlugin, luaRuntimePlugin, ...] })
     ↓
-PluginManager.loadPlugins()
+PluginManager.loadPluginModules(modules)
+
+方式 B：動態 URL 路徑（自訂擴充）
+/plugins.json → 路徑列表
     ↓
-Phase 1: 並行 fetch 所有 .js 模組（動態 import）
+PluginManager.loadPlugins(paths) → fetch → blob URL import
+```
+
+兩種方式均執行：
+```
+Phase 1: 驗證 pluginName / setup / teardown
     ↓
-Phase 2: 拓撲排序（按 dependencies 依賴解析）
+Phase 2: 拓撲排序（Kahn's 算法，按 dependencies 依賴解析）
     ↓
 Phase 3: 依序呼叫 setup(context)
 ```

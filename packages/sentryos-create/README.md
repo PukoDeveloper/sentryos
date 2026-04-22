@@ -1,6 +1,14 @@
-# create-sentryos
+# sentryos-create
 
 SentryOS 開發環境快速建立工具。一個指令即可生成插件或應用程式的完整專案骨架。
+
+## 安裝
+
+```bash
+npm install -g sentryos-create
+# 或直接使用 npx
+npx sentryos-create [plugin|app]
+```
 
 ## 使用方式
 
@@ -20,7 +28,7 @@ pnpm scaffold:app
 或直接呼叫：
 
 ```bash
-node packages/create-sentryos/index.js [plugin|app]
+node packages/sentryos-create/index.js [plugin|app]
 ```
 
 ## 功能
@@ -48,7 +56,16 @@ pnpm install
 pnpm build
 ```
 
-將 `dist/index.js` 部署至 `apps/sentryos/public/plugins/`，並在 `plugins.json` 中加入路徑。
+在宿主應用程式的 `createSentryOS({ pluginInstances: [...] })` 中加入此插件實例：
+
+```typescript
+import myPlugin from 'sentryos-plugin-<name>';
+
+createSentryOS({
+    container: document.getElementById('app')!,
+    pluginInstances: [myPlugin],
+});
+```
 
 ### 建立 App
 

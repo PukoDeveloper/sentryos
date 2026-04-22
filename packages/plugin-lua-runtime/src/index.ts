@@ -25,8 +25,6 @@ function setup(context: PluginContext): void {
     let fengari: typeof FengariWeb;
     try {
       // When bundled by Vite this resolves the npm package.
-      // When loaded as a standalone blob URL it resolves from the CDN
-      // import declared in the public/plugins JS counterpart.
       fengari = await import('fengari-web');
     } catch (err) {
       context.log('ERROR', `lua-runtime: failed to load fengari-web — ${String(err)}`);

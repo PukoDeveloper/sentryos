@@ -1,6 +1,6 @@
 {
   "name": "sentryos",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "SentryOS — A lightweight plugin-based OS-like runtime for the browser",
   "license": "MIT",
@@ -20,14 +20,18 @@
     "build": "tsc && vite build",
     "build:lib": "tsc && vite build --mode lib",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
+    "jsdom": "^29.0.2",
+    "sentryos-plugin-code-editor": "workspace:*",
+    "sentryos-plugin-html-view": "workspace:*",
+    "sentryos-plugin-lua-runtime": "workspace:*",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "sentryos-plugin-html-view": "workspace:*",
-    "sentryos-plugin-code-editor": "workspace:*",
-    "sentryos-plugin-lua-runtime": "workspace:*"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "quickjs-emscripten": "^0.32.0",

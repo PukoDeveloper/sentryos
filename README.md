@@ -66,7 +66,7 @@ pnpm scaffold:plugin
 pnpm scaffold:app
 ```
 
-詳見 [create-sentryos README](./packages/create-sentryos/README.md)。
+詳見 [sentryos-create README](./packages/sentryos-create/README.md)。
 
 ## Monorepo 結構
 

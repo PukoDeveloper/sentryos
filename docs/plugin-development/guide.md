@@ -8,38 +8,54 @@
 
 ### 最小可行插件
 
-```javascript
-// /plugins/my-plugin.js
+```typescript
+// packages/plugin-my-plugin/src/index.ts
+import type { SentryPlugin, PluginContext } from 'sentryos-sdk';
 
-function setup(context) {
+function setup(context: PluginContext): void {
     context.log('INFO', 'My Plugin loaded');
 }
 
-function teardown(context) {
+function teardown(context: PluginContext): void {
     context.log('INFO', 'My Plugin unloaded');
 }
 
-export default {
+const myPlugin: SentryPlugin = {
     pluginName: 'my-plugin',
     pluginVersion: '1.0.0',
     pluginDescription: '最小範例插件',
     setup,
     teardown,
 };
+
+export default myPlugin;
 ```
 
-### 註冊插件
+### 建立插件套件
 
-在 `public/plugins.json` 中加入路徑：
+使用腳手架工具快速建立插件骨架：
 
-```json
-[
-    "/plugins/dev.js",
-    "/plugins/my-plugin.js"
-]
+```sh
+pnpm scaffold:plugin
 ```
 
-系統開機時會自動按順序載入所有插件。
+腳手架會在 `packages/` 下建立完整的 TypeScript 插件套件，包含 `package.json`、`tsconfig.json` 和入口點。
+
+### 在主應用程式中載入插件
+
+插件以 NPM 套件形式發布，在宿主應用程式中透過 `createSentryOS` 傳入：
+
+```typescript
+import { createSentryOS } from 'sentryos';
+import myPlugin from 'sentryos-plugin-my-plugin';
+
+createSentryOS({
+    container: document.getElementById('app')!,
+    pluginInstances: [myPlugin],
+});
+```
+
+系統開機時會依依賴順序自動呼叫各插件的 `setup(context)`。
 
 ---
 
@@ -437,26 +453,28 @@ context.log('ERROR', 'Something went wrong');
 
 ## 完整範例：自訂 API 插件
 
-```javascript
-// /plugins/math-api.js
+```typescript
+import type { SentryPlugin, PluginContext } from 'sentryos-sdk';
 
-function setup(context) {
+function setup(context: PluginContext): void {
     // 註冊 OS.math.* API
     context.registerApi(
         'mathApi',
-        (ctx) => ({
-            fibonacci: (n) => {
-                if (n <= 1) return n;
+        (_ctx) => ({
+            fibonacci: (n: unknown) => {
+                const num = n as number;
+                if (num <= 1) return num;
                 let a = 0, b = 1;
-                for (let i = 2; i <= n; i++) {
+                for (let i = 2; i <= num; i++) {
                     [a, b] = [b, a + b];
                 }
                 return b;
             },
-            isPrime: (n) => {
-                if (n < 2) return false;
-                for (let i = 2; i <= Math.sqrt(n); i++) {
-                    if (n % i === 0) return false;
+            isPrime: (n: unknown) => {
+                const num = n as number;
+                if (num < 2) return false;
+                for (let i = 2; i <= Math.sqrt(num); i++) {
+                    if (num % i === 0) return false;
                 }
                 return true;
             },
@@ -467,18 +485,18 @@ function setup(context) {
 
     // 監聽程序啟動事件
     context.on('process.started', (data) => {
-        context.log('INFO', `Math API available for PID ${data.pid}`);
+        context.log('INFO', `Math API available for PID ${(data as { pid: number }).pid}`);
     });
 
     context.log('INFO', 'Math API plugin loaded');
 }
 
-function teardown(context) {
+function teardown(context: PluginContext): void {
     context.log('INFO', 'Math API plugin unloading');
     // registerApi 和 on 的清理由 context.cleanup() 自動處理
 }
 
-export default {
+const mathApiPlugin: SentryPlugin = {
     pluginName: 'math-api',
     pluginVersion: '1.0.0',
     pluginDescription: '提供數學運算 API',
@@ -487,6 +505,8 @@ export default {
     setup,
     teardown,
 };
+
+export default mathApiPlugin;
 ```
 
 應用程式使用方式：
@@ -503,34 +523,34 @@ const prime = OS.math.isPrime(17);     // true
 
 以下是使用 **Adapter 模式**（推薦）的 Lua Runtime 插件範例：
 
-```javascript
-// /plugins/lua-runtime.js
+```typescript
+import type { SentryPlugin, PluginContext } from 'sentryos-sdk';
 import { LuaFactory } from 'wasmoon';
 
-let factory;
+let factory: InstanceType<typeof LuaFactory> | undefined;
 
-async function setup(context) {
+async function setup(context: PluginContext): Promise<void> {
     factory = await new LuaFactory();
 
     const runtime = context.createRuntime({
-        createSandbox(pid) {
-            return factory.createEngine();
+        createSandbox(_pid: number) {
+            return factory!.createEngine();
         },
-        injectGlobals(lua, apiSurface) {
+        injectGlobals(lua: unknown, apiSurface: Record<string, unknown>) {
             // 將整個 OS API 表面注入 Lua 全域空間
             for (const [ns, methods] of Object.entries(apiSurface)) {
-                lua.global.set(ns, methods);
+                (lua as any).global.set(ns, methods);
             }
         },
-        execute(lua, code, timeoutMs) {
-            return lua.doString(code);
+        execute(lua: unknown, code: string, _timeoutMs?: number) {
+            return (lua as any).doString(code);
         },
-        destroy(lua) {
-            lua.global.close();
+        destroy(lua: unknown) {
+            (lua as any).global.close();
         },
-        callHandler(lua, handlerName, arg) {
+        callHandler(lua: unknown, handlerName: string, arg: unknown) {
             // 直接呼叫 Lua 全域函式（用於事件派發）
-            const fn = lua.global.get(handlerName);
+            const fn = (lua as any).global.get(handlerName);
             if (typeof fn === 'function') return fn(arg);
         },
     });
@@ -539,18 +559,19 @@ async function setup(context) {
     context.log('INFO', 'Lua runtime engine registered (adapter mode)');
 }
 
-function teardown(context) {
+function teardown(context: PluginContext): void {
     context.log('INFO', 'Lua runtime engine unregistered');
 }
 
-export default {
+const luaRuntimePlugin: SentryPlugin = {
     pluginName: 'lua-runtime',
     pluginVersion: '1.0.0',
     pluginDescription: 'Lua 5.4 runtime engine (Wasmoon)',
-    dependencies: [],
     setup,
     teardown,
 };
+
+export default luaRuntimePlugin;
 ```
 
 使用 Adapter 模式時，IPC 路由、事件訂閱/取消、API 表面建構（buildApiSurface）等全部由 `AdapterRuntime` 自動處理。事件派發（如 `onWindowEvent`）透過 `callHandler` 直接呼叫沙箱中的函式，不會產生任何語言特定的程式碼字串。
@@ -561,8 +582,8 @@ export default {
 
 以下是使用 **Adapter 模式**與 **Pyodide（CPython WASM）** 的 Python Runtime 插件範例，提供與 QuickJS 等級相同的沙箱安全性：
 
-```javascript
-// /plugins/python-runtime.js
+```typescript
+import type { SentryPlugin, PluginContext } from 'sentryos-sdk';
 import { loadPyodide } from 'pyodide';
 
 // Python 沙箱初始化程式碼（在 Pyodide 主 globals 中執行一次）
@@ -609,8 +630,8 @@ def call_handler(ns, handler_name, arg):
     return None
 `;
 
-async function setup(context) {
-    let pyodide;
+async function setup(context: PluginContext): Promise<void> {
+    let pyodide: Awaited<ReturnType<typeof loadPyodide>>;
     try {
         pyodide = await loadPyodide({
             indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/'
@@ -654,17 +675,19 @@ async function setup(context) {
     context.log('INFO', 'python-runtime: Python 3 引擎已註冊（Pyodide）');
 }
 
-function teardown(context) {
+function teardown(context: PluginContext): void {
     context.log('INFO', 'python-runtime: Python 3 引擎已卸載');
 }
 
-export default {
+const pythonRuntimePlugin: SentryPlugin = {
     pluginName: 'python-runtime',
     pluginVersion: '1.0.0',
     pluginDescription: 'Python 3 runtime engine (Pyodide WASM)',
     setup,
     teardown,
 };
+
+export default pythonRuntimePlugin;
 ```
 
 應用程式 manifest 設定：
