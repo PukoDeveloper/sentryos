@@ -22,7 +22,7 @@ importers:
         version: 29.0.2
       sentryos-plugin-code-editor:
         specifier: workspace:*
-        version: link:../../packages/plugin-monaco-editor
+        version: link:../../packages/plugin-code-editor
       sentryos-plugin-html-view:
         specifier: workspace:*
         version: link:../../packages/plugin-html-view
@@ -39,9 +39,30 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(jsdom@29.0.2)
 
-  packages/create-sentryos: {}
+  packages/plugin-code-editor:
+    dependencies:
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
+      sentryos-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
-  packages/plugin-codemirror-editor:
+  packages/plugin-html-view:
+    dependencies:
+      sentryos-sdk:
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
+  packages/plugin-lite-editor:
     dependencies:
       '@codemirror/autocomplete':
         specifier: ^6.20.1
@@ -75,34 +96,11 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
-  packages/plugin-html-view:
-    dependencies:
-      sentryos-sdk:
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-
   packages/plugin-lua-runtime:
     dependencies:
       fengari-web:
         specifier: ^0.1.4
         version: 0.1.4
-      sentryos-sdk:
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-
-  packages/plugin-monaco-editor:
-    dependencies:
-      monaco-editor:
-        specifier: ^0.55.1
-        version: 0.55.1
       sentryos-sdk:
         specifier: workspace:*
         version: link:../sdk
