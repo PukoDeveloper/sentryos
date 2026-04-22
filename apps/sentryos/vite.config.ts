@@ -1,9 +1,14 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import { resolve } from "path";
 
 export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ['quickjs-emscripten']
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
   ...(mode === 'lib' ? {
     build: {
