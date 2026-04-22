@@ -40,7 +40,8 @@ jobs:
       - name: Build sentryos-sdk
         if: >
           github.event_name == 'push' ||
-          contains(github.event.inputs.packages, 'sdk')
+          contains(github.event.inputs.packages, 'sdk') ||
+          contains(github.event.inputs.packages, 'sentryos')
         run: pnpm --filter sentryos-sdk build
 
       - name: Publish sentryos-sdk
@@ -53,6 +54,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # ── sentryos（本體）─────────────────────────────────────────────────────
+      - name: Build sentryos plugins
+        if: >
+          github.event_name == 'push' ||
+          contains(github.event.inputs.packages, 'sentryos')
+        run: pnpm --filter 'sentryos-plugin-*' --parallel build
+
       - name: Build sentryos
         if: >
           github.event_name == 'push' ||
