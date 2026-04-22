@@ -188,8 +188,9 @@ async function scaffoldPlugin(rl) {
     ${cyan('pnpm build')}             # 編譯 TypeScript → dist/
 
   ${bold('將插件載入 SentryOS：')}
-    編輯 ${gray('apps/sentryos/public/plugins.json')}，加入插件路徑：
-    ${gray(`"plugins/${pkgName}.js"`)}  ${yellow('（需先將 dist/index.js 部署至 public/plugins/）')}
+    在宿主應用程式的 ${gray('createSentryOS({ pluginInstances: [...] })')} 中加入此插件實例：
+    ${gray(`import ${name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}Plugin from '${pkgName}';`)}
+    ${gray(`// pluginInstances: [${name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}Plugin]`)}
 
   ${bold('文件：')}
     ${gray('docs/plugin-development/guide.md')}
@@ -420,7 +421,7 @@ async function scaffoldApp(rl) {
   }
 
   const engineNote = engine !== 'javascript'
-    ? `\n  ${yellow('!')} 使用 ${engine} 引擎，請確認已在 ${gray('plugins.json')} 中載入對應的 runtime 插件\n`
+    ? `\n  ${yellow('!')} 使用 ${engine} 引擎，請確認已在 ${gray('createSentryOS({ pluginInstances: [...] })')} 中載入對應的 runtime 插件\n`
     : '';
 
   console.log(`
