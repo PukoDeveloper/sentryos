@@ -1,6 +1,6 @@
 {
   "name": "sentryos",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "SentryOS — A lightweight plugin-based OS-like runtime for the browser",
   "license": "MIT",

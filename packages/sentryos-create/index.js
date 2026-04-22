@@ -446,7 +446,7 @@ ${bold(cyan('╚═════════════════════�
   // Handle --help / -h
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
-    console.log(`用法：node packages/create-sentryos/index.js [plugin|app]
+    console.log(`用法：node packages/sentryos-create/index.js [plugin|app]
 
   ${bold('plugin')}   建立插件開發骨架（TypeScript 套件）
   ${bold('app')}      建立應用程式開發骨架（JS / Lua / Python）

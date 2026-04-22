@@ -44,7 +44,7 @@
 |------|------|------|
 | **主應用** | `apps/sentryos/` | Vite + TypeScript 主程式 |
 | **SDK** | `packages/sdk/` | `sentryos-sdk` — 型別定義與常數，供 App / Plugin 開發使用 |
-| **腳手架工具** | `packages/create-sentryos/` | `create-sentryos` — 互動式插件 / 應用程式骨架產生器 |
+| **腳手架工具** | `packages/sentryos-create/` | `sentryos-create` — 互動式插件 / 應用程式骨架產生器 |
 | **HTML View 插件** | `packages/plugin-html-view/` | `sentryos-plugin-html-view` — 沙箱 HTML 渲染元件 |
 | **Code Editor 插件** | `packages/plugin-monaco-editor/` | `sentryos-plugin-code-editor` — Monaco Editor 程式碼編輯器 |
 | **Lite Editor 插件** | `packages/plugin-codemirror-editor/` | `sentryos-plugin-lite-editor` — CodeMirror 輕量版編輯器 |
