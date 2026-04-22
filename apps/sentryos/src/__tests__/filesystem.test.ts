@@ -6,16 +6,12 @@ import { Permissions } from '../kernel/constants';
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function makeFs(options?: { persistenceKey?: null }) {
+function makeFs() {
   const { kernel, systemAppId } = buildKernelWithPermissions();
-  // Disable localStorage persistence by passing persistenceKey: null so tests
-  // remain hermetic and do not require a real browser storage backend.
-  const fs = new WebFileSystemAdapter(kernel, {
-    persistenceKey: options?.persistenceKey === null ? undefined : undefined,
-    totalCapacity: 1024 * 1024,
-  });
-  // Override persistence key to null to prevent localStorage I/O in tests
-  (fs as unknown as { persistenceKey: null }).persistenceKey = null;
+  const fs = new WebFileSystemAdapter(kernel, { totalCapacity: 1024 * 1024 });
+  // Disable persistence to keep tests hermetic (no localStorage I/O).
+  // The field is readonly in TypeScript but mutable at runtime.
+  (fs as unknown as { persistenceKey: string | null }).persistenceKey = null;
   kernel.register('fileSystem', fs);
   return { kernel, fs, systemAppId };
 }
