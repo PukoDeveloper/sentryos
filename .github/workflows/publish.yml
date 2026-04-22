@@ -81,7 +81,7 @@ jobs:
         if: >
           github.event_name == 'push' ||
           contains(github.event.inputs.packages, 'create-sentryos')
-        working-directory: packages/create-sentryos
+        working-directory: packages/sentryos-create
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
