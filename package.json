@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "pnpm --filter sentryos dev",
-    "build": "pnpm --filter sentryos-sdk build && pnpm --filter sentryos build",
+    "build": "pnpm --filter sentryos-sdk build && pnpm --filter 'sentryos-plugin-*' --parallel build && pnpm --filter sentryos build",
     "build:sdk": "pnpm --filter sentryos-sdk build",
     "preview": "pnpm --filter sentryos preview",
     "scaffold": "node packages/create-sentryos/index.js",
