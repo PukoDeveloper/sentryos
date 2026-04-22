@@ -13,6 +13,10 @@ importers:
       quickjs-emscripten:
         specifier: ^0.32.0
         version: 0.32.0
+      sentryos-sdk:
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
       sentryos-plugin-code-editor:
         specifier: workspace:*
         version: link:../../packages/plugin-monaco-editor
@@ -22,16 +26,14 @@ importers:
       sentryos-plugin-lua-runtime:
         specifier: workspace:*
         version: link:../../packages/plugin-lua-runtime
-      sentryos-sdk:
-        specifier: workspace:*
-        version: link:../../packages/sdk
-    devDependencies:
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
       vite:
         specifier: ^7.2.4
         version: 7.3.2
+
+  packages/create-sentryos: {}
 
   packages/plugin-codemirror-editor:
     dependencies:
