@@ -1,9 +1,13 @@
 name: Publish to npm
 
 on:
-  # 手動觸發，可選擇要發布哪些套件
+  # 手動觸發，可選擇要發布哪些套件及指定版本號
   workflow_dispatch:
     inputs:
+      version:
+        description: '要發布的版本號（例如：1.2.3），留空則使用各套件現有版本'
+        required: false
+        default: ''
       packages:
         description: '要發布的套件（逗號分隔：sentryos, sdk, create-sentryos）'
         required: false
@@ -35,6 +39,39 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # ── 版本號解析與更新 ──────────────────────────────────────────────────────
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # 從 tag 中移除前置 'v'（例如 v1.2.3 → 1.2.3）
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump all package versions
+        if: steps.version.outputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # 自動探索 apps/ 與 packages/ 下的所有 package.json（排除 node_modules）
+          while IFS= read -r PKG; do
+            node -e "
+              const fs = require('fs');
+              try {
+                const pkg = JSON.parse(fs.readFileSync('${PKG}', 'utf8'));
+                pkg.version = process.env.VERSION;
+                fs.writeFileSync('${PKG}', JSON.stringify(pkg, null, 2) + '\n');
+                console.log('Updated ${PKG} to ' + process.env.VERSION);
+              } catch (err) {
+                console.error('Failed to update ${PKG}:', err.message);
+                process.exit(1);
+              }
+            "
+          done < <(find apps packages -name 'package.json' -not -path '*/node_modules/*')
 
       # ── sentryos-sdk ─────────────────────────────────────────────────────────
       - name: Build sentryos-sdk
