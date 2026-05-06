@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build --mode lib",
+    "build:lib": "tsc && vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
