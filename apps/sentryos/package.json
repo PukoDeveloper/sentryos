@@ -17,24 +17,21 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:lib": "tsc && vite build --mode lib",
-    "preview": "vite preview",
+    "build": "tsc && vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
     "jsdom": "^29.0.2",
-    "sentryos-plugin-code-editor": "workspace:*",
-    "sentryos-plugin-html-view": "workspace:*",
-    "sentryos-plugin-lua-runtime": "workspace:*",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "quickjs-emscripten": "^0.32.0",
-    "sentryos-sdk": "workspace:*"
+    "quickjs-emscripten": "^0.32.0"
+  },
+  "peerDependencies": {
+    "sentryos-sdk": ">=1.0.0"
   }
 }

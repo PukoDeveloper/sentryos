@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "paths": {
+      "sentryos": ["../sentryos/src/index.ts"],
+      "sentryos/*": ["../sentryos/src/*"],
+      "sentryos-plugin-html-view": ["../../packages/plugin-html-view/src/index.ts"],
+      "sentryos-plugin-code-editor": ["../../packages/plugin-code-editor/src/index.ts"],
+      "sentryos-plugin-lua-runtime": ["../../packages/plugin-lua-runtime/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts",
+    "../../packages/plugin-html-view/src",
+    "../../packages/plugin-code-editor/src",
+    "../../packages/plugin-lua-runtime/src"
+  ]
+}
