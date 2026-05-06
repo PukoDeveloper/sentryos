@@ -20,8 +20,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "sentryos-sdk": "workspace:*"
+  "peerDependencies": {
+    "sentryos-sdk": ">=1.0.0"
   },
   "devDependencies": {
     "typescript": "~5.9.3"

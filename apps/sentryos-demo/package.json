@@ -1,0 +1,22 @@
+{
+  "name": "sentryos-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SentryOS development demo — runs the full OS with all built-in plugins",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "sentryos": "workspace:*",
+    "sentryos-plugin-code-editor": "workspace:*",
+    "sentryos-plugin-html-view": "workspace:*",
+    "sentryos-plugin-lua-runtime": "workspace:*",
+    "sentryos-sdk": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
+}

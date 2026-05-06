@@ -1,9 +1,8 @@
+// Pure-core entry point — no plugins loaded.
+// To run SentryOS with plugins, see apps/sentryos-demo.
 import './style.css';
 import { createSentryOS } from './bootstrap/systemBootstrap';
 import { bios } from './ui/Bios';
-import htmlViewPlugin from 'sentryos-plugin-html-view';
-import codeEditorPlugin from 'sentryos-plugin-code-editor';
-import luaRuntimePlugin from 'sentryos-plugin-lua-runtime';
 
 const container = document.getElementById('app');
 if (!container) {
@@ -13,7 +12,7 @@ if (!container) {
 createSentryOS({
   container,
   onRestart: () => location.reload(),
-  pluginInstances: [htmlViewPlugin, codeEditorPlugin, luaRuntimePlugin],
+  pluginInstances: [],
 }).catch((error) => {
   console.error('[BOOT] [CRITICAL] Fatal boot error', error);
   const details = error instanceof Error

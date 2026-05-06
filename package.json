@@ -5,10 +5,10 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "pnpm --filter sentryos dev",
+    "dev": "pnpm --filter sentryos-demo dev",
     "build": "pnpm --filter sentryos-sdk build && pnpm --filter 'sentryos-plugin-*' --parallel build && pnpm --filter sentryos build",
     "build:sdk": "pnpm --filter sentryos-sdk build",
-    "preview": "pnpm --filter sentryos preview",
+    "preview": "pnpm --filter sentryos-demo preview",
     "scaffold": "node packages/sentryos-create/index.js",
     "scaffold:plugin": "node packages/sentryos-create/index.js plugin",
     "scaffold:app": "node packages/sentryos-create/index.js app"

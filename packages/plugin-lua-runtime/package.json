@@ -21,8 +21,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "fengari-web": "^0.1.4",
-    "sentryos-sdk": "workspace:*"
+    "fengari-web": "^0.1.4"
+  },
+  "peerDependencies": {
+    "sentryos-sdk": ">=1.0.0"
   },
   "devDependencies": {
     "typescript": "~5.9.3"

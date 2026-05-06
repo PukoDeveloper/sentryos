@@ -21,8 +21,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "monaco-editor": "^0.55.1",
-    "sentryos-sdk": "workspace:*"
+    "monaco-editor": "^0.55.1"
+  },
+  "peerDependencies": {
+    "sentryos-sdk": ">=1.0.0"
   },
   "devDependencies": {
     "typescript": "~5.9.3"
