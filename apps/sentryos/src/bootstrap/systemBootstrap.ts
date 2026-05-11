@@ -75,6 +75,11 @@ export interface SentryOSOptions {
   /**
    * System bootstrap configuration. By default no application catalog, plugin
    * list, or built-in app registry is injected.
+   *
+   * Precedence rules:
+   * - `appCatalogEntries` takes precedence over `appCatalogUrl`.
+   * - `pluginPaths` takes precedence over `pluginListUrl`.
+   * - `system.*` URL fields take precedence over legacy `config.*`.
    */
   system?: {
     /** Predefined permissions granted to the login user session. */
@@ -97,8 +102,11 @@ export interface SentryOSOptions {
     defaultRegistryFileTypes?: Record<string, { handler: string; mime?: string }>;
   };
   /**
-   * @deprecated Use `system` instead.
+   * @deprecated Use `system` instead. Planned removal: v2.0.0.
    * Legacy URL overrides for catalog / auth endpoints.
+   *
+   * Migration: move `config.authConfigUrl/appCatalogUrl/pluginListUrl`
+   * to `system.authConfigUrl/appCatalogUrl/pluginListUrl`.
    */
   config?: {
     authConfigUrl?: string;
