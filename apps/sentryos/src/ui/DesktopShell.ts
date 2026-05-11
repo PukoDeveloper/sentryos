@@ -40,6 +40,7 @@ type ThemeSettings = {
 };
 
 type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
+const MOBILE_TASKBAR_BREAKPOINT = 720;
 
 class DesktopShell {
   private root: HTMLDivElement | null = null;
@@ -79,9 +80,11 @@ class DesktopShell {
   private pinnedAppIds: string[] = [];
   private expandedPackage: string | null = null;
   private taskbarMode: TaskbarMode = 'docked';
+  private effectiveTaskbarMode: TaskbarMode = 'docked';
   private taskbarTrigger: HTMLDivElement | null = null;
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
+  private viewportResizeHandler: (() => void) | null = null;
   private locale: string = 'zh-TW';
   private translator: ((key: string) => string) | null = null;
   private compactExpanded = false;
@@ -251,6 +254,11 @@ class DesktopShell {
     this.searchTabEl = searchTab;
     this.addFolderBtnEl = addFolderBtn;
     this.clockLabel = clock;
+    this.viewportResizeHandler = () => {
+      this.applyAdaptiveTaskbarMode();
+    };
+    window.addEventListener('resize', this.viewportResizeHandler);
+    this.applyAdaptiveTaskbarMode(true);
 
     startButton.addEventListener('click', () => {
       this.toggleStartPanel();
@@ -328,6 +336,10 @@ class DesktopShell {
     if (this.clockTimer !== null) {
       window.clearInterval(this.clockTimer);
       this.clockTimer = null;
+    }
+    if (this.viewportResizeHandler) {
+      window.removeEventListener('resize', this.viewportResizeHandler);
+      this.viewportResizeHandler = null;
     }
 
     this.closeGroupPopup();
@@ -493,9 +505,23 @@ class DesktopShell {
 
   // ── Floating taskbar ──────────────────────────────────────
 
-  setTaskbarMode(mode: TaskbarMode): void {
-    if (mode === this.taskbarMode) return;
-    this.taskbarMode = mode;
+  private resolveAdaptiveTaskbarMode(): TaskbarMode {
+    const isCompactViewport =
+      typeof window.matchMedia === 'function'
+      && window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`).matches;
+    if (isCompactViewport && this.taskbarMode === 'docked') {
+      return 'fullwidth';
+    }
+    return this.taskbarMode;
+  }
+
+  private applyAdaptiveTaskbarMode(force = false): void {
+    this.applyTaskbarMode(this.resolveAdaptiveTaskbarMode(), force);
+  }
+
+  private applyTaskbarMode(mode: TaskbarMode, force = false): void {
+    if (!force && mode === this.effectiveTaskbarMode) return;
+    this.effectiveTaskbarMode = mode;
 
     if (!this.taskbarEl || !this.taskbarTrigger) return;
 
@@ -524,8 +550,17 @@ class DesktopShell {
     this.taskbarModeChangeHandler?.(mode);
   }
 
+  setTaskbarMode(mode: TaskbarMode): void {
+    if (mode === this.taskbarMode) {
+      this.applyAdaptiveTaskbarMode();
+      return;
+    }
+    this.taskbarMode = mode;
+    this.applyAdaptiveTaskbarMode();
+  }
+
   getTaskbarMode(): TaskbarMode {
-    return this.taskbarMode;
+    return this.effectiveTaskbarMode;
   }
 
   onTaskbarModeChange(handler: (mode: TaskbarMode) => void): void {
