@@ -137,13 +137,17 @@ async function loadApplicationCatalog(source: string | string[]): Promise<Applic
 
         const applications: RegisteredApplication[] = [];
         const rejected: OsRejectedApp[] = [];
+        let resolvedManifestCount = 0;
+        let recognizedManifestCount = 0;
         for (const result of results) {
             if (result.status === 'rejected') {
                 console.warn('[ApplicationCatalog]', result.reason);
                 continue;
             }
+            resolvedManifestCount += 1;
             const { raw, basePath } = result.value;
             if (isPackageManifest(raw)) {
+                recognizedManifestCount += 1;
                 const pkg = raw as PackageManifest;
                 for (const app of pkg.apps) {
                     if (!isValidAppEntry(app)) {
@@ -158,6 +162,7 @@ async function loadApplicationCatalog(source: string | string[]): Promise<Applic
                     applications.push(toRegisteredApp(pkg, app, basePath));
                 }
             } else if (isLegacyManifest(raw)) {
+                recognizedManifestCount += 1;
                 const legacy = raw as LegacyManifest;
                 const compat = checkOsCompatibility(legacy.osVersion, OS_VERSION);
                 if (compat !== 'compatible') {
@@ -168,6 +173,13 @@ async function loadApplicationCatalog(source: string | string[]): Promise<Applic
             } else {
                 console.warn('[ApplicationCatalog] Unknown manifest format in:', basePath);
             }
+        }
+
+        if (entries.length > 0 && resolvedManifestCount === 0) {
+            return { success: false, error: 'ManifestNotFound' };
+        }
+        if (entries.length > 0 && recognizedManifestCount === 0) {
+            return { success: false, error: 'InvalidManifest' };
         }
 
         return { success: true, data: { apps: applications, rejected } };
@@ -347,13 +359,17 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
 
         const applications: RegisteredApplication[] = [];
         const rejected: OsRejectedApp[] = [];
+        let resolvedManifestCount = 0;
+        let recognizedManifestCount = 0;
         for (const result of results) {
             if (result.status === 'rejected') {
                 console.warn('[ApplicationCatalog] Remote manifest load failed:', result.reason);
                 continue;
             }
+            resolvedManifestCount += 1;
             const { raw, basePath } = result.value;
             if (isPackageManifest(raw)) {
+                recognizedManifestCount += 1;
                 const pkg = raw as PackageManifest;
                 for (const app of pkg.apps) {
                     if (!isValidAppEntry(app)) {
@@ -368,6 +384,7 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
                     applications.push(toRegisteredApp(pkg, app, basePath));
                 }
             } else if (isLegacyManifest(raw)) {
+                recognizedManifestCount += 1;
                 const legacy = raw as LegacyManifest;
                 const compat = checkOsCompatibility(legacy.osVersion, OS_VERSION);
                 if (compat !== 'compatible') {
@@ -378,6 +395,13 @@ async function loadRemoteApplicationCatalog(manifestUrls: string[]): Promise<App
             } else {
                 console.warn('[ApplicationCatalog] Unknown remote manifest format at:', basePath);
             }
+        }
+
+        if (manifestUrls.length > 0 && resolvedManifestCount === 0) {
+            return { success: false, error: 'ManifestNotFound' };
+        }
+        if (manifestUrls.length > 0 && recognizedManifestCount === 0) {
+            return { success: false, error: 'InvalidManifest' };
         }
 
         return { success: true, data: { apps: applications, rejected } };
