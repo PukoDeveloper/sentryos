@@ -400,7 +400,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   // Apply the current mode immediately — the saved theme may have already set
   // a non-default taskbar mode before onTaskbarModeChange was registered.
   {
-    const currentMode = desktopShell.getTaskbarMode();
+    const currentMode = desktopShell.getEffectiveTaskbarMode();
     const initialHeight = currentMode === 'docked' ? 96 : currentMode === 'fullwidth' ? 64 : 0;
     windowManager.setMaximizedTaskbarHeight(initialHeight, false);
   }

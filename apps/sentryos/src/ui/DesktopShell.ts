@@ -40,6 +40,7 @@ type ThemeSettings = {
 };
 
 type TaskbarMode = 'docked' | 'fullwidth' | 'floating-compact';
+const MOBILE_TASKBAR_BREAKPOINT = 720;
 
 class DesktopShell {
   private root: HTMLDivElement | null = null;
@@ -79,9 +80,12 @@ class DesktopShell {
   private pinnedAppIds: string[] = [];
   private expandedPackage: string | null = null;
   private taskbarMode: TaskbarMode = 'docked';
+  private effectiveTaskbarMode: TaskbarMode = 'docked';
   private taskbarTrigger: HTMLDivElement | null = null;
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
+  private compactViewportMediaQuery: MediaQueryList | null = null;
+  private compactViewportChangeHandler: (() => void) | null = null;
   private locale: string = 'zh-TW';
   private translator: ((key: string) => string) | null = null;
   private compactExpanded = false;
@@ -251,6 +255,18 @@ class DesktopShell {
     this.searchTabEl = searchTab;
     this.addFolderBtnEl = addFolderBtn;
     this.clockLabel = clock;
+    if (typeof window.matchMedia === 'function') {
+      this.compactViewportMediaQuery = window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`);
+      this.compactViewportChangeHandler = () => {
+        this.applyAdaptiveTaskbarMode();
+      };
+      if (typeof this.compactViewportMediaQuery.addEventListener === 'function') {
+        this.compactViewportMediaQuery.addEventListener('change', this.compactViewportChangeHandler);
+      } else {
+        this.compactViewportMediaQuery.addListener(this.compactViewportChangeHandler);
+      }
+    }
+    this.applyAdaptiveTaskbarMode(true);
 
     startButton.addEventListener('click', () => {
       this.toggleStartPanel();
@@ -328,6 +344,15 @@ class DesktopShell {
     if (this.clockTimer !== null) {
       window.clearInterval(this.clockTimer);
       this.clockTimer = null;
+    }
+    if (this.compactViewportMediaQuery && this.compactViewportChangeHandler) {
+      if (typeof this.compactViewportMediaQuery.removeEventListener === 'function') {
+        this.compactViewportMediaQuery.removeEventListener('change', this.compactViewportChangeHandler);
+      } else {
+        this.compactViewportMediaQuery.removeListener(this.compactViewportChangeHandler);
+      }
+      this.compactViewportMediaQuery = null;
+      this.compactViewportChangeHandler = null;
     }
 
     this.closeGroupPopup();
@@ -493,9 +518,27 @@ class DesktopShell {
 
   // ── Floating taskbar ──────────────────────────────────────
 
-  setTaskbarMode(mode: TaskbarMode): void {
-    if (mode === this.taskbarMode) return;
-    this.taskbarMode = mode;
+  private isCompactViewport(): boolean {
+    return this.compactViewportMediaQuery?.matches
+      ?? (typeof window.matchMedia === 'function'
+        && window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`).matches);
+  }
+
+  private resolveAdaptiveTaskbarMode(): TaskbarMode {
+    const isCompactViewport = this.isCompactViewport();
+    if (isCompactViewport && this.taskbarMode === 'docked') {
+      return 'fullwidth';
+    }
+    return this.taskbarMode;
+  }
+
+  private applyAdaptiveTaskbarMode(force = false): void {
+    this.applyTaskbarMode(this.resolveAdaptiveTaskbarMode(), force);
+  }
+
+  private applyTaskbarMode(mode: TaskbarMode, force = false): void {
+    if (!force && mode === this.effectiveTaskbarMode) return;
+    this.effectiveTaskbarMode = mode;
 
     if (!this.taskbarEl || !this.taskbarTrigger) return;
 
@@ -524,8 +567,18 @@ class DesktopShell {
     this.taskbarModeChangeHandler?.(mode);
   }
 
+  setTaskbarMode(mode: TaskbarMode): void {
+    if (mode === this.taskbarMode) return;
+    this.taskbarMode = mode;
+    this.applyAdaptiveTaskbarMode();
+  }
+
   getTaskbarMode(): TaskbarMode {
     return this.taskbarMode;
+  }
+
+  getEffectiveTaskbarMode(): TaskbarMode {
+    return this.effectiveTaskbarMode;
   }
 
   onTaskbarModeChange(handler: (mode: TaskbarMode) => void): void {
