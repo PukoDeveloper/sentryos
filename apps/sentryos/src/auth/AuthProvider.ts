@@ -43,9 +43,9 @@ export class AuthProvider {
    * contains a valid `AUTH_ENDPOINT`, remote mode is activated.
    * Failures are silently ignored — the system falls back to local mode.
    */
-  async loadConfig(): Promise<void> {
+  async loadConfig(configUrl: string = '/auth.config.json'): Promise<void> {
     try {
-      const res = await fetch('/auth.config.json');
+      const res = await fetch(configUrl);
       if (!res.ok) return;
 
       const config: unknown = await res.json();

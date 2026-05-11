@@ -10,7 +10,8 @@
     ".": {
       "types": "./dist/sentryos.d.ts",
       "import": "./dist/sentryos.js"
-    }
+    },
+    "./style.css": "./dist/sentryos.css"
   },
   "files": [
     "dist"

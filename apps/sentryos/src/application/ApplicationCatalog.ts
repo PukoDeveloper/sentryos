@@ -104,16 +104,21 @@ type RegisteredApplication = Application & {
 
 // ── Catalog Loader ──────────────────────────────────────────
 
-async function loadApplicationCatalog(): Promise<ApplicationCatalogResult<CatalogData>> {
+async function loadApplicationCatalog(source: string | string[]): Promise<ApplicationCatalogResult<CatalogData>> {
     try {
-        const response = await fetch('/app.json');
-        if (!response.ok) {
-            return { success: false, error: 'ManifestNotFound' };
-        }
-
-        const entries = await response.json() as string[];
-        if (!Array.isArray(entries)) {
-            return { success: false, error: 'InvalidManifest' };
+        let entries: string[];
+        if (Array.isArray(source)) {
+            entries = source;
+        } else {
+            const response = await fetch(source);
+            if (!response.ok) {
+                return { success: false, error: 'ManifestNotFound' };
+            }
+            const loaded = await response.json() as string[];
+            if (!Array.isArray(loaded)) {
+                return { success: false, error: 'InvalidManifest' };
+            }
+            entries = loaded;
         }
 
         // 並行載入所有 manifest，個別失敗不影響其他 App

@@ -19,6 +19,7 @@
 
 export { createSentryOS } from './bootstrap/systemBootstrap';
 export type { SentryOSOptions, SentryOSInstance } from './bootstrap/systemBootstrap';
+export { DEFAULT_REGISTRY_ROLE_MAP, DEFAULT_REGISTRY_FILE_TYPE_MAP } from './bootstrap/systemBootstrap';
 export type { PluginModule } from './plugin/PluginManager';
 
 // ── Filesystem ────────────────────────────────────────────────────────────────
@@ -43,3 +44,4 @@ export type {
 //   fileSystem: (kernel: Kernel) => FileSystemAdapter
 export { Kernel } from './kernel/Kernel';
 export type { ServiceMap, ValueMap } from './kernel/Kernel';
+export { USER_DEFAULT_PERMISSIONS } from './kernel/constants';

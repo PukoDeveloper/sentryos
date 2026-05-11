@@ -1,8 +1,9 @@
 // Pure-core entry point — no plugins loaded.
 // To run SentryOS with plugins, see apps/sentryos-demo.
 import './style.css';
-import { createSentryOS } from './bootstrap/systemBootstrap';
+import { createSentryOS, DEFAULT_REGISTRY_FILE_TYPE_MAP, DEFAULT_REGISTRY_ROLE_MAP } from './bootstrap/systemBootstrap';
 import { bios } from './ui/Bios';
+import { USER_DEFAULT_PERMISSIONS } from './kernel/constants';
 
 const container = document.getElementById('app');
 if (!container) {
@@ -13,6 +14,15 @@ createSentryOS({
   container,
   onRestart: () => location.reload(),
   pluginInstances: [],
+  system: {
+    userDefaultPermissions: USER_DEFAULT_PERMISSIONS,
+    appCatalogUrl: '/app.json',
+    pluginListUrl: '/plugins.json',
+    authConfigUrl: '/auth.config.json',
+    enableBuiltinKernelConsole: true,
+    defaultRegistryRoles: DEFAULT_REGISTRY_ROLE_MAP,
+    defaultRegistryFileTypes: DEFAULT_REGISTRY_FILE_TYPE_MAP,
+  },
 }).catch((error) => {
   console.error('[BOOT] [CRITICAL] Fatal boot error', error);
   const details = error instanceof Error
