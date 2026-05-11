@@ -2,7 +2,12 @@
 // sentryos is aliased in vite.config.ts to the live TypeScript source,
 // so no build step is required during development.
 import 'sentryos/style.css';
-import { createSentryOS, DEFAULT_REGISTRY_FILE_TYPE_MAP, DEFAULT_REGISTRY_ROLE_MAP } from 'sentryos';
+import {
+  createSentryOS,
+  DEFAULT_REGISTRY_FILE_TYPE_MAP,
+  DEFAULT_REGISTRY_ROLE_MAP,
+  USER_DEFAULT_PERMISSIONS,
+} from 'sentryos';
 import htmlViewPlugin from 'sentryos-plugin-html-view';
 import codeEditorPlugin from 'sentryos-plugin-code-editor';
 import luaRuntimePlugin from 'sentryos-plugin-lua-runtime';
@@ -17,6 +22,7 @@ createSentryOS({
   onRestart: () => location.reload(),
   pluginInstances: [htmlViewPlugin, codeEditorPlugin, luaRuntimePlugin],
   system: {
+    userDefaultPermissions: USER_DEFAULT_PERMISSIONS,
     appCatalogUrl: '/app.json',
     pluginListUrl: '/plugins.json',
     authConfigUrl: '/auth.config.json',

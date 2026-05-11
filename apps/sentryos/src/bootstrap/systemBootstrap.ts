@@ -212,7 +212,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     const envManager = kernel.resolve('environmentManager');
     const networkManager = kernel.resolve('networkManager');
     const authProvider = new AuthProvider(envManager, networkManager);
-    await authProvider.loadConfig(authConfigUrl ?? '/auth.config.json');
+    await authProvider.loadConfig(authConfigUrl);
     const languageManager = kernel.resolve('languageManager');
     const authResult = await lockScreen.show(authProvider, (key) => languageManager.t('lockscreen', key));
     kernel.set('loginUser', authResult.username);
