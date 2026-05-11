@@ -574,6 +574,10 @@ class DesktopShell {
   }
 
   getTaskbarMode(): TaskbarMode {
+    return this.taskbarMode;
+  }
+
+  getEffectiveTaskbarMode(): TaskbarMode {
     return this.effectiveTaskbarMode;
   }
 
