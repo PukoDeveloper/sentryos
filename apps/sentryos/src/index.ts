@@ -10,6 +10,10 @@
 //     container: document.getElementById('os-frame')!,
 //     onRestart: () => instance.shutdown().then(() => createSentryOS({ ... })),
 //     pluginInstances: [myPlugin],
+//     system: {
+//       appCatalogEntries: [],          // package mode: no built-in apps by default
+//       enableBuiltinKernelConsole: false,
+//     },
 //   });
 //
 // The host page is responsible for styling the container element

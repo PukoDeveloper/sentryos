@@ -223,8 +223,9 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   let catalogApps: RegisteredApplication[];
   let allRejectedApps: OsRejectedApp[] = [];
   try {
-    if (Array.isArray(appCatalogEntries) || typeof appCatalogUrl === 'string') {
-      const catalogResult = await loadApplicationCatalog(appCatalogEntries ?? appCatalogUrl);
+    const catalogSource = Array.isArray(appCatalogEntries) ? appCatalogEntries : appCatalogUrl;
+    if (catalogSource !== undefined) {
+      const catalogResult = await loadApplicationCatalog(catalogSource);
       if (!catalogResult.success || !catalogResult.data) {
         showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
         container.removeEventListener('contextmenu', handleContextMenu);
