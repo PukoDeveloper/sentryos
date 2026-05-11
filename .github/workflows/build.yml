@@ -1,4 +1,4 @@
-name: Build & Package
+name: Build Packages & Demo
 
 on:
   # 手動在 Actions 頁面觸發，可自訂版本標籤
@@ -35,8 +35,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - name: Build core packages
         run: pnpm run build
+
+      - name: Build demo project
+        run: pnpm run build:demo
 
       - name: Determine artifact name
         id: artifact_name
@@ -48,10 +51,10 @@ jobs:
           fi
           echo "name=sentryos-dist-${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload dist as artifact
+      - name: Upload demo dist as artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: dist/
+          path: apps/sentryos-demo/dist/
           # artifact 保留 90 天
           retention-days: 90

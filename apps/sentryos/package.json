@@ -10,15 +10,16 @@
     ".": {
       "types": "./dist/sentryos.d.ts",
       "import": "./dist/sentryos.js"
-    }
+    },
+    "./style.css": "./dist/sentryos.css"
   },
   "files": [
     "dist"
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build --mode lib",
-    "build:lib": "tsc && vite build --mode lib",
+    "build": "tsc && vite build --mode lib && cp src/style.css dist/sentryos.css",
+    "build:lib": "tsc && vite build --mode lib && cp src/style.css dist/sentryos.css",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

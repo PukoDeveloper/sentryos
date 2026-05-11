@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "pnpm --filter sentryos-demo dev",
     "build": "pnpm --filter sentryos-sdk build && pnpm --filter 'sentryos-plugin-*' --parallel build && pnpm --filter sentryos build",
+    "build:demo": "pnpm --filter sentryos-sdk build && pnpm --filter 'sentryos-plugin-*' --parallel build && pnpm --filter sentryos build && pnpm --filter sentryos-demo build",
     "build:sdk": "pnpm --filter sentryos-sdk build",
     "preview": "pnpm --filter sentryos-demo preview",
     "scaffold": "node packages/sentryos-create/index.js",

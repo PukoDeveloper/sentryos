@@ -43,8 +43,11 @@ pnpm install
 # 啟動開發伺服器
 pnpm dev
 
-# 建置（先建置 SDK，再建置主應用）
+# 建置核心 NPM 套件（sentryos + sdk + plugins）
 pnpm build
+
+# 建置 Demo 專案（可部署到 GitHub Pages）
+pnpm build:demo
 
 # 只建置 SDK
 pnpm build:sdk
@@ -70,7 +73,7 @@ pnpm scaffold:app
 
 ## Monorepo 結構
 
-本專案採用 **pnpm workspace** 管理，分為兩個套件：
+本專案採用 **pnpm workspace** 管理，核心套件與展示/建置專案分離：
 
 ```
 sentryos/                          # Monorepo 根目錄
@@ -78,12 +81,12 @@ sentryos/                          # Monorepo 根目錄
 ├── pnpm-workspace.yaml            # pnpm workspace 設定
 ├── tsconfig.base.json             # 共用 TypeScript 設定
 ├── apps/
-│   └── sentryos/                  # 主應用程式
+│   ├── sentryos/                  # sentryos NPM 套件（核心程式庫）
 │       ├── index.html
 │       ├── package.json
 │       ├── vite.config.ts
 │       ├── src/                   # 核心原始碼（見下方詳細結構）
-│       └── public/                # 靜態資源與內建應用
+│       └── public/                # 預設 Demo 用靜態資源與內建應用
 │           ├── app.json           # 應用程式目錄
 │           ├── plugins.json       # 插件目錄
 │           ├── apps/              # 內建應用程式
@@ -95,6 +98,7 @@ sentryos/                          # Monorepo 根目錄
 │           │   ├── image-viewer/
 │           │   └── stdlib/        # 標準函式庫
 │           └── plugins/           # 插件（lua-runtime、python-runtime、monaco-editor 等）
+│   └── sentryos-demo/             # 預設建置專案（可部署 GitHub Pages）
 └── packages/
     ├── sdk/                       # sentryos-sdk 套件
     │   ├── package.json
@@ -350,5 +354,4 @@ import { Permissions, Events } from 'sentryos-sdk';
 - **Pyodide 0.29** — CPython 編譯為 WASM，用於 Python 應用程式沙箱執行（插件 Runtime）
 - **Fengari** — 純 JS 的 Lua 5.3 實作，用於 Lua 應用程式執行（插件 Runtime）
 - **純 CSS** — 無框架依賴的桌面環境樣式
-
 

@@ -27,7 +27,7 @@ import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
 import { lockScreen } from '../ui/LockScreen';
 import { AuthProvider } from '../auth/AuthProvider';
-import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
+import { Events, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager, type PluginModule } from '../plugin/PluginManager';
 import type { SentryPlugin } from 'sentryos-sdk';
 import { LanguageManager } from '../language/LanguageManager';
@@ -48,7 +48,7 @@ export interface SentryOSOptions {
   onRestart?: () => void;
   /**
    * Pre-imported plugin modules to load at boot time.
-   * These are resolved before any plugins listed in `plugins.json`.
+   * These are resolved before any path-based plugins configured in `system`.
    */
   pluginInstances?: SentryPlugin[];
   /**
@@ -72,7 +72,42 @@ export interface SentryOSOptions {
    * ```
    */
   fileSystem?: (kernel: Kernel) => FileSystemAdapter;
-  /** Optional URL overrides for catalog / auth endpoints. */
+  /**
+   * System bootstrap configuration. By default no application catalog, plugin
+   * list, or built-in app registry is injected.
+   *
+   * Precedence rules:
+   * - `appCatalogEntries` takes precedence over `appCatalogUrl`.
+   * - `pluginPaths` takes precedence over `pluginListUrl`.
+   * - `system.*` URL fields take precedence over legacy `config.*`.
+   */
+  system?: {
+    /** Predefined permissions granted to the login user session. */
+    userDefaultPermissions?: string[];
+    /** URL of an app catalog JSON file (same format as `/app.json`). */
+    appCatalogUrl?: string;
+    /** Direct app catalog entries (same values as `app.json` array items). */
+    appCatalogEntries?: string[];
+    /** URL of a plugin list JSON file (same format as `/plugins.json`). */
+    pluginListUrl?: string;
+    /** Direct plugin module paths to load via PluginManager. */
+    pluginPaths?: string[];
+    /** URL of auth config JSON file. */
+    authConfigUrl?: string;
+    /** Whether to register the built-in kernel console app. */
+    enableBuiltinKernelConsole?: boolean;
+    /** manifestId -> system role defaults to seed SystemRegistry. */
+    defaultRegistryRoles?: Record<string, string>;
+    /** file extension -> default handler manifestId/mime to seed SystemRegistry. */
+    defaultRegistryFileTypes?: Record<string, { handler: string; mime?: string }>;
+  };
+  /**
+   * @deprecated Use `system` instead. Planned removal: v2.0.0.
+   * Legacy URL overrides for catalog / auth endpoints.
+   *
+   * Migration: move `config.authConfigUrl/appCatalogUrl/pluginListUrl`
+   * to `system.authConfigUrl/appCatalogUrl/pluginListUrl`.
+   */
   config?: {
     authConfigUrl?: string;
     appCatalogUrl?: string;
@@ -103,6 +138,16 @@ type BufferedLog = (source: string, level: Parameters<typeof bios.log>[1], messa
  */
 export async function createSentryOS(options: SentryOSOptions): Promise<SentryOSInstance> {
   const { container, onRestart = () => location.reload(), pluginInstances = [] } = options;
+  const systemConfig = options.system;
+  const appCatalogUrl = systemConfig?.appCatalogUrl ?? options.config?.appCatalogUrl;
+  const appCatalogEntries = systemConfig?.appCatalogEntries;
+  const pluginListUrl = systemConfig?.pluginListUrl ?? options.config?.pluginListUrl;
+  const pluginPaths = systemConfig?.pluginPaths;
+  const authConfigUrl = systemConfig?.authConfigUrl ?? options.config?.authConfigUrl;
+  const enableBuiltinKernelConsole = systemConfig?.enableBuiltinKernelConsole ?? false;
+  const userDefaultPermissions = systemConfig?.userDefaultPermissions ?? [];
+  const registryRoleMap = systemConfig?.defaultRegistryRoles ?? {};
+  const registryFileTypeMap = systemConfig?.defaultRegistryFileTypes ?? {};
 
   // Point the singletons at our container instead of the global `#app` element.
   bios.setContainer(container);
@@ -159,7 +204,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   // 1. Initialize kernel & core services
   let kernel: Kernel;
   try {
-    kernel = await initializeCore(bufferedLog, options.fileSystem);
+    kernel = await initializeCore(bufferedLog, options.fileSystem, userDefaultPermissions);
   } catch (err) {
     showSystemError('核心服務初始化失敗', err);
     container.removeEventListener('contextmenu', handleContextMenu);
@@ -175,7 +220,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     const envManager = kernel.resolve('environmentManager');
     const networkManager = kernel.resolve('networkManager');
     const authProvider = new AuthProvider(envManager, networkManager);
-    await authProvider.loadConfig();
+    await authProvider.loadConfig(authConfigUrl);
     const languageManager = kernel.resolve('languageManager');
     const authResult = await lockScreen.show(authProvider, (key) => languageManager.t('lockscreen', key));
     kernel.set('loginUser', authResult.username);
@@ -186,14 +231,20 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   let catalogApps: RegisteredApplication[];
   let allRejectedApps: OsRejectedApp[] = [];
   try {
-    const catalogResult = await loadApplicationCatalog();
-    if (!catalogResult.success || !catalogResult.data) {
-      showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
-      container.removeEventListener('contextmenu', handleContextMenu);
-      return createShutdownOnlyInstance(kernel, container, handleContextMenu);
+    const catalogSource = Array.isArray(appCatalogEntries) ? appCatalogEntries : appCatalogUrl;
+    if (catalogSource !== undefined) {
+      const catalogResult = await loadApplicationCatalog(catalogSource);
+      if (!catalogResult.success || !catalogResult.data) {
+        showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), catalogResult.error ?? 'UnknownError', kernel);
+        container.removeEventListener('contextmenu', handleContextMenu);
+        return createShutdownOnlyInstance(kernel, container, handleContextMenu);
+      }
+      catalogApps = catalogResult.data.apps;
+      allRejectedApps = catalogResult.data.rejected;
+    } else {
+      catalogApps = [];
+      allRejectedApps = [];
     }
-    catalogApps = catalogResult.data.apps;
-    allRejectedApps = catalogResult.data.rejected;
   } catch (err) {
     showSystemError(bootT(kernel, 'boot.catalogLoadFailed', '應用程式目錄載入失敗'), err, kernel);
     container.removeEventListener('contextmenu', handleContextMenu);
@@ -231,35 +282,41 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   const { applications, iconMap } = registerApplications(appManager, catalogApps);
 
   // Register built-in kernel console as a native application
-  appManager.registerBuiltin(BUILTIN_KERNEL_CONSOLE, {
-    name: 'System Terminal',
-    version: '1.0.0',
-    permissions: [],     // 權限由 userAppId 管理，不需 manifest 層權限
-    maxInstances: 8,
-  });
+  if (enableBuiltinKernelConsole) {
+    appManager.registerBuiltin(BUILTIN_KERNEL_CONSOLE, {
+      name: 'System Terminal',
+      version: '1.0.0',
+      permissions: [],     // 權限由 userAppId 管理，不需 manifest 層權限
+      maxInstances: 8,
+    });
 
-  const kernelConsoleEntry: RegisteredApplication = {
-    name: 'System Terminal',
-    version: '1.0.0',
-    permissions: [],
-    maxInstances: 8,
-    appId: BUILTIN_KERNEL_CONSOLE,
-    packageName: 'system',
-    entryPath: '',
-    mainPath: '',
-    icon: '/default-app-icon.svg',
-    runtimeType: 'Console',
-    autoStart: false,
-    hidden: false,
-  };
-  catalogApps.push(kernelConsoleEntry);
-  applications.push({ ...kernelConsoleEntry });
+    const kernelConsoleEntry: RegisteredApplication = {
+      name: 'System Terminal',
+      version: '1.0.0',
+      permissions: [],
+      maxInstances: 8,
+      appId: BUILTIN_KERNEL_CONSOLE,
+      packageName: 'system',
+      entryPath: '',
+      mainPath: '',
+      icon: '/default-app-icon.svg',
+      runtimeType: 'Console',
+      autoStart: false,
+      hidden: false,
+    };
+    catalogApps.push(kernelConsoleEntry);
+    applications.push({ ...kernelConsoleEntry });
+  }
 
   kernel.set('catalogApps', catalogApps);
   kernel.set('iconMap', iconMap);
 
   // 3.5  Populate system registry defaults
-  populateDefaultRegistry(kernel, catalogApps);
+  populateDefaultRegistry(kernel, catalogApps, {
+    includeBuiltinTerminal: enableBuiltinKernelConsole,
+    roleMap: registryRoleMap,
+    fileTypeMap: registryFileTypeMap,
+  });
 
   // 4. Mount desktop shell
   const mounted = desktopShell.mount(applications, container);
@@ -476,10 +533,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     }
 
     // 8b. Load path-based plugins from plugins.json
-    const pluginListUrl = options.config?.pluginListUrl ?? '/plugins.json';
-    const pluginListRes = await fetch(pluginListUrl);
-    if (pluginListRes.ok) {
-      const pluginPaths: string[] = await pluginListRes.json();
+    if (Array.isArray(pluginPaths)) {
       const result = await pluginManager.loadPlugins(pluginPaths);
       for (const path of result.loaded) {
         bufferedLog('BOOT', 'INFO', `Plugin loaded: ${path}`);
@@ -487,8 +541,22 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
       for (const { path, error } of result.failed) {
         bufferedLog('BOOT', 'WARN', `Plugin failed: ${path} — ${error}`);
       }
+    } else if (typeof pluginListUrl === 'string') {
+      const pluginListRes = await fetch(pluginListUrl);
+      if (pluginListRes.ok) {
+        const listFromUrl: string[] = await pluginListRes.json();
+        const result = await pluginManager.loadPlugins(listFromUrl);
+        for (const path of result.loaded) {
+          bufferedLog('BOOT', 'INFO', `Plugin loaded: ${path}`);
+        }
+        for (const { path, error } of result.failed) {
+          bufferedLog('BOOT', 'WARN', `Plugin failed: ${path} — ${error}`);
+        }
+      } else {
+        bufferedLog('BOOT', 'INFO', `Plugin list not found at ${pluginListUrl}, skipping plugin loading`);
+      }
     } else {
-      bufferedLog('BOOT', 'INFO', 'No plugins.json found, skipping plugin loading');
+      bufferedLog('BOOT', 'INFO', 'No plugin list configured, skipping plugin loading');
     }
   } catch (err) {
     bufferedLog('BOOT', 'WARN', `Plugin loading error: ${err instanceof Error ? err.message : String(err)}`);
@@ -565,7 +633,11 @@ function createShutdownOnlyInstance(
   };
 }
 
-async function initializeCore(bufferedLog: BufferedLog, fileSystemFactory?: (kernel: Kernel) => FileSystemAdapter): Promise<Kernel> {
+async function initializeCore(
+  bufferedLog: BufferedLog,
+  fileSystemFactory: ((kernel: Kernel) => FileSystemAdapter) | undefined,
+  userDefaultPermissions: string[],
+): Promise<Kernel> {
   await initializeQuickJS();
   bufferedLog('BOOT', 'INFO', 'QuickJS WASM runtime loaded');
 
@@ -582,8 +654,8 @@ async function initializeCore(bufferedLog: BufferedLog, fileSystemFactory?: (ker
   const systemAppId = initResult.data;
   kernel.set('systemAppId', systemAppId);
 
-  // 建立使用者權限實體（與系統分離，受 USER_DEFAULT_PERMISSIONS 約束）
-  const userResult = permissions.createUser(systemAppId, USER_DEFAULT_PERMISSIONS);
+  // 建立使用者權限實體（與系統分離，受可配置的 default permissions 約束）
+  const userResult = permissions.createUser(systemAppId, userDefaultPermissions);
   if (!userResult.success || typeof userResult.data !== 'string') {
     throw new Error('User session creation failed');
   }
@@ -690,7 +762,7 @@ function registerApplications(appManager: ApplicationManager, apps: RegisteredAp
 // ── Default registry population ────────────────────────────────
 
 /** manifest id → system role 對照表 */
-const ROLE_MAP: Record<string, string> = {
+export const DEFAULT_REGISTRY_ROLE_MAP: Record<string, string> = {
   'task-manager-app': 'task-manager',
   'file-manager-app': 'file-manager',
   'settings-app': 'settings',
@@ -698,7 +770,7 @@ const ROLE_MAP: Record<string, string> = {
 };
 
 /** 預設檔案類型 → manifest id 對照表 */
-const FILE_TYPE_MAP: Record<string, { handler: string; mime?: string }> = {
+export const DEFAULT_REGISTRY_FILE_TYPE_MAP: Record<string, { handler: string; mime?: string }> = {
   '.txt': { handler: 'text-manager-app', mime: 'text/plain' },
   '.md': { handler: 'text-manager-app', mime: 'text/markdown' },
   '.json': { handler: 'text-manager-app', mime: 'application/json' },
@@ -715,7 +787,13 @@ const FILE_TYPE_MAP: Record<string, { handler: string; mime?: string }> = {
   '.csv': { handler: 'text-manager-app', mime: 'text/csv' },
 };
 
-function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplication[]): void {
+type RegistryDefaults = {
+  includeBuiltinTerminal: boolean;
+  roleMap: Record<string, string>;
+  fileTypeMap: Record<string, { handler: string; mime?: string }>;
+};
+
+function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplication[], defaults: RegistryDefaults): void {
   const registry = kernel.resolve('systemRegistry');
   const appManager = kernel.resolve('appManager');
 
@@ -736,20 +814,22 @@ function populateDefaultRegistry(kernel: Kernel, catalogApps: RegisteredApplicat
   }
 
   // Terminal 特殊處理：使用 builtin id
-  registry.setDefaultApp('terminal', BUILTIN_KERNEL_CONSOLE);
+  if (defaults.includeBuiltinTerminal) {
+    registry.setDefaultApp('terminal', BUILTIN_KERNEL_CONSOLE);
+  }
 
   // 現在 appDefId 即為 manifestId，可直接使用
   const knownManifestIds = new Set(catalogApps.map(a => a.manifestId).filter(Boolean));
 
   // 設定角色預設值
-  for (const [manifestId, role] of Object.entries(ROLE_MAP)) {
+  for (const [manifestId, role] of Object.entries(defaults.roleMap)) {
     if (knownManifestIds.has(manifestId)) {
       registry.setDefaultApp(role, manifestId);
     }
   }
 
   // 設定檔案類型預設值
-  for (const [ext, { handler, mime }] of Object.entries(FILE_TYPE_MAP)) {
+  for (const [ext, { handler, mime }] of Object.entries(defaults.fileTypeMap)) {
     if (knownManifestIds.has(handler)) {
       registry.setFileTypeHandler(ext, handler, mime);
     }
