@@ -1135,10 +1135,28 @@ class DesktopShell {
     }
 
     if (this.folders.length === 0 && this.pinnedAppIds.length === 0) {
-      const hint = document.createElement('div');
-      hint.className = 'desktop-start-folder-empty';
-      hint.textContent = this.t('hint.addFromSearch');
-      this.startFolderList.appendChild(hint);
+      if (this.allApps.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'desktop-start-folder-empty';
+        hint.textContent = this.t('hint.addFromSearch');
+        this.startFolderList.appendChild(hint);
+        return;
+      }
+
+      for (const app of this.allApps) {
+        const sid = this.stableId(app);
+        const item = this.createAppItem(app);
+        item.draggable = true;
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('text/plain', sid);
+          e.dataTransfer?.setData('application/x-sentryos-source', 'search');
+        });
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.showSearchContextMenu(e, app);
+        });
+        this.startFolderList.appendChild(item);
+      }
       return;
     }
 
