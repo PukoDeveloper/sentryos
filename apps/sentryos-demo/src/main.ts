@@ -17,15 +17,26 @@ if (!container) {
   throw new Error('[BOOT] [CRITICAL] #app element not found — cannot mount SentryOS');
 }
 
+const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+const buildUrl = (path: string) => new URL(path, baseUrl).toString();
+
 createSentryOS({
   container,
   onRestart: () => location.reload(),
   pluginInstances: [htmlViewPlugin, codeEditorPlugin, luaRuntimePlugin],
   system: {
     userDefaultPermissions: USER_DEFAULT_PERMISSIONS,
-    appCatalogUrl: '/app.json',
-    pluginListUrl: '/plugins.json',
-    authConfigUrl: '/auth.config.json',
+    appCatalogEntries: [
+      buildUrl('apps/stdlib'),
+      buildUrl('apps/system'),
+      buildUrl('apps/utilities'),
+      buildUrl('apps/text-manager'),
+      buildUrl('apps/image-viewer'),
+      buildUrl('apps/developer-tools'),
+      buildUrl('pcode'),
+    ],
+    pluginPaths: [],
+    authConfigUrl: buildUrl('auth.config.json'),
     enableBuiltinKernelConsole: true,
     defaultRegistryRoles: DEFAULT_REGISTRY_ROLE_MAP,
     defaultRegistryFileTypes: DEFAULT_REGISTRY_FILE_TYPE_MAP,
