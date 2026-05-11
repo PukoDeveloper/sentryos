@@ -84,7 +84,8 @@ class DesktopShell {
   private taskbarTrigger: HTMLDivElement | null = null;
   private taskbarHideTimer: number | null = null;
   private taskbarModeChangeHandler: ((mode: TaskbarMode) => void) | null = null;
-  private viewportResizeHandler: (() => void) | null = null;
+  private compactViewportMediaQuery: MediaQueryList | null = null;
+  private compactViewportChangeHandler: (() => void) | null = null;
   private locale: string = 'zh-TW';
   private translator: ((key: string) => string) | null = null;
   private compactExpanded = false;
@@ -254,10 +255,17 @@ class DesktopShell {
     this.searchTabEl = searchTab;
     this.addFolderBtnEl = addFolderBtn;
     this.clockLabel = clock;
-    this.viewportResizeHandler = () => {
-      this.applyAdaptiveTaskbarMode();
-    };
-    window.addEventListener('resize', this.viewportResizeHandler);
+    if (typeof window.matchMedia === 'function') {
+      this.compactViewportMediaQuery = window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`);
+      this.compactViewportChangeHandler = () => {
+        this.applyAdaptiveTaskbarMode();
+      };
+      if (typeof this.compactViewportMediaQuery.addEventListener === 'function') {
+        this.compactViewportMediaQuery.addEventListener('change', this.compactViewportChangeHandler);
+      } else {
+        this.compactViewportMediaQuery.addListener(this.compactViewportChangeHandler);
+      }
+    }
     this.applyAdaptiveTaskbarMode(true);
 
     startButton.addEventListener('click', () => {
@@ -337,9 +345,14 @@ class DesktopShell {
       window.clearInterval(this.clockTimer);
       this.clockTimer = null;
     }
-    if (this.viewportResizeHandler) {
-      window.removeEventListener('resize', this.viewportResizeHandler);
-      this.viewportResizeHandler = null;
+    if (this.compactViewportMediaQuery && this.compactViewportChangeHandler) {
+      if (typeof this.compactViewportMediaQuery.removeEventListener === 'function') {
+        this.compactViewportMediaQuery.removeEventListener('change', this.compactViewportChangeHandler);
+      } else {
+        this.compactViewportMediaQuery.removeListener(this.compactViewportChangeHandler);
+      }
+      this.compactViewportMediaQuery = null;
+      this.compactViewportChangeHandler = null;
     }
 
     this.closeGroupPopup();
@@ -507,8 +520,9 @@ class DesktopShell {
 
   private resolveAdaptiveTaskbarMode(): TaskbarMode {
     const isCompactViewport =
-      typeof window.matchMedia === 'function'
-      && window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`).matches;
+      this.compactViewportMediaQuery?.matches
+      ?? (typeof window.matchMedia === 'function'
+        && window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`).matches);
     if (isCompactViewport && this.taskbarMode === 'docked') {
       return 'fullwidth';
     }
