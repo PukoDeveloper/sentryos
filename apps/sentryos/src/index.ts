@@ -11,7 +11,7 @@
 //     onRestart: () => instance.shutdown().then(() => createSentryOS({ ... })),
 //     pluginInstances: [myPlugin],
 //     system: {
-//       appCatalogEntries: [],          // package mode: no built-in apps by default
+//       appCatalogEntries: [], // package mode: no built-in apps by default
 //       enableBuiltinKernelConsole: false,
 //     },
 //   });

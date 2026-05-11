@@ -27,7 +27,7 @@ import { registerAllHostApis } from '../api';
 import { bios } from '../ui/Bios';
 import { lockScreen } from '../ui/LockScreen';
 import { AuthProvider } from '../auth/AuthProvider';
-import { Events, USER_DEFAULT_PERMISSIONS, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
+import { Events, BUILTIN_KERNEL_CONSOLE } from '../kernel/constants';
 import { PluginManager, type PluginModule } from '../plugin/PluginManager';
 import type { SentryPlugin } from 'sentryos-sdk';
 import { LanguageManager } from '../language/LanguageManager';
@@ -137,7 +137,7 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
   const pluginPaths = systemConfig?.pluginPaths;
   const authConfigUrl = systemConfig?.authConfigUrl ?? options.config?.authConfigUrl;
   const enableBuiltinKernelConsole = systemConfig?.enableBuiltinKernelConsole ?? false;
-  const userDefaultPermissions = systemConfig?.userDefaultPermissions ?? USER_DEFAULT_PERMISSIONS;
+  const userDefaultPermissions = systemConfig?.userDefaultPermissions ?? [];
   const registryRoleMap = systemConfig?.defaultRegistryRoles ?? {};
   const registryFileTypeMap = systemConfig?.defaultRegistryFileTypes ?? {};
 
