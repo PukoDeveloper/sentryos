@@ -33,7 +33,7 @@ createSentryOS({
       buildUrl('apps/text-manager'),
       buildUrl('apps/image-viewer'),
       buildUrl('apps/developer-tools'),
-      buildUrl('pcode'),
+      buildUrl('apps/pcode'),
     ],
     pluginPaths: [],
     authConfigUrl: buildUrl('auth.config.json'),
