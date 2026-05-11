@@ -326,8 +326,6 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
     return createShutdownOnlyInstance(kernel, container, handleContextMenu);
   }
 
-  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
-
   // Restore persisted theme settings
   {
     const fs = kernel.resolve('fileSystem');
@@ -482,6 +480,12 @@ export async function createSentryOS(options: SentryOSOptions): Promise<SentryOS
       launcher.launchApplication({ app, type: app.runtimeType });
     }
   });
+
+  // Now that the launch handler is wired, populate the Start menu.
+  // setApplications is intentionally deferred to this point so that
+  // clicking a Start-menu item before onLaunchRequest is set never
+  // results in a silent no-op launch.
+  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 
   // 7.5 Wire keyboard events (scoped to container, not the whole document)
   // 有焦點視窗時 → 直接 dispatch 給該程序的 onKeyboardEvent
@@ -859,7 +863,8 @@ function isRemoteUrl(url: string): boolean {
  * - 若使用者同意或無變更 → 更新 app-grants 快取
  *
  * catalogApps 陣列會被就地修改（splice 移除被拒絕的項目）。
- * 呼叫完成後，呼叫端應重新呼叫 desktopShell.setApplications() 以同步最新清單。
+ * 呼叫完成後，呼叫端必須在接好 onLaunchRequest 之後才呼叫
+ * desktopShell.setApplications()，以確保 launchHandler 已就緒。
  */
 async function checkRemoteAppConsent(
   kernel: Kernel,
@@ -953,7 +958,4 @@ async function checkRemoteAppConsent(
     bufferedLog('BOOT', 'INFO', `Removed declined remote app: ${manifestUrl}`);
   }
 
-  // Re-sync the desktop shell app list after removals
-  const desktopShell = kernel.resolve('desktopShell');
-  desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 }
