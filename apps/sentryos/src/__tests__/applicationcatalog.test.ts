@@ -15,7 +15,7 @@ describe('ApplicationCatalog', () => {
   });
 
   it('returns ManifestNotFound when all catalog entries fail to load', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => new Response('not found', { status: 404 })));
 
     const result = await loadApplicationCatalog(['apps/system', 'apps/utilities']);
 
@@ -24,7 +24,7 @@ describe('ApplicationCatalog', () => {
   });
 
   it('returns InvalidManifest when all loaded entries are unrecognized', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => okJson({ foo: 'bar' })));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => okJson({ foo: 'bar' })));
 
     const result = await loadApplicationCatalog(['apps/system']);
 
@@ -33,7 +33,7 @@ describe('ApplicationCatalog', () => {
   });
 
   it('returns ManifestNotFound when all remote manifests fail', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => new Response('not found', { status: 404 })));
 
     const result = await loadRemoteApplicationCatalog([
       'https://example.com/apps/system/manifest.json',
@@ -44,7 +44,7 @@ describe('ApplicationCatalog', () => {
   });
 
   it('returns InvalidManifest when all remote manifests are unrecognized', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => okJson({ bad: true })));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => okJson({ bad: true })));
 
     const result = await loadRemoteApplicationCatalog([
       'https://example.com/apps/system/manifest.json',
