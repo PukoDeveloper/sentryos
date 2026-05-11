@@ -518,11 +518,14 @@ class DesktopShell {
 
   // ── Floating taskbar ──────────────────────────────────────
 
-  private resolveAdaptiveTaskbarMode(): TaskbarMode {
-    const isCompactViewport =
-      this.compactViewportMediaQuery?.matches
+  private isCompactViewport(): boolean {
+    return this.compactViewportMediaQuery?.matches
       ?? (typeof window.matchMedia === 'function'
         && window.matchMedia(`(max-width: ${MOBILE_TASKBAR_BREAKPOINT}px)`).matches);
+  }
+
+  private resolveAdaptiveTaskbarMode(): TaskbarMode {
+    const isCompactViewport = this.isCompactViewport();
     if (isCompactViewport && this.taskbarMode === 'docked') {
       return 'fullwidth';
     }
@@ -565,10 +568,7 @@ class DesktopShell {
   }
 
   setTaskbarMode(mode: TaskbarMode): void {
-    if (mode === this.taskbarMode) {
-      this.applyAdaptiveTaskbarMode();
-      return;
-    }
+    if (mode === this.taskbarMode) return;
     this.taskbarMode = mode;
     this.applyAdaptiveTaskbarMode();
   }
