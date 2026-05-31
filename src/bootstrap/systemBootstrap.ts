@@ -187,16 +187,6 @@ async function bootstrapSystem(): Promise<void> {
 
   desktopShell.setApplications(catalogApps.filter(a => a.runtimeType !== 'Service' && a.runtimeType !== 'Library' && !a.hidden));
 
-  // Restore persisted theme settings
-  {
-    const fs = kernel.resolve('fileSystem');
-    const sysId = kernel.get('systemAppId');
-    const savedTheme = fs.read(sysId, 'sys', 'system-theme');
-    if (savedTheme.success && savedTheme.data) {
-      desktopShell.applyTheme(savedTheme.data.data as Parameters<typeof desktopShell.applyTheme>[0]);
-    }
-  }
-
   // Register notification overlay
   const notifContainer = kernel.resolve('notificationManager').createContainer();
   desktopShell.registerOverlay({ id: 'notification-layer', element: notifContainer, order: 100 });
@@ -250,11 +240,21 @@ async function bootstrapSystem(): Promise<void> {
   });
   kernel.register('windowManager', windowManager);
 
-  // Wire floating taskbar mode to window manager
+  // Wire floating taskbar mode to window manager (MUST register BEFORE restoring theme)
   desktopShell.onTaskbarModeChange((mode) => {
     const height = mode === 'docked' ? 96 : mode === 'fullwidth' ? 64 : 0;
     windowManager.setMaximizedTaskbarHeight(height);
   });
+
+  // Restore persisted theme settings (now that taskbar mode handler is registered)
+  {
+    const fs = kernel.resolve('fileSystem');
+    const sysId = kernel.get('systemAppId');
+    const savedTheme = fs.read(sysId, 'sys', 'system-theme');
+    if (savedTheme.success && savedTheme.data) {
+      desktopShell.applyTheme(savedTheme.data.data as Parameters<typeof desktopShell.applyTheme>[0]);
+    }
+  }
 
   const kernelConsole = new KernelConsole(kernel);
   kernel.register('kernelConsole', kernelConsole);
