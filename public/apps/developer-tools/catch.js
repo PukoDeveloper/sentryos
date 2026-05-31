@@ -1,18 +1,23 @@
 
 var counter = 0;
 
+function test(fn) {
+    OS.console.writeLine("... Catching global errors for debugging ... (" + (++counter) + ")");
+    runTimeout();
+}
+
+function runTimeout() {
+    setTimeout(test, 1);
+}
+
 function run() {
-    setTimeout(() => {
-        if (counter > 1000) {
-            counter = 0;
-            OS.console.clear();
-        }
+    setInterval(() => {
         OS.console.writeLine("... Catching global errors for debugging ... (" + (++counter) + ")");
-        run();
+        // run();
     }, 1);
 }
-run();
-
+// run();
+runTimeout();
 
 // var _loadResult = OS.env.loadLibrary('stdlib/UI Utils');
 // if (!_loadResult.success) {
@@ -28,3 +33,7 @@ run();
 //         }
 //     })
 // }
+
+function onConsoleInput(command) {
+    OS.console.writeLine("You entered: " + command);
+}

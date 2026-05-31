@@ -48,23 +48,26 @@ class ScriptRuntime extends BaseRuntime implements IRuntime {
             }
         }
 
-        runtimeProcess.runtime.setInterruptHandler(
-            shouldInterruptAfterDeadline(Date.now() + timeoutMs)
-        );
+        const interruptHandler = shouldInterruptAfterDeadline(Date.now() + timeoutMs);
+        runtimeProcess.runtime.setInterruptHandler(interruptHandler);
 
-        const startTime = performance.now();
-        const result = runtimeProcess.context.evalCode(code);
-        const duration = performance.now() - startTime;
-        this.monitor?.recordExecution(pid, duration);
+        try {
+            const startTime = performance.now();
+            const result = runtimeProcess.context.evalCode(code);
+            const duration = performance.now() - startTime;
+            this.monitor?.recordExecution(pid, duration);
 
-        if (result.error) {
-            const err = runtimeProcess.context.dump(result.error);
-            result.error.dispose();
-            return { success: false, error: 'RuntimeError', data: err };
+            if (result.error) {
+                const err = runtimeProcess.context.dump(result.error);
+                result.error.dispose();
+                return { success: false, error: 'RuntimeError', data: err };
+            }
+            const value = runtimeProcess.context.dump(result.value);
+            result.value.dispose();
+            return { success: true, data: value };
+        } finally {
+            runtimeProcess.runtime.removeInterruptHandler();
         }
-        const value = runtimeProcess.context.dump(result.value);
-        result.value.dispose();
-        return { success: true, data: value };
     }
 
     /** 在已存在的程序上下文中執行代碼（不重新注入 API），用於載入程式庫 */
